@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import Navbar from "@/components/navbar"
 import Card from "@/components/Card"
-
+import Link from "next/link"
 const App = () => {
   return (
     <main className="body">
@@ -18,7 +18,9 @@ const App = () => {
 
           <div className="flex gap-4 items-center my-15">
           <Button className="px-6 py-6 text-lg">Join for Free</Button>
-          <Button className="px-6 py-6 text-lg">See a demo</Button>
+         <Link href="/[boardId]" as="/new">
+         <Button className="px-6 py-6 text-lg">Start a Session</Button>
+         </Link> 
           </div>
         </div>
         
