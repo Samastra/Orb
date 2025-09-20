@@ -1,64 +1,50 @@
-"use client" 
-import {useState} from 'react'
-import {Tool} from '@/types/types'
+// components/ShapesMenu.tsx
+import React from 'react';
+
+// Define the same Tool type from your BoardPage
+type Tool = 
+  | "select"
+  | "stickyNote"
+  | "text"
+  | "rect"
+  | "pen"
+  | "connect"
+  | "sort"
+  | "join"
+  | "ellipse"
+  | "shapes"
+  | "triangle"
+  | "arrow"
+  | "circle";
 
 interface ShapesMenuProps {
-    activeTool: Tool | null;
-    setActiveTool: (tool:Tool) => void;
-    toolIcons:Record<string,string>;
+  onSelectShape: (shapeType: Tool) => void;
 }
 
-const ShapesMenu = ({ activeTool, setActiveTool, toolIcons }: ShapesMenuProps) => {
-    const [showShapes, setShowShapes] = useState(false);
+const ShapesMenu: React.FC<ShapesMenuProps> = ({ onSelectShape }) => {
+  const shapes = [
+    { type: 'rect', label: 'Rectangle', icon: '/image/square.svg' },
+    { type: 'circle', label: 'Circle', icon: '/image/circle.svg' },
+    { type: 'ellipse', label: 'Ellipse', icon: '/image/ellipse.svg' },
+    { type: 'triangle', label: 'Triangle', icon: '/image/triangle.svg' },
+    { type: 'arrow', label: 'Arrow', icon: '/image/arrow-icon.svg' },
+  ] as const;
 
-    return (
-    <div className="relative">
-        
-        
-        {/* main shapes button */}
-
-        <button onClick={() => setShowShapes((prev) => !prev)}
-            className={`flex items-center justify-center my-1 w-10 h-10 rounded 
-            ${activeTool === "shapes" ? "bg-blue-300" : "bg-white hover:bg-gray-200"}`}
-        >
-            <img src={toolIcons.shapes} alt="shapes" className="w-6 h-6"/>   
-            
-        </button>
-        
-        {/* dropdown */}
-
-                 {showShapes && (
-        <div className="absolute left-12 top-0 flex flex-col bg-white shadow-md rounded p-2 z-50">
+  return (
+    <div className="absolute left-20 top-0 bg-white p-3 rounded-md shadow-md z-20">
+      <div className="flex flex-col space-y-2 items-center">
+        {shapes.map((shape) => (
           <button
-            className="px-2 py-1 hover:bg-gray-100 text-sm text-left"
-            onClick={() => setActiveTool("rect")}
+            key={shape.type}
+            onClick={() => onSelectShape(shape.type as Tool)}
+            className="flex flex-col items-center rounded hover:bg-gray-100"
           >
-            Rectangle
-          </button>
-          <button
-            className="px-2 py-1 hover:bg-gray-100 text-sm text-left"
-            onClick={() => setActiveTool("ellipse")}
-          >
-            Ellipse
-          </button>
-          <button
-            className="px-2 py-1 hover:bg-gray-100 text-sm text-left"
-            onClick={() => setActiveTool("triangle")}
-          >
-            Triangle
-          </button>
-          <button
-            className="px-2 py-1 hover:bg-gray-100 text-sm text-left"
-            onClick={() => setActiveTool("arrow")}
-          >
-            arrow
-          </button>
-        </div>
-      )}
+            <img src={shape.icon} alt={shape.label} className="w-6 h-6 mb-1" />
+         </button>
+        ))}
+      </div>
     </div>
   );
-}
-             
- 
+};
 
-export default ShapesMenu
+export default ShapesMenu;
