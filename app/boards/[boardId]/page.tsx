@@ -3,23 +3,25 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Konva from "konva";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 
 import ShapesMenu from "@/components/ShapesMenu";
 import { Button } from "@/components/ui/button";
 import GridLayer from "@/components/gridLayer";
 import EditableTextComponent from "@/components/editableTextCompoent";
+import ResourceList from "@/components/ResourceList";
 
 // --- Dynamic imports for Konva ---
 const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
   ssr: false,
 });
-import { Layer, Transformer } from "react-konva";
+import { Layer, Transformer, Line } from "react-konva"; // Added Line import
 
 // ---------- Types ----------
 type Action =
   | { type: "add"; node: Konva.Shape | Konva.Group }
   | { type: "add-react-shape"; shapeType: string; data: any }
+  | { type: "add-line"; line: { tool: 'brush' | 'eraser', points: number[] } }
   | {
       type: "update";
       id: string;
@@ -27,7 +29,8 @@ type Action =
       newAttrs: Konva.NodeConfig;
     }
   | { type: "delete"; node: Konva.Shape | Konva.Group }
-  | { type: "delete-react-shape"; data: any };
+  | { type: "delete-react-shape"; data: any }
+  | { type: "delete-line"; lineIndex: number };
 
 type Tool =
   | "select"
@@ -37,12 +40,12 @@ type Tool =
   | "pen"
   | "connect"
   | "sort"
-  | "join"
   | "ellipse"
   | "shapes"
   | "triangle"
   | "arrow"
-  | "circle";
+  | "circle"
+  | "eraser";
 
 type ReactShape = {
   id: string;
@@ -66,8 +69,8 @@ const toolIcons: Record<Tool, string> = {
   shapes: "/image/shapes.svg",
   pen: "/image/edit-pen.svg",
   connect: "/image/connect-nodes2.svg",
-  sort: "/image/sort-icon.svg",
-  join: "/image/join-icon.svg",
+  eraser: "/image/eraser.svg",
+  sort: "/image/sort-grid.svg",
   circle: "/image/circle.svg",
   triangle: "/image/triangle.svg",
   arrow: "/image/arrow-icon.svg",
@@ -76,6 +79,11 @@ const toolIcons: Record<Tool, string> = {
 
 // ---------- Main Board Page ----------
 const BoardPage = () => {
+  // SIMPLIFIED CONNECTION STATE - No shape dependency!
+  const [connectionStart, setConnectionStart] = useState<{ x: number; y: number } | null>(null);
+  const [tempConnection, setTempConnection] = useState<Konva.Line | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  
   const stageRef = useRef<Konva.Stage | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
   const [scale, setScale] = useState(1);
@@ -88,6 +96,11 @@ const BoardPage = () => {
   const [showShapesMenu, setShowShapesMenu] = useState(false);
   const [reactShapes, setReactShapes] = useState<ReactShape[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  
+  const [drawingMode, setDrawingMode] = useState<'brush' | 'eraser'>('brush');
+  const [lines, setLines] = useState<Array<{tool: 'brush' | 'eraser', points: number[]}>>([]);
+  const isDrawing = useRef(false);
+  const [showResources, setShowResources] = useState(false);
 
   // ---------- Helpers ----------
   const addAction = (action: Action) => {
@@ -95,33 +108,351 @@ const BoardPage = () => {
     setUndoneActions([]);
   };
 
-  // Update transformer when selection changes
+  // Add cleanup effect to prevent memory leaks
   useEffect(() => {
-    if (!trRef.current || !stageRef.current) return;
+    return () => {
+      if (trRef.current) {
+        trRef.current.nodes([]);
+        trRef.current.destroy();
+      }
+    };
+  }, []);
+
+ const updateTransformer = useCallback(() => {
+  if (!trRef.current || !stageRef.current || !selectedNodeId) {
+    if (trRef.current) {
+      trRef.current.nodes([]);
+    }
+    return;
+  }
+
+  const drawLayer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
+  if (!drawLayer) return;
+
+  const node = drawLayer.findOne(`#${selectedNodeId}`);
+  
+  if (node && node instanceof Konva.Shape && node.isVisible()) {
+    try {
+      trRef.current.nodes([node]);
+      trRef.current.moveToTop();
+      drawLayer.batchDraw();
+    } catch (error) {
+      console.warn('Transformer error:', error);
+      trRef.current.nodes([]);
+    }
+  } else {
+    trRef.current.nodes([]);
+  }
+}, [selectedNodeId]);
+
+  useEffect(() => {
+    if (activeTool !== "select" && trRef.current) {
+      trRef.current.nodes([]);
+      setSelectedNodeId(null);
+    }
+  }, [activeTool]);
+
+  // ---------- SIMPLIFIED CONNECTION TOOL LOGIC ----------
+  const getStagePointerPosition = () => {
+    if (!stageRef.current) return null;
+    const pos = stageRef.current.getPointerPosition();
+    if (!pos) return null;
+    
+    return {
+      x: (pos.x - position.x) / scale,
+      y: (pos.y - position.y) / scale
+    };
+  };
+
+  // Start connection from current mouse position
+  const handleConnectionStart = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool !== "connect") return;
+    
+    e.evt.preventDefault();
+    const stagePos = getStagePointerPosition();
+    if (!stagePos) return;
+
+    setConnectionStart({ x: stagePos.x, y: stagePos.y });
+    setIsConnecting(true);
+    
+    const drawLayer = stageRef.current?.findOne(".draw-layer") as Konva.Layer;
+    if (drawLayer) {
+      const line = new Konva.Line({
+        points: [stagePos.x, stagePos.y, stagePos.x, stagePos.y],
+        stroke: '#007bff',
+        strokeWidth: 3,
+        lineCap: 'round',
+        lineJoin: 'round',
+        dash: [5, 5],
+        listening: false,
+      });
+      drawLayer.add(line);
+      setTempConnection(line);
+      drawLayer.batchDraw();
+    }
+  };
+
+  // Update connection line as mouse moves
+  const handleConnectionMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool !== "connect" || !isConnecting || !tempConnection || !connectionStart) return;
+    
+    const stagePos = getStagePointerPosition();
+    if (!stagePos) return;
+
+    // Update line to follow mouse
+    tempConnection.points([connectionStart.x, connectionStart.y, stagePos.x, stagePos.y]);
+    tempConnection.getLayer()?.batchDraw();
+  };
+
+  // Finalize connection
+  const handleConnectionEnd = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool !== "connect" || !isConnecting || !tempConnection || !connectionStart) return;
+    
+    const stagePos = getStagePointerPosition();
+    if (!stagePos) return;
+
+    const drawLayer = stageRef.current?.findOne(".draw-layer") as Konva.Layer;
+    
+    // Create permanent connection line
+    const connectionLine = new Konva.Arrow({
+      points: [connectionStart.x, connectionStart.y, stagePos.x, stagePos.y],
+      stroke: '#6c757d',
+      strokeWidth: 3,
+      fill: '#6c757d',
+      pointerLength: 12,
+      pointerWidth: 12,
+      // Connection lines should also only be draggable in select mode
+      draggable: (activeTool as string) === "select",
+      lineCap: 'round',
+      lineJoin: 'round',
+    });
+    
+    if (drawLayer) {
+      drawLayer.add(connectionLine);
+      connectionLine.on("click", handleShapeClick);
+      addAction({ type: "add", node: connectionLine });
+    }
+    
+    // Clean up temporary line
+    if (drawLayer && tempConnection) {
+      tempConnection.destroy();
+      drawLayer.batchDraw();
+    }
+    
+    setTempConnection(null);
+    setConnectionStart(null);
+    setIsConnecting(false);
+  };
+
+  // Visual feedback for connection tool
+  const handleConnectionHover = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool !== "connect" || isConnecting) return;
+    
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const container = stage.container();
+    container.style.cursor = 'crosshair';
+  };
+
+  // ---------- PEN TOOL LOGIC (KONVA LINE APPROACH) ----------
+  const handleDrawingMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool !== 'pen') return;
+
+    e.cancelBubble = true;
+    isDrawing.current = true;
+    
+    const stage = stageRef.current;
+    if (!stage) return;
+    
+    const pos = stage.getPointerPosition();
+    if (!pos) return;
+
+    // Start a new line
+    setLines(prev => [...prev, { 
+      tool: drawingMode, 
+      points: [pos.x, pos.y] 
+    }]);
+  };
+
+  const handleDrawingMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool !== 'pen' || !isDrawing.current) return;
+
+    e.cancelBubble = true;
+    
+    const stage = stageRef.current;
+    if (!stage) return;
+    
+    const point = stage.getPointerPosition();
+    if (!point) return;
+
+    // Add point to the current line
+    setLines(prev => {
+      if (prev.length === 0) return prev;
+      
+      const lastLine = prev[prev.length - 1];
+      const updatedLine = {
+        ...lastLine,
+        points: lastLine.points.concat([point.x, point.y])
+      };
+      
+      return [...prev.slice(0, -1), updatedLine];
+    });
+  };
+
+  const handleDrawingMouseUp = () => {
+    if (activeTool !== 'pen') return;
+    
+    if (isDrawing.current) {
+      // Add to undo history when finishing a line
+      const lastLine = lines[lines.length - 1];
+      if (lastLine) {
+        addAction({ type: "add-line", line: lastLine });
+      }
+    }
+    
+    isDrawing.current = false;
+  };
+
+  const handleDrawingTouchStart = (e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (activeTool !== 'pen') return;
+    handleDrawingMouseDown(e as any);
+  };
+
+  const handleDrawingTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (activeTool !== 'pen') return;
+    handleDrawingMouseMove(e as any);
+  };
+
+  const handleDrawingTouchEnd = () => {
+    if (activeTool !== 'pen') return;
+    handleDrawingMouseUp();
+  };
+
+  // Centralized mouse handlers
+  const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool === 'pen') {
+      handleDrawingMouseDown(e);
+    } else if (activeTool === 'connect') {
+      handleConnectionStart(e);
+    } else if (activeTool === 'select') {
+      if(!(e.target instanceof Konva.Transformer) && e.target !== e.target.getStage()) {
+        handleShapeClick(e);
+      }
+    }
+  };
+
+  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool === 'pen') {
+      handleDrawingMouseMove(e);
+    } else if (activeTool === 'connect') {
+      handleConnectionMove(e);
+      handleConnectionHover(e);
+    }
+  };
+
+  const handleMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (activeTool === 'pen') {
+      handleDrawingMouseUp();
+    } else if (activeTool === 'connect') {
+      handleConnectionEnd(e);
+    }
+  };
+
+  const handleTouchStart = (e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (activeTool === 'pen') {
+      handleDrawingTouchStart(e);
+    }
+  };
+
+  const handleTouchEnd = (e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (activeTool === 'pen') {
+      handleDrawingTouchEnd();
+    }
+  };
+
+  const handleTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
+    if (activeTool === 'pen') {
+      handleDrawingTouchMove(e);
+    }
+  };
+
+  // Tool change handler
+  const handleToolChange = (tool: Tool | null) => {
+    // Clean up drawing state when switching away from pen
+    if (activeTool === 'pen' && tool !== 'pen') {
+      isDrawing.current = false;
+    }
+    
+    setActiveTool(tool);
+    
+    if (!stageRef.current) return;
     
     const drawLayer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
     if (!drawLayer) return;
 
-    if (selectedNodeId) {
-      // Check if selected node is a React shape or Konva shape
-      const isReactShape = reactShapes.some(shape => shape.id === selectedNodeId);
-      
-      if (!isReactShape) {
-        const node = drawLayer.findOne(`#${selectedNodeId}`);
-        if (node) {
-          trRef.current.nodes([node]);
-          drawLayer.batchDraw();
+    // Update draggable state for all shapes
+    const shapes = drawLayer.find((node: Konva.Node) => 
+      node instanceof Konva.Shape && 
+      !(node instanceof Konva.Transformer) &&
+      node.name() === 'selectable-shape'
+    ) as unknown as Konva.Shape[];
+    
+    shapes.forEach((shape: Konva.Shape) => {
+      shape.draggable(tool === "select");
+    });
+    
+    // Clear transformer when switching away from select tool
+    if (tool !== "select" && trRef.current) {
+      trRef.current.nodes([]);
+      setSelectedNodeId(null);
+    }
+    
+    // Update cursor
+    const container = stageRef.current.container();
+    container.style.cursor = tool === "connect" ? 'crosshair' : 
+                            tool === "select" ? 'move' : 
+                            tool === "pen" ? 'crosshair' : 'default';
+    
+    drawLayer.batchDraw();
+  };
+
+  // Update transformer when selection changes
+  useEffect(() => {
+    if (!trRef.current || !stageRef.current) return;
+    
+    // Clear transformer if no selection
+    if (!selectedNodeId) {
+      trRef.current.nodes([]);
+      return;
+    }
+
+    const drawLayer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
+    if (!drawLayer) return;
+
+    const node = drawLayer.findOne(`#${selectedNodeId}`);
+    
+    if (node && node instanceof Konva.Shape && node.isVisible()) {
+      try {
+        // Small delay to prevent recursion
+        setTimeout(() => {
+          if (trRef.current) {
+            trRef.current.nodes([node]);
+            drawLayer.batchDraw();
+          }
+        }, 0);
+      } catch (error) {
+        console.warn('Transformer setup error:', error);
+        if (trRef.current) {
+          trRef.current.nodes([]);
         }
-      } else {
-        // For React shapes, we handle selection visually within the component
-        trRef.current.nodes([]);
-        drawLayer.batchDraw();
       }
     } else {
-      trRef.current.nodes([]);
-      drawLayer.batchDraw();
+      if (trRef.current) {
+        trRef.current.nodes([]);
+      }
     }
-  }, [selectedNodeId, reactShapes]);
+  }, [selectedNodeId]);
 
   // Undo
   const undo = () => {
@@ -144,6 +475,9 @@ const BoardPage = () => {
       case "add-react-shape":
         setReactShapes((prev) => prev.filter(shape => shape.id !== lastAction.data.id));
         break;
+      case "add-line":
+        setLines(prev => prev.slice(0, -1));
+        break;
       case "update":
         const updateTarget = drawLayer.findOne(`#${lastAction.id}`);
         if (updateTarget) {
@@ -157,6 +491,18 @@ const BoardPage = () => {
         break;
       case "delete-react-shape":
         setReactShapes((prev) => [...prev, lastAction.data]);
+        break;
+      case "delete-line":
+        // Restore the deleted line using its index from undoneActions
+        if (lastAction.lineIndex !== undefined) {
+          const deletedLine = undoneActions[undoneActions.length - 1] as any;
+          if (lines[lastAction.lineIndex]) {
+            setLines(prev => {
+              const restoredLine = prev[lastAction.lineIndex];
+              return [...prev, restoredLine];
+            });
+          }
+        }
         break;
     }
   };
@@ -179,6 +525,9 @@ const BoardPage = () => {
       case "add-react-shape":
         setReactShapes((prev) => [...prev, lastAction.data]);
         break;
+      case "add-line":
+        setLines(prev => [...prev, lastAction.line]);
+        break;
       case "update":
         const updateTarget = drawLayer.findOne(`#${lastAction.id}`);
         if (updateTarget) {
@@ -196,23 +545,52 @@ const BoardPage = () => {
       case "delete-react-shape":
         setReactShapes((prev) => prev.filter(shape => shape.id !== lastAction.data.id));
         break;
+      case "delete-line":
+        setLines(prev => prev.filter((_, index) => index !== lastAction.lineIndex));
+        break;
     }
   };
 
-  // ---------- Shape Handling ----------
-  const handleShapeClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const node = e.target;
-    if (!(node instanceof Konva.Shape || node instanceof Konva.Group)) return;
-    
+  // Shape Handling
+ const handleShapeClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  // Don't select if we're not in select mode
+  if (activeTool !== 'select') {
+    setSelectedNodeId(null);
+    if (trRef.current) {
+      trRef.current.nodes([]);
+    }
+    return;
+  }
+
+  const node = e.target;
+  
+  // If clicking on transformer itself, do nothing
+  if (node instanceof Konva.Transformer) {
+    return;
+  }
+
+  // Clicked on stage or non-shape object - deselect
+  if (node instanceof Konva.Stage || !(node instanceof Konva.Shape)) {
+    setSelectedNodeId(null);
+    if (trRef.current) {
+      trRef.current.nodes([]);
+    }
+    return;
+  }
+
+  // Prevent event from bubbling to stage
+  e.cancelBubble = true;
+
+  // Only update if selection actually changed
+  if (selectedNodeId !== node.id()) {
     setSelectedNodeId(node.id());
-    e.cancelBubble = true; // Prevent event from propagating to stage
-  };
-
-  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (e.target === e.target.getStage()) {
-      setSelectedNodeId(null);
-    }
-  };
+    
+    // Force immediate transformer update
+    setTimeout(() => {
+      updateTransformer();
+    }, 0);
+  }
+};
 
   const addShape = (type: Tool) => {
     if (!stageRef.current) return;
@@ -226,28 +604,45 @@ const BoardPage = () => {
     };
 
     let shape: Konva.Shape | null = null;
+    const shapeId = `shape-${Date.now()}`;
 
     switch (type) {
       case "rect":
         shape = new Konva.Rect({
-          id: `shape-${Date.now()}`,
+          id: shapeId,
           x: center.x - 50,
           y: center.y - 50,
           width: 100,
           height: 100,
           fill: "#aae3ff",
-          draggable: true,
+          draggable: activeTool === "select",
+          name: 'selectable-shape',
+        });
+        break;
+
+      case "arrow":
+        shape = new Konva.Arrow({
+          id: shapeId,
+          points: [center.x, center.y, center.x + 100, center.y],
+          pointerLength: 10,
+          pointerWidth: 10,
+          fill: "black",
+          stroke: "black",
+          strokeWidth: 2,
+          draggable: activeTool === "select",
+          name: 'selectable-shape'
         });
         break;
 
       case "circle":
         shape = new Konva.Circle({
-          id: `shape-${Date.now()}`,
+          id: shapeId,
           x: center.x,
           y: center.y,
           radius: 50,
-          fill: "blue",
-          draggable: true,
+          fill: "#aae3ff",
+          draggable: activeTool === "select",
+          name: 'selectable-shape'
         });
         break;
 
@@ -263,30 +658,9 @@ const BoardPage = () => {
         });
         break;
 
-      case "triangle":
-        shape = new Konva.Line({
-          id: `shape-${Date.now()}`,
-          x: center.x,
-          y: center.y,
-          points: [0, 0, 50, 100, 100, 0],
-          closed: true,
-          fill: "blue",
-          draggable: true,
-        });
-        break;
-
-      case "arrow":
-        shape = new Konva.Arrow({
-          id: `shape-${Date.now()}`,
-          points: [center.x, center.y, center.x + 100, center.y],
-          pointerLength: 10,
-          pointerWidth: 10,
-          fill: "black",
-          stroke: "black",
-          strokeWidth: 2,
-          draggable: true,
-        });
-        break;
+      case "pen":
+        setActiveTool("pen");
+        return;
 
       case "text":
         const newTextId = `text-${Date.now()}`;
@@ -301,7 +675,7 @@ const BoardPage = () => {
         };
         setReactShapes(prev => [...prev, newTextShape]);
         addAction({ type: "add-react-shape", shapeType: 'text', data: newTextShape });
-        return; // Return early to avoid adding to Konva layer
+        return;
 
       default:
         return;
@@ -312,10 +686,15 @@ const BoardPage = () => {
       drawLayer.add(shape);
       drawLayer.batchDraw();
       addAction({ type: "add", node: shape });
+
+      // Auto-select the new shape if in select mode
+      if (activeTool === "select") {
+        setSelectedNodeId(shapeId);
+      }
     }
   };
 
-  // ---------- Zoom & Pan ----------
+  // Zoom & Pan
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
     const scaleBy = 1.05;
@@ -347,10 +726,47 @@ const BoardPage = () => {
     setPosition(newPos);
   };
 
-  // ---------- JSX ----------
   return (
     <div className="relative w-screen h-screen bg-gray-50">
-      {/* Top navbar */}
+      {showResources && (
+        <div className="absolute top-20 right-0 z-10 w-80 p-5 mr-4 mb-4 h-auto rounded-md bg-white shadow-[0_0_30px_rgba(0,0,0,0.10)] border-l">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-semibold text-lg">Related Resources</h2>
+            <button className="bg-grey-300 p-2 rounded-full" onClick={() => setShowResources(false)}>✕</button>
+          </div>
+          <div className="bg-gray-200 rounded-md p-3">
+            <div className="space-y-4 text-sm">
+              <section>
+                <h3 className="font-bold">📚 Books</h3>
+                <ul className="list-disc list-inside">
+                  <li><a href="#">Book 1</a></li>
+                  <li><a href="#">Book 2</a></li>
+                </ul>
+              </section>
+              <section>
+                <h3 className="font-bold">🌐 Websites</h3>
+                <ul className="list-disc list-inside">
+                  <li><a href="#">Resource 1</a></li>
+                </ul>
+              </section>
+              <section>
+                <h3 className="font-bold">🎥 Videos</h3>
+                <ul className="list-disc list-inside">
+                  <li><a href="#">Vector Tutorial</a></li>
+                </ul>
+              </section>
+              <section>
+                <h3 className="font-bold">📝 Public Boards</h3>
+                <ul className="list-disc list-inside">
+                  <li>Board 1</li>
+                  <li>Board 2</li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="flex items-center justify-between gap-4">
         <div className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between bg-white px-6 py-3 shadow-md">
           <div className="flex items-center gap-3">
@@ -360,12 +776,11 @@ const BoardPage = () => {
             <Link href={"/"}>Orb</Link>
             <p>- Vector(physics)-Study</p>
           </div>
-
           <div className="flex items-center gap-3">
             <button>
               <img src="/image/mic.svg" alt="microphone" />
             </button>
-            <button>
+            <button onClick={() => setShowResources(!showResources)}>
               <img src="/image/review-bubble.svg" alt="recommendations" />
             </button>
             <Button>Invite</Button>
@@ -374,12 +789,10 @@ const BoardPage = () => {
         </div>
       </section>
 
-      {/* Tool bar */}
       <div className="absolute left-0 top-20 flex flex-col items-center">
         <div className="z-10 flex flex-col items-center space-y-4 bg-white p-3 m-5 rounded-md shadow-md">
-          {/* Select */}
           <button
-            onClick={() => setActiveTool("select")}
+            onClick={() => handleToolChange("select")}
             className={`flex items-center justify-center my-1 w-10 h-10 rounded ${
               activeTool === "select" ? "bg-blue-300" : "hover:bg-gray-300"
             }`}
@@ -387,7 +800,6 @@ const BoardPage = () => {
             <img src={toolIcons["select"]} alt="select" className="w-6 h-6" />
           </button>
 
-          {/* Text */}
           <button
             onClick={() => addShape("text")}
             className="flex items-center justify-center my-1 w-10 h-10 rounded hover:bg-gray-300"
@@ -395,7 +807,53 @@ const BoardPage = () => {
             <img src={toolIcons["text"]} alt="text" className="w-6 h-6" />
           </button>
 
-          {/* Shapes menu */}
+          <button
+            onClick={() => addShape("stickyNote")}
+            className="flex items-center justify-center my-1 w-10 h-10 rounded hover:bg-gray-300"
+          >
+            <img src={toolIcons["stickyNote"]} alt="sticky-note" className="w-6 h-6" />
+          </button>
+
+          <button
+            onClick={() => {
+              handleToolChange("pen");
+              setDrawingMode("brush");
+            }}
+            className={`flex items-center justify-center my-1 w-10 h-10 rounded ${
+              activeTool === "pen" && drawingMode === "brush" ? "bg-blue-300" : "hover:bg-gray-300"
+            }`}
+          >
+            <img src="/image/edit-pen.svg" alt="pen" className="w-6 h-6" />
+          </button>
+
+          <button
+            onClick={() => {
+              handleToolChange("pen");
+              setDrawingMode("eraser");
+            }}
+            className={`flex items-center justify-center my-1 w-10 h-10 rounded ${
+              activeTool === "pen" && drawingMode === "eraser" ? "bg-blue-300" : "hover:bg-gray-300"
+            }`}
+          >
+            <img src="/image/eraser.svg" alt="eraser" className="w-6 h-6" />
+          </button>
+
+          <button
+            onClick={() => addShape("sort")}
+            className="flex items-center justify-center my-1 w-10 h-10 rounded hover:bg-gray-300"
+          >
+            <img src={toolIcons["sort"]} alt="sort" className="w-6 h-6" />
+          </button>
+
+          <button
+            onClick={() => handleToolChange("connect")}
+            className={`flex items-center justify-center my-1 w-10 h-10 rounded ${
+              activeTool === "connect" ? "bg-blue-300" : "hover:bg-gray-300"
+            }`}
+          >
+            <img src={toolIcons["connect"]} alt="connect" className="w-6 h-6" />
+          </button>
+
           <button
             onClick={() => setShowShapesMenu((prev) => !prev)}
             className={`flex items-center justify-center my-1 w-10 h-10 rounded ${
@@ -415,7 +873,6 @@ const BoardPage = () => {
           )}
         </div>
 
-        {/* Undo/redo */}
         <div className="z-10 flex flex-col items-center space-y-4 bg-white p-3 m-5 rounded-md shadow-md">
           <button
             onClick={undo}
@@ -432,14 +889,12 @@ const BoardPage = () => {
         </div>
       </div>
 
-      {/* Zoom */}
       <div className="absolute z-10 bottom-0 right-0 flex items-center bg-white rounded-md m-4 p-3 shadow-md">
         <img src="/image/connect-nodes2.svg" alt="zoom-out" />
         <p>{Math.round(scale * 100)}%</p>
         <img src="/image/add-icon.svg" alt="zoom-in" />
       </div>
 
-      {/* Stage */}
       <div className="absolute inset-0 z-0">
         <Stage
           width={typeof window !== "undefined" ? window.innerWidth : 800}
@@ -449,9 +904,9 @@ const BoardPage = () => {
           x={position.x}
           y={position.y}
           onWheel={handleWheel}
-          onClick={handleStageClick}
-          onTap={handleStageClick}
-          draggable={activeTool === "select"}
+          onClick={handleShapeClick}
+          onTap={handleShapeClick}
+          
           ref={(node) => {
             if (node) {
               stageRef.current = node;
@@ -459,49 +914,102 @@ const BoardPage = () => {
             }
           }}
           className="bg-white cursor-move"
+          onMouseDown={
+            (e) =>{
+              if(activeTool === "select" && e.target === e.target.getStage()){
+                setSelectedNodeId(null);
+                if(trRef.current){
+                  trRef.current.nodes([]);
+                }
+              }
+              handleMouseDown(e)
+            }
+            }
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
+          draggable={activeTool === "select"}
         >
           <GridLayer stage={stageInstance} baseSize={30} color="#d6d4d4ff" />
           <Layer name="draw-layer">
-            {/* Transformer for Konva shapes */}
+
+            {/* Render all the drawn lines */}
+                  {lines.map((line, i) => (
+                    <Line
+                      key={i}
+                      points={line.points}
+                      stroke={line.tool === 'brush' ? '#000000' : '#ffffff'}
+                      strokeWidth={5}
+                      tension={0.5}
+                      lineCap="round"
+                      lineJoin="round"
+                      globalCompositeOperation={
+                        line.tool === 'eraser' ? 'destination-out' : 'source-over'
+                      }
+                      listening={false} // Don't interfere with other tools
+                    />
+                  ))}
+
+            {reactShapes.map((shapeData) => {
+              if (shapeData.type === 'text') {
+                return (
+                  <EditableTextComponent
+                    key={shapeData.id}
+                    id={shapeData.id}
+                    x={shapeData.x}
+                    y={shapeData.y}
+                    text={shapeData.text || "Double click to edit"}
+                    fontSize={shapeData.fontSize || 20}
+                    fill={shapeData.fill || "black"}
+                    isSelected={selectedNodeId === shapeData.id}
+                    activeTool={activeTool}
+                    onSelect={() => {
+                      if(activeTool === "select"){
+                        setSelectedNodeId(shapeData.id)
+                      }
+                    }}
+                    onUpdate={(newAttrs) => {
+                      setReactShapes(prev => 
+                        prev.map(shape => 
+                          shape.id === shapeData.id 
+                            ? { ...shape, ...newAttrs }
+                            : shape
+                        )
+                      );
+                    }}
+                  />
+                );
+              }
+              return null;
+            })}
+
             <Transformer
               ref={trRef}
-              enabledAnchors={["top-left", "middle-top", "top-right", "middle-right","middle-left","middle-bottom", "bottom-right", "bottom-left"]}
+              enabledAnchors={[
+                "top-left", "top-right", 
+                "bottom-left", "bottom-right",
+                "middle-top", "middle-bottom", 
+                "middle-left", "middle-right"
+              ]}
               boundBoxFunc={(oldBox, newBox) => ({
                 ...newBox,
-                width: Math.max(30, newBox.width),
-                height: Math.max(30, newBox.height),
+                width: Math.max(20, newBox.width),
+                height: Math.max(20, newBox.height),
               })}
+              keepRatio={false}
+              rotateEnabled={true}
+              resizeEnabled={true}
+              anchorSize={10}
+              anchorStrokeWidth={1}
+              borderStroke="#0099e5"
+              borderStrokeWidth={1}
+              anchorCornerRadius={4}
+              anchorStroke="#0099e5"
+              anchorFill="#ffffff"
+              name="no-select"
             />
-            {/* Render React-powered shapes (like editable text) */}
-          
-                  {reactShapes.map((shapeData) => {
-                    if (shapeData.type === 'text') {
-                      return (
-                        <EditableTextComponent
-                          key={shapeData.id}
-                          id={shapeData.id}
-                          x={shapeData.x}
-                          y={shapeData.y}
-                          text={shapeData.text || "Double click to edit"}
-                          fontSize={shapeData.fontSize || 20}
-                          fill={shapeData.fill || "black"}
-                          isSelected={selectedNodeId === shapeData.id}
-                          activeTool={activeTool} // Make sure this is passed
-                          onSelect={() => setSelectedNodeId(shapeData.id)}
-                          onUpdate={(newAttrs) => {
-                            setReactShapes(prev => 
-                              prev.map(shape => 
-                                shape.id === shapeData.id 
-                                  ? { ...shape, ...newAttrs }
-                                  : shape
-                              )
-                            );
-                          }}
-                        />
-                      );
-                    }
-                    return null;
-                  })}
           </Layer>
         </Stage>
       </div>

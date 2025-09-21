@@ -55,7 +55,7 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
         if (activeTool === 'text' && isHovered) {
           container.style.cursor = 'text';
         } else if (isHovered) {
-          container.style.cursor = 'pointer';
+          container.style.cursor = `url(https://www.flaticon.com/free-icons/cursor), auto`;
         } else {
           container.style.cursor = 'default';
         }

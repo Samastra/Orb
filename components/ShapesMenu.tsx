@@ -10,7 +10,6 @@ type Tool =
   | "pen"
   | "connect"
   | "sort"
-  | "join"
   | "ellipse"
   | "shapes"
   | "triangle"
@@ -27,7 +26,8 @@ const ShapesMenu: React.FC<ShapesMenuProps> = ({ onSelectShape }) => {
     { type: 'circle', label: 'Circle', icon: '/image/circle.svg' },
     { type: 'ellipse', label: 'Ellipse', icon: '/image/ellipse.svg' },
     { type: 'triangle', label: 'Triangle', icon: '/image/triangle.svg' },
-    { type: 'arrow', label: 'Arrow', icon: '/image/arrow-icon.svg' },
+    { type: 'arrow', label: 'Arrow', icon: '/image/line.svg' },
+ 
   ] as const;
 
   return (
@@ -39,8 +39,21 @@ const ShapesMenu: React.FC<ShapesMenuProps> = ({ onSelectShape }) => {
             onClick={() => onSelectShape(shape.type as Tool)}
             className="flex flex-col items-center rounded hover:bg-gray-100"
           >
-            <img src={shape.icon} alt={shape.label} className="w-6 h-6 mb-1" />
-         </button>
+            <img
+              src={shape.icon}
+              alt={shape.label}
+              className="w-5 h-5 mb-1"
+              onError={e => {
+                e.currentTarget.style.display = 'none';
+                const label = document.createElement('span');
+                label.textContent = shape.label;
+                label.className = 'text-xs text-gray-500 mb-1';
+                e.currentTarget.parentNode?.appendChild(label);
+              }}
+            />
+            {/* Always show label below icon for accessibility */}
+            <span className="text-xs text-gray-500 mb-1">{shape.label}</span>
+          </button>
         ))}
       </div>
     </div>
