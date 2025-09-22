@@ -1,54 +1,41 @@
-// components/ResourceList.tsx
-"use client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import ResourceCard from "./resourceCard"
 
-import { useEffect } from "react";
 
-interface RelatedResourcesPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export default function RelatedResourcesPanel({ isOpen, onClose }: RelatedResourcesPanelProps) {
-  if (!isOpen) return null;
-
+const ResourceList = () => {
   return (
-    <div className="fixed top-16 right-4 w-80 h-[80vh] bg-white shadow-xl rounded-2xl border p-4 overflow-y-auto z-50">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="font-semibold text-lg">Related Resources</h2>
-        <button onClick={onClose} className="text-gray-500 hover:text-black">✕</button>
+    <Tabs defaultValue="books" className=" mx-3">
+      <div className="mx-1">
+      <TabsList>
+        <TabsTrigger value="books">Books</TabsTrigger>
+        <TabsTrigger value="videos">Videos</TabsTrigger>
+        <TabsTrigger value="websites">Websites</TabsTrigger>
+        <TabsTrigger value="boards">Boards</TabsTrigger>
+      </TabsList>
+      <div className="border border-gray-300 rounded-lg p-1 mt-4 mx-auto h-96 overflow-y-auto">
+      <TabsContent value="books">
+
+        <ResourceCard heading="Book Title" body="Book Description"  alt="Book Image" />
+
+      </TabsContent>
+      <TabsContent value="videos">
+        <ResourceCard heading="Video Title" body="Video Description"  alt="Video Image" />
+
+      </TabsContent>
+      <TabsContent value="websites">
+        <ResourceCard heading="Website Title" body="Website Description"  alt="Website Image" />
+
+      </TabsContent>
+      <TabsContent value="boards">
+        <ResourceCard heading="Board Title" body="Board Description"  alt="Board Image" />
+
+      </TabsContent>
+
       </div>
 
-      <div className="space-y-4">
-        <section>
-          <h3 className="text-sm font-bold">📚 Books</h3>
-          <ul className="list-disc list-inside text-sm">
-            <li>Book 1 (link)</li>
-            <li>Book 2 (link)</li>
-          </ul>
-        </section>
-
-        <section>
-          <h3 className="text-sm font-bold">🌐 Websites</h3>
-          <ul className="list-disc list-inside text-sm">
-            <li><a href="#">Physics Resource</a></li>
-          </ul>
-        </section>
-
-        <section>
-          <h3 className="text-sm font-bold">🎥 Videos</h3>
-          <ul className="list-disc list-inside text-sm">
-            <li><a href="#">Vector Explained (YouTube)</a></li>
-          </ul>
-        </section>
-
-        <section>
-          <h3 className="text-sm font-bold">📝 Public Boards</h3>
-          <ul className="list-disc list-inside text-sm">
-            <li>Board 1</li>
-            <li>Board 2</li>
-          </ul>
-        </section>
       </div>
-    </div>
-  );
+    </Tabs>
+  )
 }
+
+export default ResourceList

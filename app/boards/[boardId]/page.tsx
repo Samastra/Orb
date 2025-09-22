@@ -7,8 +7,10 @@ import { useRef, useState, useEffect, useCallback } from "react";
 
 import ShapesMenu from "@/components/ShapesMenu";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import GridLayer from "@/components/gridLayer";
 import EditableTextComponent from "@/components/editableTextCompoent";
+
 import ResourceList from "@/components/ResourceList";
 
 // --- Dynamic imports for Konva ---
@@ -16,6 +18,7 @@ const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
   ssr: false,
 });
 import { Layer, Transformer, Line } from "react-konva"; // Added Line import
+
 
 // ---------- Types ----------
 type Action =
@@ -780,9 +783,26 @@ const BoardPage = () => {
             <button>
               <img src="/image/mic.svg" alt="microphone" />
             </button>
-            <button onClick={() => setShowResources(!showResources)}>
-              <img src="/image/review-bubble.svg" alt="recommendations" />
-            </button>
+            {/* recommendations functionality */}
+            <Sheet>
+
+            <SheetTrigger asChild>
+              <button>
+                <img src="/image/review-bubble.svg" alt="recommendations" />
+              </button>
+            </SheetTrigger>
+            <SheetContent className="">
+              <SheetHeader>
+                 <SheetTitle>
+                   <p className="font-bold text-lg mb-4">AI Recommendations</p>
+                 </SheetTitle>
+              </SheetHeader>
+
+              <ResourceList />
+              </SheetContent>
+
+            </Sheet>
+
             <Button>Invite</Button>
             <Button>Solo</Button>
           </div>
