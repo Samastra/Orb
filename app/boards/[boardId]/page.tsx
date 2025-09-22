@@ -4,13 +4,20 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import Konva from "konva";
 import { useRef, useState, useEffect, useCallback } from "react";
-
-import ShapesMenu from "@/components/ShapesMenu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import GridLayer from "@/components/gridLayer";
 import EditableTextComponent from "@/components/editableTextCompoent";
-
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import ResourceList from "@/components/ResourceList";
 
 // --- Dynamic imports for Konva ---
@@ -18,10 +25,14 @@ const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
   ssr: false,
 });
 import { Layer, Transformer, Line } from "react-konva"; // Added Line import
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {Label} from "@/components/ui/label"
 
 
 // ---------- Types ----------
 type Action =
+
   | { type: "add"; node: Konva.Shape | Konva.Group }
   | { type: "add-react-shape"; shapeType: string; data: any }
   | { type: "add-line"; line: { tool: 'brush' | 'eraser', points: number[] } }
@@ -33,11 +44,13 @@ type Action =
     }
   | { type: "delete"; node: Konva.Shape | Konva.Group }
   | { type: "delete-react-shape"; data: any }
-  | { type: "delete-line"; lineIndex: number };
+  | { type: "delete-line"; lineIndex: number }
+  | { type: "add-stage-with-text";stageGroup: Konva.Group;textShape: ReactShape;};
 
 type Tool =
   | "select"
   | "stickyNote"
+  | "stage"
   | "text"
   | "rect"
   | "pen"
@@ -58,6 +71,7 @@ type ReactShape = {
   text?: string;
   fontSize?: number;
   fill?: string;
+  stageGroupId?: string; 
 };
 
 if (typeof window !== 'undefined') {
@@ -78,11 +92,17 @@ const toolIcons: Record<Tool, string> = {
   triangle: "/image/triangle.svg",
   arrow: "/image/arrow-icon.svg",
   ellipse: "/image/ellipse.svg",
+  stage: "/image/rectangle.svg",
 };
 
 // ---------- Main Board Page ----------
 const BoardPage = () => {
   // SIMPLIFIED CONNECTION STATE - No shape dependency!
+  // collect dimension from user and setshapedimension
+  const [stageDimensions, setStageDimensions] = useState({ width: 100, height: 25 });
+  // update popover dimensions
+  const [tempDimensions, setTempDimensions] = useState(stageDimensions);
+
   const [connectionStart, setConnectionStart] = useState<{ x: number; y: number } | null>(null);
   const [tempConnection, setTempConnection] = useState<Konva.Line | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -111,6 +131,63 @@ const BoardPage = () => {
     setUndoneActions([]);
   };
 
+  // Add stage with user-defined dimensions
+   const addStageWithDimensions = (width: number, height: number) => {
+          if (!stageRef.current) return;
+          const stage = stageRef.current;
+          const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
+          if (!drawLayer) return;
+
+          const center = {
+            x: stage.width() / 2 / scale - position.x / scale,
+            y: stage.height() / 2 / scale - position.y / scale,
+          };
+
+          const shapeId = `shape-${Date.now()}`;
+
+          // Create stage rectangle
+          const shape = new Konva.Rect({
+            id: shapeId,
+            x: 0,
+            y: 0,
+            width: width,
+            height: height,
+            fill: "#ffffffff",
+            name: 'stage-rect',
+            shadowColor: 'rgba(0, 0, 0, 0.3)',
+            shadowBlur: 10,
+            shadowOffset: { x: 0, y: 0 },
+            shadowOpacity: 0.6,
+          });
+
+          // Create group
+          const stageGroup = new Konva.Group({
+            id: shapeId,
+            x: center.x - width / 2,
+            y: center.y - height / 2,
+            draggable: activeTool === "select",
+            name: 'selectable-shape stage-group',
+          });
+
+          stageGroup.add(shape);
+          stageGroup.on("click", handleShapeClick);
+          drawLayer.add(stageGroup);
+          drawLayer.batchDraw();
+
+          addAction({ 
+            type: "add", 
+            node: stageGroup 
+          });
+
+          if (activeTool === "select") {
+            setSelectedNodeId(shapeId);
+          }
+        };
+  // Apply stage dimensions from popover
+      const handleApplyStage = () => {
+        addStageWithDimensions(tempDimensions.width, tempDimensions.height);
+        // Close the popover if needed
+      };
   // Add cleanup effect to prevent memory leaks
   useEffect(() => {
     return () => {
@@ -731,48 +808,11 @@ const BoardPage = () => {
 
   return (
     <div className="relative w-screen h-screen bg-gray-50">
-      {showResources && (
-        <div className="absolute top-20 right-0 z-10 w-80 p-5 mr-4 mb-4 h-auto rounded-md bg-white shadow-[0_0_30px_rgba(0,0,0,0.10)] border-l">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-lg">Related Resources</h2>
-            <button className="bg-grey-300 p-2 rounded-full" onClick={() => setShowResources(false)}>✕</button>
-          </div>
-          <div className="bg-gray-200 rounded-md p-3">
-            <div className="space-y-4 text-sm">
-              <section>
-                <h3 className="font-bold">📚 Books</h3>
-                <ul className="list-disc list-inside">
-                  <li><a href="#">Book 1</a></li>
-                  <li><a href="#">Book 2</a></li>
-                </ul>
-              </section>
-              <section>
-                <h3 className="font-bold">🌐 Websites</h3>
-                <ul className="list-disc list-inside">
-                  <li><a href="#">Resource 1</a></li>
-                </ul>
-              </section>
-              <section>
-                <h3 className="font-bold">🎥 Videos</h3>
-                <ul className="list-disc list-inside">
-                  <li><a href="#">Vector Tutorial</a></li>
-                </ul>
-              </section>
-              <section>
-                <h3 className="font-bold">📝 Public Boards</h3>
-                <ul className="list-disc list-inside">
-                  <li>Board 1</li>
-                  <li>Board 2</li>
-                </ul>
-              </section>
-            </div>
-          </div>
-        </div>
-      )}
-
+    
       <section className="flex items-center justify-between gap-4">
         <div className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between bg-white px-6 py-3 shadow-md">
           <div className="flex items-center gap-3">
+            {/* menu */}
             <button>
               <img src="/image/three-dots-vertical.svg" alt="Menu" />
             </button>
@@ -809,8 +849,14 @@ const BoardPage = () => {
         </div>
       </section>
 
+        {/* tooltip component button for tools */}
+
+
       <div className="absolute left-0 top-20 flex flex-col items-center">
         <div className="z-10 flex flex-col items-center space-y-4 bg-white p-3 m-5 rounded-md shadow-md">
+
+        <Tooltip>
+          <TooltipTrigger asChild>
           <button
             onClick={() => handleToolChange("select")}
             className={`flex items-center justify-center my-1 w-10 h-10 rounded ${
@@ -819,21 +865,42 @@ const BoardPage = () => {
           >
             <img src={toolIcons["select"]} alt="select" className="w-6 h-6" />
           </button>
+          </TooltipTrigger>
+          <TooltipContent side = "right">
+            <p>Move Tool</p>
+          </TooltipContent>
+        </Tooltip>
 
-          <button
-            onClick={() => addShape("text")}
-            className="flex items-center justify-center my-1 w-10 h-10 rounded hover:bg-gray-300"
-          >
-            <img src={toolIcons["text"]} alt="text" className="w-6 h-6" />
-          </button>
-
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => addShape("text")}
+              className="flex items-center justify-center my-1 w-10 h-10 rounded hover:bg-gray-300"
+            >
+              <img src={toolIcons["text"]} alt="text" className="w-6 h-6" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side = "right">
+            <p>Text Tool</p>
+          </TooltipContent>
+        </Tooltip>
+            
+            <Tooltip>
+          <TooltipTrigger asChild>
           <button
             onClick={() => addShape("stickyNote")}
             className="flex items-center justify-center my-1 w-10 h-10 rounded hover:bg-gray-300"
           >
             <img src={toolIcons["stickyNote"]} alt="sticky-note" className="w-6 h-6" />
           </button>
+          </TooltipTrigger>
+          <TooltipContent   side = "right">
+            <p>Sticky Note</p>
+          </TooltipContent>
+            </Tooltip>
 
+            <Tooltip>
+          <TooltipTrigger asChild>
           <button
             onClick={() => {
               handleToolChange("pen");
@@ -845,7 +912,14 @@ const BoardPage = () => {
           >
             <img src="/image/edit-pen.svg" alt="pen" className="w-6 h-6" />
           </button>
+            </TooltipTrigger>
+          <TooltipContent side = "right">
+            <p>Pen Tool</p>
+          </TooltipContent>
+        </Tooltip>
 
+        <Tooltip>
+            <TooltipTrigger asChild>
           <button
             onClick={() => {
               handleToolChange("pen");
@@ -857,14 +931,78 @@ const BoardPage = () => {
           >
             <img src="/image/eraser.svg" alt="eraser" className="w-6 h-6" />
           </button>
+          </TooltipTrigger>
+          <TooltipContent   side = "right">
+            <p>Eraser Tool</p>
+          </TooltipContent>
+        </Tooltip>
 
-          <button
-            onClick={() => addShape("sort")}
-            className="flex items-center justify-center my-1 w-10 h-10 rounded hover:bg-gray-300"
-          >
-            <img src={toolIcons["sort"]} alt="sort" className="w-6 h-6" />
+                <Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                <button
+                  className="flex items-center justify-center my-1 w-10 h-10 rounded hover:bg-gray-300"
+                >
+            <img src={toolIcons["stage"]} alt="stage" className="w-6 h-6" />
           </button>
+            </PopoverTrigger>
+           </TooltipTrigger>
+              <TooltipContent side = "right">
+                <p>Add Stage</p>
+              </TooltipContent>
+              </Tooltip>
 
+            <PopoverContent side = "right">
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <h4 className="leading-none font-medium">Dimensions</h4>
+            <p className="text-muted-foreground text-sm">
+              Input stage size
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <div className="grid grid-cols-3 items-center gap-4">
+              <Label htmlFor="width">Width :px</Label>
+              <Input
+                id="width"
+                className="col-span-2 h-8"
+                value={tempDimensions.width}
+                onChange = {
+                  (e)=> setTempDimensions(prev => ({
+                    ...prev,
+                    width: parseInt(e.target.value) || 0
+                  }))
+                }
+              />
+            </div>
+            
+            <div className="grid grid-cols-3 items-center gap-4">
+              <Label htmlFor="height">Height :px</Label>
+              <Input
+                id="height"
+                className="col-span-2 h-8"
+                value = {tempDimensions.height}
+                onChange = {
+                  (e) => setTempDimensions(prev =>({
+                    ...prev,
+                    height: parseInt(e.target.value) || 0
+                  }))
+                }
+              />
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button onClick = {handleApplyStage} >
+                Apply
+              </Button>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+                </Popover>
+             
+              <Tooltip>
+            <TooltipTrigger asChild>
           <button
             onClick={() => handleToolChange("connect")}
             className={`flex items-center justify-center my-1 w-10 h-10 rounded ${
@@ -873,24 +1011,48 @@ const BoardPage = () => {
           >
             <img src={toolIcons["connect"]} alt="connect" className="w-6 h-6" />
           </button>
+          </TooltipTrigger>
+          <TooltipContent side = "right">
+            <p>Connection Tool</p>
+          </TooltipContent>
+                </Tooltip>
 
-          <button
-            onClick={() => setShowShapesMenu((prev) => !prev)}
-            className={`flex items-center justify-center my-1 w-10 h-10 rounded ${
-              showShapesMenu ? "bg-blue-300" : "hover:bg-gray-300"
-            }`}
-          >
-            <img src={toolIcons["shapes"]} alt="shapes" className="w-6 h-6" />
-          </button>
+          
 
-          {showShapesMenu && (
-            <ShapesMenu
-              onSelectShape={(shapeType: Tool) => {
-                addShape(shapeType);
-                setShowShapesMenu(false);
-              }}
-            />
-          )}
+      <DropdownMenu>
+        <DropdownMenuTrigger className="outline-none">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="my-1 w-10 h-10 rounded hover:bg-gray-300 flex items-center justify-center cursor-pointer">
+                  <img src={toolIcons["shapes"]} alt="shapes" className="w-6 h-6" />
+
+                </div>
+                </TooltipTrigger>
+            <TooltipContent side = "right">
+              <p>Shapes</p>
+            </TooltipContent>
+            </Tooltip>
+            
+                </DropdownMenuTrigger>
+                <div className="absolute left-12">
+                <DropdownMenuContent side="right" align="start">
+                  <DropdownMenuItem onClick={() => addShape("rect")}>
+                    <img src="/image/square.svg" alt="rectangle" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("circle")}>
+                    <img src="/image/circle.svg" alt="circle" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("triangle")}>
+                    <img src="/image/triangle.svg" alt="triangle" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => addShape("arrow")}>
+                    <img src="/image/line.svg" alt="arrow" />
+                  </DropdownMenuItem>
+              </DropdownMenuContent>
+
+                </div>
+     </DropdownMenu>
+
         </div>
 
         <div className="z-10 flex flex-col items-center space-y-4 bg-white p-3 m-5 rounded-md shadow-md">
