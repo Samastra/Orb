@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Button } from "./ui/button"
+import { SignOutButton } from "@clerk/nextjs"
 
 const Navbar = () => {
   return (
@@ -19,6 +20,7 @@ const Navbar = () => {
         <Link href={"/boards"}>Boards</Link>
         <Link href={"/sign-in"}><Button>Sign In</Button></Link>
         <Link href={"/sign-up"}><Button>Sign Up</Button></Link>
+        <SignOutButton />
 
       </div>
         </nav>
