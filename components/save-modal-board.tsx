@@ -1,0 +1,90 @@
+"use client";
+import { useUser, useClerk } from "@clerk/nextjs";
+import { SignIn, SignUp } from "@clerk/nextjs";
+import { useState, useEffect } from "react";
+import { saveAnonymousBoard } from "@/lib/actions/board-actions";
+
+interface SaveBoardModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  tempBoardId: string;
+}
+
+export default function SaveBoardModal({ isOpen, onClose, tempBoardId }: SaveBoardModalProps) {
+  const { isSignedIn, user } = useUser();
+  const { openSignIn, openSignUp } = useClerk();
+  const [isSignUp, setIsSignUp] = useState(false);
+
+  // Handle save after user authenticates
+  useEffect(() => {
+    if (isSignedIn && user && isOpen) {
+      handleSaveAfterAuth();
+    }
+  }, [isSignedIn, user, isOpen]);
+
+  const handleSaveAfterAuth = async () => {
+    if (!user) return;
+    
+    try {
+      await saveAnonymousBoard(tempBoardId, user.id);
+      onClose();
+      // Show success message
+      alert("Board saved successfully!");
+    } catch (error) {
+      console.error("Failed to save board:", error);
+      alert("Failed to save board. Please try again.");
+    }
+  };
+
+  const handleAuthClick = () => {
+    if (isSignUp) {
+      openSignUp();
+    } else {
+      openSignIn();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg max-w-md">
+        <h2 className="text-xl font-bold mb-4">Save Your Board</h2>
+        
+        {!isSignedIn ? (
+          <div>
+            <p className="mb-4">Sign in to save your work permanently</p>
+            
+            <button 
+              onClick={handleAuthClick}
+              className="bg-blue-500 text-white px-4 py-2 rounded w-full mb-4"
+            >
+              {isSignUp ? "Sign Up" : "Sign In"}
+            </button>
+            
+            <button 
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-blue-500"
+            >
+              {isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p>Ready to save your board?</p>
+            <button 
+              onClick={handleSaveAfterAuth}
+              className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
+            >
+              Save Board
+            </button>
+          </div>
+        )}
+        
+        <button onClick={onClose} className="mt-4 text-gray-500">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -1,13 +1,25 @@
+"use client"
 import { SignIn } from "@clerk/nextjs"
-import { currentUser } from "@clerk/nextjs/server"
-import { redirect } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
-export default async function SignUpPage() {
-  const user = await currentUser()
-  
-  // If already signed in, redirect to profile
-  if (user) {
-    redirect('/profilePage')
+export default function SignInPage() {
+  const { isLoaded, isSignedIn } = useUser()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      router.push("/profilePage")
+    }
+  }, [isLoaded, isSignedIn, router])
+
+  if (!isLoaded) {
+    return <div>Loading...</div>
+  }
+
+  if (isSignedIn) {
+    return <div>Redirecting...</div>
   }
 
   return <SignIn />

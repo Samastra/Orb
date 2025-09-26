@@ -1,33 +1,51 @@
 "use server";
+import { createSupabaseClient } from "../supabase";
 
-import { currentUser } from "@clerk/nextjs/server"
-import { createSupabaseClient } from "../supabase" // Your existing function
+export const createUserIfNotExists = async (clerkUserId: string) => {
+  console.log("🔍 createUserIfNotExists START - clerkUserId:", clerkUserId, "type:", typeof clerkUserId);
+  
+  const supabase = createSupabaseClient();
 
-export const createUser = async () => {
-    const user = await currentUser()
-    
-    if (!user) {
-        throw new Error("No user authenticated")
+  try {
+    console.log("🔍 Executing SELECT query...");
+    const { data: existingUser, error: selectError } = await supabase
+      .from("users")
+      .select("id, clerk_user_id")
+      .eq("clerk_user_id", clerkUserId)
+      .single();
+
+    console.log("🔍 SELECT query completed:", { existingUser, selectError });
+
+    if (existingUser) {
+      console.log("✅ User exists, returning ID:", existingUser.id);
+      return existingUser;
     }
 
-    const supabase = createSupabaseClient() // Use your existing function
-
-    const { data, error } = await supabase
+    if (selectError && selectError.code === 'PGRST116') {
+      console.log("🆕 No user found, creating new one...");
+      const { data: newUser, error: insertError } = await supabase
         .from("users")
         .insert({
-            clerk_user_id: user.id,
-            email: user.emailAddresses[0]?.emailAddress,
-            username: user.username,
-            full_name: user.fullName,
-            avatar_url: user.imageUrl
+          clerk_user_id: clerkUserId,
+          created_at: new Date().toISOString()
         })
         .select()
+        .single();
 
-    if (error) {
-        console.error('Supabase error:', error)
-        throw new Error(error.message)
+      if (insertError) {
+        console.error("❌ INSERT ERROR:", insertError);
+        throw insertError;
+      }
+      
+      console.log("✅ New user created:", newUser.id);
+      return newUser;
     }
-    
-    console.log('User created in Supabase:', data[0])
-    return data[0]
-}
+
+    console.error("❌ UNEXPECTED SELECT ERROR:", selectError);
+    throw selectError;
+
+  } catch (error) {
+    console.error("❌ CATCH BLOCK ERROR:", error);
+    throw error;
+  }
+};

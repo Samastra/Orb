@@ -18,7 +18,7 @@ const App = () => {
 
           <div className="flex gap-4 items-center my-15">
           <Button className="px-6 py-6 text-lg">Join for Free</Button>
-         <Link href="/[boardId]" as="/new">
+         <Link href="/[boardId]" as="/boards/new">
          <Button className="px-6 py-6 text-lg">Start a Session</Button>
          </Link> 
           </div>

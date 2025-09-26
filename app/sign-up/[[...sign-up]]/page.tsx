@@ -1,14 +1,25 @@
-import { currentUser } from "@clerk/nextjs/server"
-import { redirect } from "next/navigation"
+// app/sign-up/[[...sign-up]]/page.tsx
+"use client"
 import { SignUp } from "@clerk/nextjs"
+import { useUser } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
-export default async function SignUpPage() {
-  const user = await currentUser()
-  
-  // If already signed in, redirect to profile
-  if (user) {
-    redirect('/profilePage')
-  }
+export default function SignUpPage() {
+  const { isLoaded, isSignedIn } = useUser()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      // Add timeout to ensure profile page is working
+      setTimeout(() => {
+        router.push("/profilePage")
+      }, 1000)
+    }
+  }, [isLoaded, isSignedIn, router])
+
+  if (!isLoaded) return <div>Loading...</div>
+  if (isSignedIn) return <div>Redirecting to profile...</div>
 
   return <SignUp />
 }

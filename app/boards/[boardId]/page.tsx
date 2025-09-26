@@ -1,5 +1,7 @@
 "use client";
 
+
+import { deleteBoard } from "@/lib/actions/board-actions";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Konva from "konva";
@@ -27,8 +29,9 @@ const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
 import { Layer, Transformer, Line } from "react-konva"; // Added Line import
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {Label} from "@/components/ui/label"
-
+import {Label} from "@/components/ui/label";
+import SaveBoardModal from "@/components/save-modal-board"; 
+import { useParams } from "next/navigation";
 
 // ---------- Types ----------
 type Action =
@@ -116,7 +119,6 @@ const BoardPage = () => {
   const [actions, setActions] = useState<Action[]>([]);
   const [undoneActions, setUndoneActions] = useState<Action[]>([]);
   const [stageInstance, setStageInstance] = useState<Konva.Stage | null>(null);
-  const [showShapesMenu, setShowShapesMenu] = useState(false);
   const [reactShapes, setReactShapes] = useState<ReactShape[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   
@@ -124,12 +126,45 @@ const BoardPage = () => {
   const [lines, setLines] = useState<Array<{tool: 'brush' | 'eraser', points: number[]}>>([]);
   const isDrawing = useRef(false);
   const [showResources, setShowResources] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [isTemporaryBoard, setIsTemporaryBoard] = useState(false);
+
+
+  const params = useParams();
+  const currentBoardId = params.id as string; 
+
+  useEffect(() => {
+      const checkBoardStatus = async () => {
+        try {
+          const response = await fetch(`/api/boards/${currentBoardId}`);
+          const board = await response.json();
+          setIsTemporaryBoard(board.is_temporary);
+        } catch (error) {
+          console.error("Failed to fetch board status:", error);
+        }
+      };
+      
+      if (currentBoardId) {
+        checkBoardStatus();
+      }
+    }, [currentBoardId]);
+
 
   // ---------- Helpers ----------
   const addAction = (action: Action) => {
     setActions((prev) => [...prev, action]);
     setUndoneActions([]);
   };
+
+    const handleCloseWithoutSave = async () => {
+          try {
+            await deleteBoard(currentBoardId);
+            // Redirect to home or show confirmation
+            window.location.href = "/";
+          } catch (error) {
+            console.error("Failed to delete board:", error);
+          }
+      };
 
   // Add stage with user-defined dimensions
    const addStageWithDimensions = (width: number, height: number) => {
@@ -806,6 +841,8 @@ const BoardPage = () => {
     setPosition(newPos);
   };
 
+  
+
   return (
     <div className="relative w-screen h-screen bg-gray-50">
     
@@ -843,11 +880,27 @@ const BoardPage = () => {
 
             </Sheet>
 
+
+            {isTemporaryBoard && (
+          <Button onClick={handleCloseWithoutSave} className="bg-red-500 text-white">
+            Close 
+          </Button>
+             )}
+            <Button  onClick={() => setShowSaveModal(true)}>save board</Button>      
             <Button>Invite</Button>
             <Button>Solo</Button>
           </div>
         </div>
       </section>
+
+      {/* // Show "Close without Save" button for temporary boards */}
+        
+
+        <SaveBoardModal 
+            isOpen={showSaveModal}
+            onClose={() => setShowSaveModal(false)}
+            tempBoardId={currentBoardId}
+          />
 
         {/* tooltip component button for tools */}
 
