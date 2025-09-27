@@ -15,6 +15,8 @@ export default function SaveBoardModal({ isOpen, onClose, tempBoardId }: SaveBoa
   const { openSignIn, openSignUp } = useClerk();
   const [isSignUp, setIsSignUp] = useState(false);
 
+
+  console.log("🔍 Modal received tempBoardId:", tempBoardId);
   // Handle save after user authenticates
   useEffect(() => {
     if (isSignedIn && user && isOpen) {
@@ -23,18 +25,17 @@ export default function SaveBoardModal({ isOpen, onClose, tempBoardId }: SaveBoa
   }, [isSignedIn, user, isOpen]);
 
   const handleSaveAfterAuth = async () => {
-    if (!user) return;
-    
-    try {
-      await saveAnonymousBoard(tempBoardId, user.id);
-      onClose();
-      // Show success message
-      alert("Board saved successfully!");
-    } catch (error) {
-      console.error("Failed to save board:", error);
-      alert("Failed to save board. Please try again.");
-    }
-  };
+  if (!user) return;
+  
+  try {
+    await saveAnonymousBoard(tempBoardId, user.id);
+    onClose();
+    alert("Board saved successfully!");
+  } catch (error: any) {
+    console.error("Failed to save board:", error);
+    alert(`Failed to save board: ${error.message || 'Unknown error'}`);
+  }
+};
 
   const handleAuthClick = () => {
     if (isSignUp) {

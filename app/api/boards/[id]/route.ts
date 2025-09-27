@@ -8,10 +8,11 @@ const supabase = createClient(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // ← params is a Promise
 ) {
   try {
-    const boardId = params.id;
+    const { id } = await params; // ← Await the params first!
+    const boardId = id;
 
     if (!boardId) {
       return NextResponse.json(

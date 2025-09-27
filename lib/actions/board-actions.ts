@@ -3,41 +3,42 @@ import { createSupabaseClient } from "../supabase";
 import { createUserIfNotExists } from "./user-actions";
 
 export const saveAnonymousBoard = async (tempBoardId: string, clerkUserId: string) => {
-  console.log("=== DEBUG SAVE ANONYMOUS BOARD ===");
-  console.log("tempBoardId:", tempBoardId, "type:", typeof tempBoardId);
-  console.log("clerkUserId:", clerkUserId, "type:", typeof clerkUserId);
+  console.log("🔍 saveAnonymousBoard called with:", { tempBoardId, clerkUserId });
   
   const supabase = createSupabaseClient();
-  
-  // 1. Create user record
-  const user = await createUserIfNotExists(clerkUserId);
-  console.log("User from createUserIfNotExists:", user);
-  console.log("User ID (for owner_id):", user.id, "type:", typeof user.id);
-  
-  // 2. Link board to user
-  console.log("Updating board with owner_id:", user.id);
-  
-  const { data: board, error } = await supabase
-    .from("boards")
-    .update({ 
-      owner_id: user.id,
-      is_temporary: false 
-    })
-    .eq("id", tempBoardId)
-    .select()
-    .single();
 
-  if (error) {
-    console.error("❌ SUPABASE UPDATE ERROR DETAILS:");
-    console.error("Error code:", error.code);
-    console.error("Error message:", error.message);
-    console.error("Error details:", error.details);
+  try {
+    // 1. Create user record
+    console.log("🔄 Step 1: Getting/Creating user...");
+    const user = await createUserIfNotExists(clerkUserId);
+    console.log("✅ User obtained:", user.id);
+
+    // 2. Link board to user
+    console.log("🔄 Step 2: Updating board with owner_id:", user.id);
+    const { data: board, error } = await supabase
+      .from("boards")
+      .update({ 
+        owner_id: user.id,
+        is_temporary: false 
+      })
+      .eq("id", tempBoardId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("❌ Supabase update error:", error);
+      throw error;
+    }
+
+    console.log("✅ Board updated successfully:", board);
+    return board;
+
+  } catch (error) {
+    console.error("❌ saveAnonymousBoard full error:", error);
     throw error;
   }
-  
-  console.log("✅ Board updated successfully:", board);
-  return board;
 };
+
 
 export const createNewBoard = async (clerkUserId: string, boardData: any) => {
   const supabase = createSupabaseClient();

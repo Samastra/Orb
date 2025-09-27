@@ -128,18 +128,27 @@ const BoardPage = () => {
   const [showResources, setShowResources] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isTemporaryBoard, setIsTemporaryBoard] = useState(false);
-
+  const [currentBoardId, setCurrentBoardId] = useState<string>("");
 
   const params = useParams();
-  const currentBoardId = params.id as string; 
+  console.log("🔍 Board component - params:", params);
+  console.log("🔍 Board component - currentBoardId:", currentBoardId);
+
+    useEffect(() => {
+      console.log("🔍 useEffect - params.boardId:", params.boardId);
+      if (params.boardId) {
+        setCurrentBoardId(params.boardId as string);
+      }
+        }, [params.boardId]);
+        console.log("🔍 Current board ID:", currentBoardId);
 
   useEffect(() => {
       const checkBoardStatus = async () => {
         try {
           const response = await fetch(`/api/boards/${currentBoardId}`);
           const board = await response.json();
-          setIsTemporaryBoard(board.is_temporary);
-        } catch (error) {
+          setIsTemporaryBoard(board.is_temporary || false);
+        } catch (error) { 
           console.error("Failed to fetch board status:", error);
         }
       };
@@ -149,7 +158,7 @@ const BoardPage = () => {
       }
     }, [currentBoardId]);
 
-
+    
   // ---------- Helpers ----------
   const addAction = (action: Action) => {
     setActions((prev) => [...prev, action]);
@@ -886,7 +895,15 @@ const BoardPage = () => {
             Close 
           </Button>
              )}
-            <Button  onClick={() => setShowSaveModal(true)}>save board</Button>      
+            <Button  
+            onClick={() =>  {
+                console.log("🔄 Save button clicked - currentBoardId:", currentBoardId);
+                console.log("🔄 Save button clicked - showSaveModal will be:", !showSaveModal);
+                setShowSaveModal(true);
+            }}
+              
+              >save board
+              </Button>      
             <Button>Invite</Button>
             <Button>Solo</Button>
           </div>
@@ -895,12 +912,12 @@ const BoardPage = () => {
 
       {/* // Show "Close without Save" button for temporary boards */}
         
-
         <SaveBoardModal 
             isOpen={showSaveModal}
             onClose={() => setShowSaveModal(false)}
             tempBoardId={currentBoardId}
           />
+    
 
         {/* tooltip component button for tools */}
 
