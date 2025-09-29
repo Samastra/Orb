@@ -32,6 +32,8 @@ import { Input } from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import SaveBoardModal from "@/components/save-modal-board"; 
 import { useParams } from "next/navigation";
+import CreateBoard from "@/components/createBoard";
+import { fetchBoard } from "@/lib/actions/board-actions";
 
 // ---------- Types ----------
 type Action =
@@ -129,6 +131,14 @@ const BoardPage = () => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isTemporaryBoard, setIsTemporaryBoard] = useState(false);
   const [currentBoardId, setCurrentBoardId] = useState<string>("");
+  const [showSetupDialog, setShowSetupDialog] = useState(false);
+  const [boardInfo, setBoardInfo] = useState({title: "Untitled Board",category: ""})
+
+
+
+  // getting board data from supabase and seting the board title and category
+
+    
 
   const params = useParams();
   console.log("🔍 Board component - params:", params);
@@ -849,13 +859,25 @@ const BoardPage = () => {
     setScale(newScale);
     setPosition(newPos);
   };
+      // for board page dialog
 
+       useEffect(() => {
+        const checkIfNewBoard = async () => {
+          const board = await fetchBoard(params.boardId as string);
+          if (board.title === "Untitled Board" && !showSetupDialog) {
+            setShowSetupDialog(true);
+          }
+        };
+        checkIfNewBoard();
+      }, [params.boardId, showSetupDialog]); // Add showSetupDialog as dependency
   
 
   return (
+    <>
     <div className="relative w-screen h-screen bg-gray-50">
-    
-      <section className="flex items-center justify-between gap-4">
+
+                  
+          <section className="flex items-center justify-between gap-4">
         <div className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between bg-white px-6 py-3 shadow-md">
           <div className="flex items-center gap-3">
             {/* menu */}
@@ -863,7 +885,7 @@ const BoardPage = () => {
               <img src="/image/three-dots-vertical.svg" alt="Menu" />
             </button>
             <Link href={"/"}>Orb</Link>
-            <p>- Vector(physics)-Study</p>
+            <p>- {boardInfo.title}{boardInfo.category ? ` (${boardInfo.category})` : ""}</p>
           </div>
           <div className="flex items-center gap-3">
             <button>
@@ -1266,6 +1288,21 @@ const BoardPage = () => {
         </Stage>
       </div>
     </div>
+
+  <CreateBoard 
+        open={showSetupDialog}
+        onOpenChange={(open) => setShowSetupDialog(open)} 
+        boardId={params.boardId as string}
+        onBoardUpdate={(updates) => {
+          setBoardInfo({
+            title: updates.title,
+            category: updates.category
+          })
+        }}
+      />
+
+
+    </>
   );
 };
 

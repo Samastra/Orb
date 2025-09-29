@@ -2,6 +2,19 @@
 import { createSupabaseClient } from "../supabase";
 import { createUserIfNotExists } from "./user-actions";
 
+export const fetchBoard = async (boardId: string) => {
+  const supabase = createSupabaseClient();
+  
+  const { data: board, error } = await supabase
+    .from("boards")
+    .select("id, title, is_temporary, owner_id, created_at")
+    .eq("id", boardId)
+    .single();
+
+  if (error) throw error;
+  return board;
+};
+
 export const saveAnonymousBoard = async (tempBoardId: string, clerkUserId: string) => {
   console.log("🔍 saveAnonymousBoard called with:", { tempBoardId, clerkUserId });
   
@@ -98,4 +111,29 @@ export const deleteBoard = async (boardId: string) => {
     .eq("id", boardId);
 
   if (error) throw error;
+};
+
+export const updateBoard = async (boardId: string, updates: {
+  title?: string;
+  is_public?: boolean;
+  category?: string;
+}) => {
+  console.log("🔄 updateBoard called with:", { boardId, updates });
+  
+  const supabase = createSupabaseClient();
+  
+  const { data, error } = await supabase
+    .from("boards")
+    .update(updates)
+    .eq("id", boardId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("❌ Supabase error:", error);
+    throw error;
+  }
+  
+  console.log("✅ Board updated successfully:", data);
+  return data;
 };
