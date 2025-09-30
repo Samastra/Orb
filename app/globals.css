@@ -1,14 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-
 .body {
   background-image: url("../public/image/bgimage.jpg");
   background-size: cover;
   background-position: center;
   background-repeat: none;
 }
-
 
 @font-face {
   font-family: 'Inter';
@@ -28,7 +26,6 @@
 .font-light   { font-weight: 300; }
 .font-medium  { font-weight: 500; }
 .font-black   { font-weight: 900; }
-
 
 @custom-variant dark (&:is(.dark *));
 

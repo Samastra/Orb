@@ -17,7 +17,10 @@ const App = () => {
         <h3 className="my-5 text-2xl">Brainstorm your way through complex ideas, with AI to guide, clarify, and <br/> recommend what’s worth learning next.</h3>
 
           <div className="flex gap-4 items-center my-15">
+
+            <Link href = "/sign-up">
           <Button className="px-6 py-6 text-lg">Join for Free</Button>
+           </Link>
          <Link href="/[boardId]" as="/boards/new">
          <Button className="px-6 py-6 text-lg">Start a Session</Button>
          </Link> 

@@ -10,7 +10,7 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      router.push("/profilePage")
+      router.push("/dashboard")
     }
   }, [isLoaded, isSignedIn, router])
 

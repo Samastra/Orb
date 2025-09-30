@@ -9,7 +9,7 @@ type BoardCardProps = {
 
 const  BoardCard = ({ title, username, boardcategory, upvotes, saves }: BoardCardProps) => {
   return (
-    <div className = " mt-3  p-4 bg-white shadow-[0_0_30px_rgba(0,0,0,0.10)]  rounded-lg">
+    <div className = " mt-3  p-4 bg-white shadow-[0_0_30px_rgba(0,0,0,0.10)]  rounded-md">
 
       <div className="flex items-center justify-between gap-4"> 
         <h2 className="text-md font-bold">{title}</h2>
