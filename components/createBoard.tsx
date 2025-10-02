@@ -45,7 +45,7 @@ const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate }: CreateBoard
     
     try {
       const updates = {
-        title: title || "Untitled Board",
+        title: title || "Untitled Board",                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
         is_public: visibility === "public", 
         category: category
       }

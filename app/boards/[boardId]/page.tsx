@@ -1,6 +1,10 @@
 "use client";
 
-
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar"
 import { deleteBoard } from "@/lib/actions/board-actions";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -34,6 +38,7 @@ import SaveBoardModal from "@/components/save-modal-board";
 import { useParams } from "next/navigation";
 import CreateBoard from "@/components/createBoard";
 import { fetchBoard } from "@/lib/actions/board-actions";
+import { useUser } from "@clerk/nextjs";
 
 // ---------- Types ----------
 type Action =
@@ -104,6 +109,7 @@ const toolIcons: Record<Tool, string> = {
 const BoardPage = () => {
   // SIMPLIFIED CONNECTION STATE - No shape dependency!
   // collect dimension from user and setshapedimension
+  const { user } = useUser();
   const [stageDimensions, setStageDimensions] = useState({ width: 100, height: 25 });
   // update popover dimensions
   const [tempDimensions, setTempDimensions] = useState(stageDimensions);
@@ -928,6 +934,19 @@ const BoardPage = () => {
               </Button>      
             <Button>Invite</Button>
             <Button>Solo</Button>
+            <Link href= "/dashboard">
+            
+            <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarImage src={user?.imageUrl} alt = {user?.fullName || " "} />
+                <AvatarFallback className="rounded-lg">
+              {user?.fullName?.split(" ")
+              .map((word :any ) => word.charAt(0).toUpperCase())
+              .join("")
+              }
+                  </AvatarFallback>
+            </Avatar>
+            </Link>
+
           </div>
         </div>
       </section>

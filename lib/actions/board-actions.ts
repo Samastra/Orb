@@ -137,3 +137,44 @@ export const updateBoard = async (boardId: string, updates: {
   console.log("✅ Board updated successfully:", data);
   return data;
 };
+
+export const getUserBoards = async (
+  clerkUserId: string, 
+  clerkUserData?: any
+) => {
+  const supabase = createSupabaseClient()
+  
+  // Convert Clerk ID to Supabase ID with user data
+  const user = await createUserIfNotExists(clerkUserId, clerkUserData)
+  
+  const { data, error } = await supabase
+    .from("boards")
+    .select("*")
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: false })
+
+  if (error) throw error
+  return data
+}
+
+export const getPublicBoards = async () => {
+  const supabase = createSupabaseClient()
+  
+  const { data, error } = await supabase
+    .from("boards")
+    .select(`
+      *,
+      users:owner_id (
+        username,
+        full_name,
+        avatar_url
+      )
+    `)
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+    .limit(10)
+
+  if (error) throw error
+  return data
+}
+
