@@ -1,6 +1,14 @@
 import { useRef, useCallback } from "react";
 import Konva from "konva";
-import { Tool, ReactShape, Action } from "../types/board-types";
+import { Tool, Action } from "../types/board-types";
+
+function getRelativePointerPosition(stage: Konva.Stage) {
+  const transform = stage.getAbsoluteTransform().copy();
+  transform.invert();
+  const pos = stage.getPointerPosition();
+  if (!pos) return null;
+  return transform.point(pos);
+}
 
 export const useKonvaTools = (
   stageRef: React.RefObject<Konva.Stage | null>,
@@ -33,7 +41,7 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    const pos = stage.getPointerPosition();
+    const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
     setConnectionStart({ x: pos.x, y: pos.y });
@@ -62,7 +70,7 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    const point = stage.getPointerPosition();
+    const point = getRelativePointerPosition(stage);
     if (!point) return;
 
     tempConnection.points([connectionStart.x, connectionStart.y, point.x, point.y]);
@@ -75,7 +83,7 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    const point = stage.getPointerPosition();
+    const point = getRelativePointerPosition(stage);
     if (!point) return;
 
     const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
@@ -128,7 +136,7 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    const pos = stage.getPointerPosition();
+    const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
     setLines(prevLines => [...prevLines, { 
@@ -145,7 +153,7 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    const point = stage.getPointerPosition();
+    const point = getRelativePointerPosition(stage);
     if (!point) return;
 
     setLines(prevLines => {
@@ -189,7 +197,7 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    const pos = stage.getPointerPosition();
+    const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
     setLines(prevLines => [...prevLines, { 
@@ -206,7 +214,7 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    const point = stage.getPointerPosition();
+    const point = getRelativePointerPosition(stage);
     if (!point) return;
 
     setLines(prevLines => {

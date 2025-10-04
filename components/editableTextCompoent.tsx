@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Text, Transformer } from 'react-konva';
-import TextEditor from '@/components/TextEditor';
-import Konva from 'konva';
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import { Text, Transformer } from "react-konva";
+import TextEditor from "@/components/TextEditor";
+import Konva from "konva";
 
 interface TextAttributes {
   x?: number;
@@ -12,7 +12,6 @@ interface TextAttributes {
   fontSize?: number;
   fill?: string;
   width?: number;
-  height?: number;
 }
 
 interface EditableTextComponentProps {
@@ -43,28 +42,25 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
   const textRef = useRef<Konva.Text>(null);
   const trRef = useRef<Konva.Transformer>(null);
 
-  // Start editing automatically if text is empty (newly created)
   const [isEditing, setIsEditing] = useState(text === "");
-  const [isHovered, setIsHovered] = useState(false);
+  const [textWidth, setTextWidth] = useState(200);
 
-  // Update cursor style
+  // cursor logic
   useEffect(() => {
     if (textRef.current) {
       const stage = textRef.current.getStage();
       if (stage && stage.container()) {
         const container = stage.container();
-        if (activeTool === 'text' && isHovered) {
-          container.style.cursor = 'text';
-        } else if (isHovered) {
-          container.style.cursor = 'pointer';
+        if (activeTool === "text") {
+          container.style.cursor = "text";
         } else {
-          container.style.cursor = 'default';
+          container.style.cursor = "default";
         }
       }
     }
-  }, [activeTool, isHovered]);
+  }, [activeTool]);
 
-  // Update transformer when selection changes
+  // transformer selection logic
   useEffect(() => {
     if (isSelected && trRef.current && textRef.current && !isEditing) {
       trRef.current.nodes([textRef.current]);
@@ -85,23 +81,46 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
     [onUpdate]
   );
 
-  const handleTransform = useCallback(() => {
-    const node = textRef.current;
-    if (!node) return;
+  const handleTransformEnd = useCallback(() => {
+  const node = textRef.current;
+  if (!node) return;
 
-    const scaleX = node.scaleX();
-    const newWidth = Math.max(30, node.width() * scaleX);
+  const scaleX = node.scaleX();
+  const scaleY = node.scaleY();
 
-    node.setAttrs({
-      width: newWidth,
-      scaleX: 1,
-    });
+  let newWidth = textWidth;
+  let newFontSize = fontSize;
 
-    onUpdate({
-      width: newWidth,
-      fontSize: node.fontSize(),
-    });
-  }, [onUpdate]);
+  const activeAnchor = trRef.current?.getActiveAnchor();
+
+  // Corner anchors → adjust font size
+  if (
+    activeAnchor?.includes("top") ||
+    activeAnchor?.includes("bottom") ||
+    activeAnchor?.includes("left") ||
+    activeAnchor?.includes("right")
+  ) {
+    newFontSize = Math.max(5, node.fontSize() * scaleY);
+  }
+
+  // Side anchors → change width only
+  if (activeAnchor === "middle-left" || activeAnchor === "middle-right") {
+    newWidth = Math.max(30, node.width() * scaleX);
+    setTextWidth(newWidth);
+  }
+
+  // Reset transform to avoid compounding
+  node.scaleX(1);
+  node.scaleY(1);
+
+  onUpdate({
+    width: newWidth,
+    fontSize: newFontSize,
+    x: node.x(),
+    y: node.y(),
+  });
+}, [onUpdate, textWidth, fontSize]);
+
 
   return (
     <>
@@ -114,20 +133,18 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
         fontSize={fontSize}
         fill={fill}
         draggable
-        width={200}
+        width={textWidth}
         onDblClick={handleTextDblClick}
         onDblTap={handleTextDblClick}
         onClick={onSelect}
         onTap={onSelect}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
         onDragEnd={(e) => {
           onUpdate({
             x: e.target.x(),
             y: e.target.y(),
           });
         }}
-        onTransform={handleTransform}
+        onTransform={handleTransformEnd}
         visible={!isEditing}
       />
 
@@ -135,7 +152,6 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
         <TextEditor
           textNode={textRef.current}
           onChange={handleTextChange}
-          // ✅ When Enter/Escape/blur happens, exit edit mode
           onClose={() => setIsEditing(false)}
         />
       )}
@@ -144,12 +160,12 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
         <Transformer
           ref={trRef}
           enabledAnchors={[
-            'middle-left',
-            'middle-right',
-            'top-right',
-            'top-left',
-            'bottom-left',
-            'bottom-right',
+            "middle-left",
+            "middle-right",
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right",
           ]}
           boundBoxFunc={(oldBox, newBox) => ({
             ...newBox,
