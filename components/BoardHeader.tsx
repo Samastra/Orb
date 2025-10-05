@@ -68,7 +68,10 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                     <p className="font-bold text-lg mb-4">AI Recommendations</p>
                   </SheetTitle>
                 </SheetHeader>
-                <ResourceList />
+                <ResourceList 
+                boardTitle={boardInfo.title}
+                boardCategory={boardInfo.category}
+      />
               </SheetContent>
             </Sheet>
 
