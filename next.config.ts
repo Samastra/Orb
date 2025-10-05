@@ -1,13 +1,65 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      // Google Books
+      {
+        protocol: 'https',
+        hostname: 'books.google.com',
+      },
+      // YouTube
+      {
+        protocol: 'https',
+        hostname: 'i.ytimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.youtube.com',
+      },
+      // Freepik
+      {
+        protocol: 'https',
+        hostname: 'freepik.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.freepik.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.freepik.com',
+      },
+      // Wikipedia
+      {
+        protocol: 'https',
+        hostname: 'wikipedia.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+      },
+      // Clerk
+      {
+        protocol: 'https',
+        hostname: 'img.clerk.com',
+      },
+      // Generic patterns
+      {
+        protocol: 'https',
+        hostname: '**.google.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.ytimg.com',
+      },
+    ],
+  },
   webpack: (config) => {
-    // Prevent Next.js from trying to bundle Konva's Node.js version
     config.resolve.alias = {
       ...config.resolve.alias,
-      domains: ['img.clerk.com'],
-      "konva/node": false, // make sure node build is ignored
-      "canvas": false,     // disable native canvas package
+      "konva/node": false,
+      "canvas": false,
     };
     return config;
   },

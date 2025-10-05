@@ -13,7 +13,7 @@ const PublicBoards = () => {
           <Link href="/" className="text-2xl font-bold mr-10 ml-10">Orb</Link>
         </div>
         <div >
-          <Link href="/profilePage">
+          <Link href="/dashboard">
             <img src="/image/account-circle.svg" alt="account" className="w-12 h-12" />
           </Link>
         </div>
