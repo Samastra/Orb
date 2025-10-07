@@ -12,6 +12,11 @@ interface TextAttributes {
   fontSize?: number;
   fill?: string;
   width?: number;
+  fontFamily?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  textDecoration?: string;
+  align?: string;
 }
 
 interface EditableTextComponentProps {
@@ -25,6 +30,11 @@ interface EditableTextComponentProps {
   activeTool: string | null;
   onSelect: () => void;
   onUpdate: (attrs: TextAttributes) => void;
+  fontFamily?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  textDecoration?: string;
+  align?: string;
 }
 
 const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
@@ -38,6 +48,11 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
   activeTool,
   onSelect,
   onUpdate,
+  fontFamily = "Arial",
+  fontWeight = "normal",
+  fontStyle = "normal",
+  textDecoration = "none",
+  align = "left",
 }) => {
   const textRef = useRef<Konva.Text>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -70,6 +85,13 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
     }
   }, [isSelected, isEditing]);
 
+  // Apply formatting properties when they change
+  useEffect(() => {
+    if (textRef.current) {
+      textRef.current.getLayer()?.batchDraw();
+    }
+  }, [fontFamily, fontWeight, fontStyle, textDecoration, align]);
+
   const handleTextDblClick = useCallback(() => {
     setIsEditing(true);
   }, []);
@@ -81,46 +103,53 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
     [onUpdate]
   );
 
+  // FIXED: Uniform scaling like Figma/Illustrator
   const handleTransformEnd = useCallback(() => {
-  const node = textRef.current;
-  if (!node) return;
+    const node = textRef.current;
+    if (!node) return;
 
-  const scaleX = node.scaleX();
-  const scaleY = node.scaleY();
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
 
-  let newWidth = textWidth;
-  let newFontSize = fontSize;
+    const activeAnchor = trRef.current?.getActiveAnchor();
 
-  const activeAnchor = trRef.current?.getActiveAnchor();
+    let newWidth = textWidth;
+    let newFontSize = fontSize;
 
-  // Corner anchors → adjust font size
-  if (
-    activeAnchor?.includes("top") ||
-    activeAnchor?.includes("bottom") ||
-    activeAnchor?.includes("left") ||
-    activeAnchor?.includes("right")
-  ) {
-    newFontSize = Math.max(5, node.fontSize() * scaleY);
-  }
+    // For corner anchors → scale uniformly (both font size and width)
+    if (
+      activeAnchor?.includes("top-left") ||
+      activeAnchor?.includes("top-right") ||
+      activeAnchor?.includes("bottom-left") ||
+      activeAnchor?.includes("bottom-right")
+    ) {
+      // Use the average of scaleX and scaleY for uniform scaling, or just scaleY for font
+      const uniformScale = (scaleX + scaleY) / 2;
+      newFontSize = Math.max(5, Math.round(fontSize * uniformScale));
+      newWidth = Math.max(30, Math.round(textWidth * uniformScale));
+      setTextWidth(newWidth);
+    }
+    // For middle-left and middle-right anchors → change width only (text wrapping)
+    else if (activeAnchor === "middle-left" || activeAnchor === "middle-right") {
+      newWidth = Math.max(30, Math.round(textWidth * scaleX));
+      setTextWidth(newWidth);
+    }
+    // For middle-top and middle-bottom anchors → change font size only
+    else if (activeAnchor === "middle-top" || activeAnchor === "middle-bottom") {
+      newFontSize = Math.max(5, Math.round(fontSize * scaleY));
+    }
 
-  // Side anchors → change width only
-  if (activeAnchor === "middle-left" || activeAnchor === "middle-right") {
-    newWidth = Math.max(30, node.width() * scaleX);
-    setTextWidth(newWidth);
-  }
+    // Reset transform to avoid compounding
+    node.scaleX(1);
+    node.scaleY(1);
 
-  // Reset transform to avoid compounding
-  node.scaleX(1);
-  node.scaleY(1);
-
-  onUpdate({
-    width: newWidth,
-    fontSize: newFontSize,
-    x: node.x(),
-    y: node.y(),
-  });
-}, [onUpdate, textWidth, fontSize]);
-
+    onUpdate({
+      width: newWidth,
+      fontSize: newFontSize,
+      x: node.x(),
+      y: node.y(),
+    });
+  }, [onUpdate, textWidth, fontSize]);
 
   return (
     <>
@@ -132,6 +161,13 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
         text={text}
         fontSize={fontSize}
         fill={fill}
+        fontFamily={fontFamily}
+        fontStyle={fontStyle}
+        fontVariant="normal"
+        fontWeight={fontWeight}
+        textDecoration={textDecoration}
+        align={align}
+        verticalAlign="middle"
         draggable
         width={textWidth}
         onDblClick={handleTextDblClick}
@@ -166,11 +202,15 @@ const EditableTextComponent: React.FC<EditableTextComponentProps> = ({
             "top-right",
             "bottom-left",
             "bottom-right",
+            "middle-top",    // Added for vertical scaling
+            "middle-bottom", // Added for vertical scaling
           ]}
           boundBoxFunc={(oldBox, newBox) => ({
             ...newBox,
             width: Math.max(30, newBox.width),
+            height: Math.max(20, newBox.height),
           })}
+          keepRatio={false} // We handle ratio manually for better text control
         />
       )}
     </>

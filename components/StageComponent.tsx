@@ -232,39 +232,45 @@ const StageComponent: React.FC<StageComponentProps> = ({
             listening={false}
           />
         ))}
-          {reactShapes.map((shapeData) => {
-            if (shapeData.type === 'text') {
-              return (
-                <EditableTextComponent
-                  key={shapeData.id}
-                  id={shapeData.id}
-                  x={shapeData.x}
-                  y={shapeData.y}
-                  text={shapeData.text || "Double click to edit"}
-                  fontSize={shapeData.fontSize || 20}
-                  fill={shapeData.fill || "black"}
-                  isSelected={selectedNodeId === shapeData.id}
-                  activeTool={activeTool}
-                  onSelect={() => {
-                    if (activeTool === "select") {
-                      setSelectedNodeId(shapeData.id);
-                    }
-                  }}
-                  onUpdate={(newAttrs) => {
-                    setReactShapes(prev => 
-                      prev.map(shape => 
-                        shape.id === shapeData.id 
-                          ? { ...shape, ...newAttrs }
-                          : shape
-                      )
-                    );
-                  }}
-                />
-              );
-            }
-            return null;
-          })}
-
+          {/* // In your StageComponent, update the EditableTextComponent usage: */}
+{reactShapes.map((shapeData) => {
+  if (shapeData.type === 'text') {
+    return (
+      <EditableTextComponent
+        key={shapeData.id}
+        id={shapeData.id}
+        x={shapeData.x}
+        y={shapeData.y}
+        text={shapeData.text || "Double click to edit"}
+        fontSize={shapeData.fontSize || 20}
+        fill={shapeData.fill || "black"}
+        // PASS ALL THE FORMATTING PROPERTIES
+        fontFamily={shapeData.fontFamily || "Arial"}
+        fontWeight={shapeData.fontWeight || "normal"}
+        fontStyle={shapeData.fontStyle || "normal"}
+        textDecoration={shapeData.textDecoration || "none"}
+        align={shapeData.align || "left"}
+        isSelected={selectedNodeId === shapeData.id}
+        activeTool={activeTool}
+        onSelect={() => {
+          if (activeTool === "select") {
+            setSelectedNodeId(shapeData.id);
+          }
+        }}
+        onUpdate={(newAttrs) => {
+          setReactShapes(prev => 
+            prev.map(shape => 
+              shape.id === shapeData.id 
+                ? { ...shape, ...newAttrs }
+                : shape
+            )
+          );
+        }}
+      />
+    );
+  }
+  return null;
+})}
           {/* Transformer - this will now work properly */}
           <Transformer
             ref={trRef}

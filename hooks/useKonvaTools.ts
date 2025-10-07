@@ -10,6 +10,56 @@ function getRelativePointerPosition(stage: Konva.Stage) {
   return transform.point(pos);
 }
 
+// Helper function to check if a point is near a line segment
+function isPointNearLine(
+  point: { x: number; y: number },
+  linePoints: number[],
+  threshold: number = 10
+): boolean {
+  for (let i = 0; i < linePoints.length - 2; i += 2) {
+    const x1 = linePoints[i];
+    const y1 = linePoints[i + 1];
+    const x2 = linePoints[i + 2];
+    const y2 = linePoints[i + 3];
+
+    // Calculate distance from point to line segment
+    const A = point.x - x1;
+    const B = point.y - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    
+    if (lenSq !== 0) {
+      param = dot / lenSq;
+    }
+
+    let xx, yy;
+
+    if (param < 0) {
+      xx = x1;
+      yy = y1;
+    } else if (param > 1) {
+      xx = x2;
+      yy = y2;
+    } else {
+      xx = x1 + param * C;
+      yy = y1 + param * D;
+    }
+
+    const dx = point.x - xx;
+    const dy = point.y - yy;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance <= threshold) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export const useKonvaTools = (
   stageRef: React.RefObject<Konva.Stage | null>,
   activeTool: Tool | null,
@@ -31,6 +81,44 @@ export const useKonvaTools = (
   addAction: (action: Action) => void
 ) => {
   const isDrawing = useRef(false);
+  const lastErasedLines = useRef<number[]>([]); // Track recently erased lines to avoid duplicate detection
+
+  // NEW: Function to detect and erase lines that intersect with current eraser position
+  const detectAndEraseLines = useCallback((currentPoint: { x: number; y: number }) => {
+    setLines(prevLines => {
+      const linesToKeep: Array<{tool: 'brush' | 'eraser', points: number[]}> = [];
+      const erasedLineIndices: number[] = [];
+
+      prevLines.forEach((line, index) => {
+        // Only check brush lines (not eraser lines) and lines not recently erased
+        if (line.tool === 'brush' && !lastErasedLines.current.includes(index)) {
+          if (isPointNearLine(currentPoint, line.points, 15 / scale)) {
+            // This line is near the eraser - mark it for erasure
+            erasedLineIndices.push(index);
+            addAction({ type: "delete-line", lineIndex: index });
+          } else {
+            linesToKeep.push(line);
+          }
+        } else {
+          linesToKeep.push(line);
+        }
+      });
+
+      // Update recently erased lines
+      if (erasedLineIndices.length > 0) {
+        lastErasedLines.current = [...lastErasedLines.current, ...erasedLineIndices];
+        
+        // Clear the recently erased lines after a short delay to allow continuous erasing
+        setTimeout(() => {
+          lastErasedLines.current = lastErasedLines.current.filter(
+            idx => !erasedLineIndices.includes(idx)
+          );
+        }, 100);
+      }
+
+      return linesToKeep;
+    });
+  }, [setLines, addAction, scale]);
 
   // ---------- Connection Tool Logic ----------
   const handleConnectionStart = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -139,11 +227,17 @@ export const useKonvaTools = (
     const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
-    setLines(prevLines => [...prevLines, { 
-      tool: drawingMode, 
-      points: [pos.x, pos.y]
-    }]);
-  }, [activeTool, drawingMode, stageRef, setLines]);
+    // For eraser mode, detect lines immediately on mouse down
+    if (drawingMode === 'eraser') {
+      detectAndEraseLines(pos);
+    } else {
+      // For brush mode, start a new line
+      setLines(prevLines => [...prevLines, { 
+        tool: drawingMode, 
+        points: [pos.x, pos.y]
+      }]);
+    }
+  }, [activeTool, drawingMode, stageRef, setLines, detectAndEraseLines]);
 
   const handleDrawingMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (activeTool !== 'pen' || !isDrawing.current) return;
@@ -156,28 +250,34 @@ export const useKonvaTools = (
     const point = getRelativePointerPosition(stage);
     if (!point) return;
 
-    setLines(prevLines => {
-      if (prevLines.length === 0) return prevLines;
-      
-      const lastLineIndex = prevLines.length - 1;
-      const lastLine = prevLines[lastLineIndex];
-      
-      const updatedLine = {
-        ...lastLine,
-        points: [...lastLine.points, point.x, point.y]
-      };
-      
-      const newLines = [...prevLines];
-      newLines[lastLineIndex] = updatedLine;
-      
-      return newLines;
-    });
-  }, [activeTool, stageRef, setLines]);
+    if (drawingMode === 'eraser') {
+      // For eraser mode, detect and erase lines as we move
+      detectAndEraseLines(point);
+    } else {
+      // For brush mode, continue drawing the current line
+      setLines(prevLines => {
+        if (prevLines.length === 0) return prevLines;
+        
+        const lastLineIndex = prevLines.length - 1;
+        const lastLine = prevLines[lastLineIndex];
+        
+        const updatedLine = {
+          ...lastLine,
+          points: [...lastLine.points, point.x, point.y]
+        };
+        
+        const newLines = [...prevLines];
+        newLines[lastLineIndex] = updatedLine;
+        
+        return newLines;
+      });
+    }
+  }, [activeTool, drawingMode, stageRef, setLines, detectAndEraseLines]);
 
   const handleDrawingMouseUp = useCallback(() => {
     if (activeTool !== 'pen') return;
     
-    if (isDrawing.current) {
+    if (isDrawing.current && drawingMode === 'brush') {
       const lastLine = lines[lines.length - 1];
       if (lastLine) {
         addAction({ type: "add-line", line: lastLine });
@@ -185,7 +285,11 @@ export const useKonvaTools = (
     }
     
     isDrawing.current = false;
-  }, [activeTool, lines, addAction]);
+    // Clear recently erased lines when finishing erasing
+    if (drawingMode === 'eraser') {
+      lastErasedLines.current = [];
+    }
+  }, [activeTool, drawingMode, lines, addAction]);
 
   // Touch handlers for pen tool
   const handleDrawingTouchStart = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
@@ -200,11 +304,15 @@ export const useKonvaTools = (
     const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
-    setLines(prevLines => [...prevLines, { 
-      tool: drawingMode, 
-      points: [pos.x, pos.y]
-    }]);
-  }, [activeTool, drawingMode, stageRef, setLines]);
+    if (drawingMode === 'eraser') {
+      detectAndEraseLines(pos);
+    } else {
+      setLines(prevLines => [...prevLines, { 
+        tool: drawingMode, 
+        points: [pos.x, pos.y]
+      }]);
+    }
+  }, [activeTool, drawingMode, stageRef, setLines, detectAndEraseLines]);
 
   const handleDrawingTouchMove = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
     if (activeTool !== 'pen' || !isDrawing.current) return;
@@ -217,28 +325,32 @@ export const useKonvaTools = (
     const point = getRelativePointerPosition(stage);
     if (!point) return;
 
-    setLines(prevLines => {
-      if (prevLines.length === 0) return prevLines;
-      
-      const lastLineIndex = prevLines.length - 1;
-      const lastLine = prevLines[lastLineIndex];
-      
-      const updatedLine = {
-        ...lastLine,
-        points: [...lastLine.points, point.x, point.y]
-      };
-      
-      const newLines = [...prevLines];
-      newLines[lastLineIndex] = updatedLine;
-      
-      return newLines;
-    });
-  }, [activeTool, stageRef, setLines]);
+    if (drawingMode === 'eraser') {
+      detectAndEraseLines(point);
+    } else {
+      setLines(prevLines => {
+        if (prevLines.length === 0) return prevLines;
+        
+        const lastLineIndex = prevLines.length - 1;
+        const lastLine = prevLines[lastLineIndex];
+        
+        const updatedLine = {
+          ...lastLine,
+          points: [...lastLine.points, point.x, point.y]
+        };
+        
+        const newLines = [...prevLines];
+        newLines[lastLineIndex] = updatedLine;
+        
+        return newLines;
+      });
+    }
+  }, [activeTool, drawingMode, stageRef, setLines, detectAndEraseLines]);
 
   const handleDrawingTouchEnd = useCallback(() => {
     if (activeTool !== 'pen') return;
     
-    if (isDrawing.current) {
+    if (isDrawing.current && drawingMode === 'brush') {
       const lastLine = lines[lines.length - 1];
       if (lastLine) {
         addAction({ type: "add-line", line: lastLine });
@@ -246,7 +358,10 @@ export const useKonvaTools = (
     }
     
     isDrawing.current = false;
-  }, [activeTool, lines, addAction]);
+    if (drawingMode === 'eraser') {
+      lastErasedLines.current = [];
+    }
+  }, [activeTool, drawingMode, lines, addAction]);
 
   // ---------- Centralized Mouse Handlers ----------
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -325,6 +440,7 @@ export const useKonvaTools = (
   const handleToolChange = useCallback((tool: Tool | null) => {
     if (activeTool === 'pen' && tool !== 'pen') {
       isDrawing.current = false;
+      lastErasedLines.current = [];
     }
     
     setActiveTool(tool);
@@ -342,10 +458,10 @@ export const useKonvaTools = (
     const container = stageRef.current.container();
     container.style.cursor = tool === "connect" ? 'crosshair' : 
                             tool === "select" ? 'move' : 
-                            tool === "pen" ? 'crosshair' : 'default';
+                            tool === "pen" ? (drawingMode === 'eraser' ? 'cell' : 'crosshair') : 'default';
     
     drawLayer.batchDraw();
-  }, [activeTool, setActiveTool, stageRef]);
+  }, [activeTool, drawingMode, setActiveTool, stageRef]);
 
   return {
     // Handlers

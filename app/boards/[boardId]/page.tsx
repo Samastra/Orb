@@ -111,17 +111,20 @@ const BoardPage = () => {
     return konvaShape || null;
   }, [selectedNodeId, reactShapes, shapes]);
 
-  // FIXED: Use your existing action structure properly
+  // FIXED: Improved update function with proper state updates
   const debouncedUpdateShape = useDebounce((shapeId: string, updates: Record<string, any>) => {
     const isReactShape = reactShapes.some((s) => s.id === shapeId);
     
     if (isReactShape) {
-      // For react shapes, just update the state (no undo for formatting changes to keep it simple)
+      // For react shapes, update with proper state setter
       setReactShapes(prev => 
         prev.map(shape => 
           shape.id === shapeId ? { ...shape, ...updates } : shape
         )
       );
+      
+      // Force a re-render by updating the state
+      setReactShapes(current => [...current]);
     } else {
       // For Konva shapes, find the node and create proper update action
       const drawLayer = stageRef.current?.findOne(".draw-layer") as Konva.Layer;
@@ -142,9 +145,28 @@ const BoardPage = () => {
         }
       }
     }
-  }, 150);
+  }, 50); // Reduced debounce time for better responsiveness
 
-  // Shape creation - FIXED: Use only properties that exist in ReactShape type
+  // DEBUG: Log shape updates to see what's happening
+  useEffect(() => {
+    if (selectedNodeId) {
+      const shape = reactShapes.find(s => s.id === selectedNodeId);
+      if (shape) {
+        console.log('Selected Text Shape:', {
+          id: shape.id,
+          text: shape.text,
+          fontSize: shape.fontSize,
+          fontFamily: shape.fontFamily,
+          fontWeight: shape.fontWeight,
+          fontStyle: shape.fontStyle,
+          textDecoration: shape.textDecoration,
+          align: shape.align
+        });
+      }
+    }
+  }, [selectedNodeId, reactShapes]);
+
+  // Shape creation - IMPROVED with better default formatting
   const addShape = useCallback((type: Tool) => {
     if (!stageRef.current) return;
     const stage = stageRef.current;
@@ -164,13 +186,15 @@ const BoardPage = () => {
         text: "Double click to edit",
         fontSize: 20,
         fill: "#000000",
-        // Only include properties that exist in ReactShape type
-        fontFamily: "Canva Sans",
+        fontFamily: "Arial", // Use Arial as default for better compatibility
         fontWeight: "normal",
         fontStyle: "normal",
         textDecoration: "none",
         align: "left",
       };
+      
+      console.log('Creating text shape:', textShape); // Debug log
+      
       setReactShapes(prev => [...prev, textShape]);
       addAction({ 
         type: "add-react-shape", 
@@ -182,7 +206,6 @@ const BoardPage = () => {
         setSelectedNodeId(shapeId);
       }
     } else {
-      // For shapes, we need to ensure they have stroke and cornerRadius properties
       const shapeId = addKonvaShape(type, center, true);
       if (shapeId && activeTool === "select") {
         setSelectedNodeId(shapeId);
@@ -198,7 +221,6 @@ const BoardPage = () => {
             shapeUpdates.cornerRadius = 0;
           }
           
-          // Apply the updates after a short delay to ensure shape is created
           setTimeout(() => {
             debouncedUpdateShape(shapeId, shapeUpdates);
           }, 100);
@@ -207,13 +229,32 @@ const BoardPage = () => {
     }
   }, [stageRef, scale, position, activeTool, addKonvaShape, addAction, setSelectedNodeId, setReactShapes, debouncedUpdateShape]);
 
-  // Handle shape updates from formatting toolbar
+  // Handle shape updates from formatting toolbar - IMPROVED
   const handleShapeUpdate = useCallback((updates: Record<string, any>) => {
     if (!selectedNodeId) return;
-    debouncedUpdateShape(selectedNodeId, updates);
-  }, [selectedNodeId, debouncedUpdateShape]);
+    
+    console.log('Formatting update:', { selectedNodeId, updates }); // Debug log
+    
+    // Special handling for text formatting to ensure they work
+    if (updates.fontWeight || updates.fontStyle || updates.textDecoration || updates.align) {
+      // Apply immediately without debounce for better UX
+      const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
+      
+      if (isReactShape) {
+        setReactShapes(prev => 
+          prev.map(shape => 
+            shape.id === selectedNodeId ? { ...shape, ...updates } : shape
+          )
+        );
+      } else {
+        debouncedUpdateShape(selectedNodeId, updates);
+      }
+    } else {
+      debouncedUpdateShape(selectedNodeId, updates);
+    }
+  }, [selectedNodeId, debouncedUpdateShape, reactShapes]);
 
-  // Stage dimensions - PRESERVED your original function
+  // Stage dimensions
   const handleApplyStage = useCallback(() => {
     addStageWithDimensions(
       tempDimensions.width,
@@ -227,7 +268,7 @@ const BoardPage = () => {
     );
   }, [tempDimensions, scale, position, activeTool, addAction, setSelectedNodeId]);
 
-  // Close without save - PRESERVED your original function
+  // Close without save
   const handleCloseWithoutSave = useCallback(async () => {
     try {
       await deleteBoard(currentBoardId);
@@ -236,14 +277,6 @@ const BoardPage = () => {
       console.error("Failed to delete board:", error);
     }
   }, [currentBoardId]);
-
-  // Clear selection when clicking on stage background - OPTIONAL enhancement
-  const handleStageClick = useCallback((e: any) => {
-    // If clicked on empty space, clear selection
-    if (e.target === e.target.getStage()) {
-      setSelectedNodeId(null);
-    }
-  }, [setSelectedNodeId]);
 
   useEffect(() => {
     const checkIfNewBoard = async () => {
@@ -255,7 +288,7 @@ const BoardPage = () => {
     checkIfNewBoard();
   }, [params.boardId, showSetupDialog, setShowSetupDialog]);
 
-  // Cleanup - PRESERVED your original cleanup
+  // Cleanup
   useEffect(() => {
     return () => {
       if (trRef.current) {
@@ -299,13 +332,13 @@ const BoardPage = () => {
           <img src="/image/add-icon.svg" alt="zoom-in" />
         </div>
 
-        {/* Formatting Toolbar - NOW COMPATIBLE with your action system */}
+        {/* Formatting Toolbar */}
         <FormattingToolbar
           selectedShape={selectedShape}
           onChange={handleShapeUpdate}
         />
 
-        {/* Stage - PRESERVED all your original props */}
+        {/* Stage */}
         <StageComponent
           stageRef={stageRef}
           trRef={trRef}
@@ -318,11 +351,7 @@ const BoardPage = () => {
           selectedNodeId={selectedNodeId}
           stageInstance={stageInstance}
           handleWheel={toolHandlers.handleWheel}
-          handleMouseDown={(e) => {
-            toolHandlers.handleMouseDown(e);
-            // Optional: uncomment if you want the click behavior
-            // handleStageClick(e);
-          }}
+          handleMouseDown={toolHandlers.handleMouseDown}
           handleMouseUp={toolHandlers.handleMouseUp}
           handleMouseMove={toolHandlers.handleMouseMove}
           handleTouchStart={toolHandlers.handleTouchStart}
