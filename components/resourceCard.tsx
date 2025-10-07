@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 
 type ResourceCardProps = {
   heading: string;
@@ -7,29 +8,65 @@ type ResourceCardProps = {
   image?: string;
   alt: string;
   url?: string;
-  type: 'book' | 'video' | 'image' | 'website';
+  type: 'book' | 'video' | 'photo' | 'vector' | 'website';
 }
 
 const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProps) => {
-  // Truncate long text
-  const truncateText = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-  };
+  const [imageError, setImageError] = useState(false);
 
-  // Limit authors to 2 maximum
-  const formatAuthors = (authors: string) => {
-    if (!authors) return '';
-    const authorList = authors.split(',');
-    if (authorList.length > 2) {
-      return authorList.slice(0, 2).join(', ') + ' et al.';
+  // Get fallback image based on type
+  const getFallbackImage = () => {
+    switch (type) {
+      case 'book':
+        return '/book-placeholder.svg';
+      case 'video':
+        return '/video-placeholder.svg';
+      case 'photo':
+        return '/photo-placeholder.svg';
+      case 'vector':
+        return '/vector-placeholder.svg';
+      case 'website':
+        return '/website-placeholder.svg';
+      default:
+        return '/book-placeholder.svg';
     }
-    return authors;
   };
 
-  const formattedBody = type === 'book' ? formatAuthors(body || '') : body;
+  const displayImage = image && !imageError ? image : getFallbackImage();
 
-  // Card content
+  // IMAGE-ONLY LAYOUT for photos and vectors - NO TEXT AT ALL
+  if (type === 'photo' || type === 'vector') {
+    const cardContent = (
+      <div className={`
+        bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.1)] 
+        hover:shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-200 
+        border border-gray-100 hover:border-blue-200 overflow-hidden
+        ${url ? 'cursor-pointer hover:scale-[1.02]' : ''}
+      `}>
+        {/* Pure image - no text, no badges, nothing */}
+        <div className="w-full h-48 relative">
+          <img
+            src={displayImage}
+            alt={alt}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        </div>
+      </div>
+    );
+
+    if (url) {
+      return (
+        <Link href={url} target="_blank" rel="noopener noreferrer">
+          {cardContent}
+        </Link>
+      );
+    }
+
+    return cardContent;
+  }
+
+  // REGULAR LAYOUT for other types (books, videos, websites)
   const cardContent = (
     <div className={`
       bg-white p-3 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.1)] 
@@ -38,29 +75,23 @@ const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProp
       ${url ? 'cursor-pointer hover:scale-[1.02]' : ''}
     `}>
       {/* Image/Thumbnail */}
-      {/* // Replace the Image component with regular img tag */}
-        {image && (
-          <div className="flex-shrink-0 w-16 h-16 relative rounded-md overflow-hidden">
-            <img
-              src={image}
-              alt={alt}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback if image fails to load
-                (e.target as HTMLImageElement).src = getFallbackImage(type);
-              }}
-            />
-          </div>
-        )}
+      <div className="flex-shrink-0 w-16 h-16 relative rounded-md overflow-hidden bg-gray-100">
+        <img
+          src={displayImage}
+          alt={alt}
+          className="w-full h-full object-cover"
+          onError={() => setImageError(true)}
+        />
+      </div>
       
-      {/* Content */}
+      {/* Content - keep for non-image types */}
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <h3 className="text-sm font-semibold text-gray-800 leading-tight mb-1 line-clamp-2">
-          {truncateText(heading, 60)}
+          {heading}
         </h3>
-        {formattedBody && (
+        {body && (
           <p className="text-xs text-gray-600 line-clamp-2">
-            {truncateText(formattedBody, 80)}
+            {body}
           </p>
         )}
         <div className="flex items-center mt-1">
@@ -68,7 +99,6 @@ const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProp
             text-xs px-1.5 py-0.5 rounded-full capitalize
             ${type === 'book' ? 'bg-blue-100 text-blue-700' : ''}
             ${type === 'video' ? 'bg-red-100 text-red-700' : ''}
-            ${type === 'image' ? 'bg-green-100 text-green-700' : ''}
             ${type === 'website' ? 'bg-purple-100 text-purple-700' : ''}
           `}>
             {type}
@@ -78,7 +108,6 @@ const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProp
     </div>
   );
 
-  // Wrap with link if URL exists
   if (url) {
     return (
       <Link href={url} target="_blank" rel="noopener noreferrer">
@@ -88,22 +117,6 @@ const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProp
   }
 
   return cardContent;
-};
-
-// Fallback images for different types
-const getFallbackImage = (type: String) => {
-  switch (type) {
-    case 'book':
-      return '/book-placeholder.svg';
-    case 'video':
-      return '/video-placeholder.svg';
-    case 'image':
-      return '/image-placeholder.svg';
-    case 'website':
-      return '/website-placeholder.svg';
-    default:
-      return '/book-placeholder.svg';
-  }
 };
 
 export default ResourceCard;

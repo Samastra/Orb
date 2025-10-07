@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import SelectOptions from './SelectOptions'
 import { updateBoard } from '@/lib/actions/board-actions'
+import { useRecommendations } from '@/context/RecommendationsContext'
 
 interface CreateBoardProps {
   open: boolean;
@@ -25,7 +26,13 @@ interface CreateBoardProps {
 const Category = [
   { value: "Study / Education", label: "Study / Education" },
   { value: "Work / Office", label: "Work / Office" },
-  // ... your other categories
+  { value: "Personal / Life", label: "Personal / Life" },
+  { value: "Health / Fitness", label: "Health / Fitness" },
+  { value: "Technology", label: "Technology" },
+  { value: "Business", label: "Business" },
+  { value: "Creative / Arts", label: "Creative / Arts" },
+  { value: "Science", label: "Science" },
+  { value: "Other", label: "Other" }
 ]
 
 const Visibility = [
@@ -38,6 +45,7 @@ const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate }: CreateBoard
   const [category, setCategory] = useState("")
   const [visibility, setVisibility] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const { setRecommendations } = useRecommendations()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,14 +58,30 @@ const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate }: CreateBoard
         category: category
       }
       
+      // 1. Update the board first
       await updateBoard(boardId, updates)
       
-      // Call the callback with new data
+      // 2. Fetch recommendations immediately after board creation AND store them
+      if (title && title !== "Untitled Board") {
+        const query = category ? `${title} ${category}` : title
+        try {
+          const response = await fetch(`/api/recommendations/search?query=${encodeURIComponent(query)}`)
+          if (response.ok) {
+            const data = await response.json()
+            setRecommendations(data) // Store in context
+            console.log('Recommendations stored for board:', title)
+          }
+        } catch (error) {
+          console.error('Failed to fetch recommendations:', error)
+        }
+      }
+      
+      // 3. Call the callback with new data
       if (onBoardUpdate) {
         onBoardUpdate({ title: updates.title, category: updates.category })
       }
       
-      // Close dialog without page reload
+      // 4. Close dialog without page reload
       onOpenChange(false)
       
     } catch (error) {
@@ -66,6 +90,7 @@ const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate }: CreateBoard
       setIsLoading(false)
     }
   }
+
   const handleClose = () => {
     // Reset form when closing
     setTitle("")

@@ -1,8 +1,9 @@
 // app/layout.tsx
 import type { Metadata } from "next";
-import {Inter} from "next/font/google" 
+import { Inter } from "next/font/google" 
 import { ClerkProvider } from "@clerk/nextjs";
-import "./globals.css"; // <-- Tailwind/global styles
+import { RecommendationsProvider } from '@/context/RecommendationsContext';
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Orb - AI Brainstorming",
@@ -10,27 +11,20 @@ export const metadata: Metadata = {
 };
 
 const inter = Inter({
-  subsets: ["latin"], // you can also add "latin-ext" if needed
-  weight: [
-    "100", // Thin
-    "200", // Extra Light
-    "300", // Light
-    "400", // Regular
-    "500", // Medium
-    "600", // Semi Bold
-    "700", // Bold
-    "800", // Extra Bold
-    "900", // Black
-  ], // pick the weights you’ll use
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
 });
-
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
-    </html>
+      <html lang="en">
+        <body className={inter.className}>
+          <RecommendationsProvider>
+            {children}
+          </RecommendationsProvider>
+        </body>
+      </html>
     </ClerkProvider>
   );
 }

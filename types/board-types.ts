@@ -34,6 +34,7 @@ export type Tool =
   | "eraser";
 
 // ---------- Shape Types ----------
+// ---------- Shape Types ----------
 export type ReactShape = {
   id: string;
   type: string;
@@ -43,6 +44,13 @@ export type ReactShape = {
   fontSize?: number;
   fill?: string;
   stageGroupId?: string;
+  // Add formatting properties for text shapes
+  fontFamily?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  textDecoration?: string;
+  align?: string;
+  draggable?: boolean;
 };
 
 // ---------- Board State Types ----------

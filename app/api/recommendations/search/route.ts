@@ -10,14 +10,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Enhanced query with category for better results
     const enhancedQuery = category ? `${query} ${category} learning` : `${query} tutorial education`;
     
-    // Fetch from all APIs in parallel
+    // Fetch from all APIs in parallel - ONLY images route now
     const [booksResponse, videosResponse, imagesResponse, websitesResponse] = await Promise.allSettled([
       fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/books?query=${encodeURIComponent(enhancedQuery)}`),
       fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/videos?query=${encodeURIComponent(enhancedQuery)}`),
-      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}`),
+      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}`), // Changed from photos to images
       fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/websites?query=${encodeURIComponent(enhancedQuery)}`),
     ]);
 
@@ -31,7 +30,7 @@ export async function GET(request: NextRequest) {
       query: enhancedQuery,
       books: Array.isArray(books) ? books : [],
       videos: Array.isArray(videos) ? videos : [],
-      images: Array.isArray(images) ? images : [],
+      images: Array.isArray(images) ? images : [], // Direct images array
       websites: Array.isArray(websites) ? websites : [],
       timestamp: new Date().toISOString()
     });
