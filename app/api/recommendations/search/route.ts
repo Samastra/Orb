@@ -4,19 +4,34 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
   const category = searchParams.get('category');
+  const refresh = searchParams.get('refresh');
+  const refreshCount = searchParams.get('refreshCount');
 
   if (!query) {
     return NextResponse.json({ error: 'Query is required' }, { status: 400 });
   }
 
   try {
-    const enhancedQuery = category ? `${query} ${category} learning` : `${query} tutorial education`;
+    // Enhanced query with variations for refresh
+    let enhancedQuery = category ? `${query} ${category} learning` : `${query} tutorial education`;
     
-    // Fetch from all APIs in parallel - ONLY images route now
+    // If refresh, add variations to get different results
+    if (refresh === 'true') {
+      const variations = [
+        'creative', 'inspiration', 'ideas', 'concept', 'design',
+        'art', 'visual', 'graphic', 'modern', 'trending'
+      ];
+      
+      // Use refreshCount to cycle through variations
+      const variationIndex = parseInt(refreshCount || '0') % variations.length;
+      enhancedQuery = `${query} ${variations[variationIndex]} ${category ? `${category} learning` : 'tutorial education'}`;
+    }
+
+    // Fetch from all APIs in parallel
     const [booksResponse, videosResponse, imagesResponse, websitesResponse] = await Promise.allSettled([
       fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/books?query=${encodeURIComponent(enhancedQuery)}`),
       fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/videos?query=${encodeURIComponent(enhancedQuery)}`),
-      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}`), // Changed from photos to images
+      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}`),
       fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/websites?query=${encodeURIComponent(enhancedQuery)}`),
     ]);
 
@@ -30,9 +45,10 @@ export async function GET(request: NextRequest) {
       query: enhancedQuery,
       books: Array.isArray(books) ? books : [],
       videos: Array.isArray(videos) ? videos : [],
-      images: Array.isArray(images) ? images : [], // Direct images array
+      images: Array.isArray(images) ? images : [],
       websites: Array.isArray(websites) ? websites : [],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      refreshed: refresh === 'true'
     });
   } catch (error) {
     console.error('Search orchestration error:', error);

@@ -1,10 +1,16 @@
 import Konva from "konva";
+// In board-types.ts, add this import at the top:
+import { KonvaShape } from '@/hooks/useShapes'; // Adjust the path as needed
 
+// The rest of your board-types.ts code remains the same
 // ---------- Action Types ----------
+// Add these to your Action type
 export type Action =
   | { type: "add"; node: Konva.Shape | Konva.Group }
   | { type: "add-react-shape"; shapeType: string; data: ReactShape }
   | { type: "add-line"; line: { tool: 'brush' | 'eraser', points: number[] } }
+  | { type: "add-konva-shape"; shapeType: Tool; data: KonvaShape } // NEW
+  | { type: "delete-konva-shape"; data: KonvaShape } // NEW
   | {
       type: "update";
       id: string;
@@ -14,8 +20,9 @@ export type Action =
   | { type: "delete"; node: Konva.Shape | Konva.Group }
   | { type: "delete-react-shape"; data: any }
   | { type: "delete-line"; lineIndex: number }
-  | { type: "add-stage-with-text"; stageGroup: Konva.Group; textShape: ReactShape };
-
+  | { type: "add-stage-with-text"; stageGroup: Konva.Group; textShape: ReactShape }
+  | { type: "update-react-shape"; id: string; prevData: ReactShape; newData: ReactShape } // NEW
+  | { type: "update-konva-shape"; id: string; prevData: KonvaShape; newData: KonvaShape }; // NEW
 // ---------- Tool Types ----------
 export type Tool =
   | "select"
@@ -34,7 +41,8 @@ export type Tool =
   | "eraser";
 
 // ---------- Shape Types ----------
-// ---------- Shape Types ----------
+
+
 export type ReactShape = {
   id: string;
   type: string;
@@ -51,6 +59,23 @@ export type ReactShape = {
   textDecoration?: string;
   align?: string;
   draggable?: boolean;
+
+  width?: number;
+  height?: number;
+  backgroundColor?: string;
+  textColor?: string;
+
+  letterSpacing?: number;
+  lineHeight?: number;
+  textTransform?: string;
+  textShadow?: {
+    color: string;
+    blur: number;
+    offsetX: number;
+    offsetY: number;
+  };
+  // ADD Z-INDEX FOR LAYERING
+  zIndex?: number;
 };
 
 // ---------- Board State Types ----------

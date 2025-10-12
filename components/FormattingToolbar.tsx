@@ -4,10 +4,10 @@ import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Settings } from "lucide-react";
+import AdvancedTextControls from "./AdvancedTextControls";
+
 import { 
-  Bold, 
-  Italic, 
-  Underline, 
   AlignLeft, 
   AlignCenter, 
   AlignRight,
@@ -15,7 +15,11 @@ import {
   Palette,
   Type,
   CornerDownLeft,
-  Minus
+  Minus,
+  Underline,
+  ArrowUpWideNarrow,
+  Italic,
+  StickyNote
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,13 +34,19 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
-// import { Slider } from "@/components/ui/slider";
+import ColorPicker from "./ColorPicker";
+import { ChevronUp,Layers } from "lucide-react";
 
 interface FormattingToolbarProps {
   selectedShape: any;
   onChange: (updates: Record<string, any>) => void;
+  onBringForward: () => void;
+  onSendBackward: () => void;
+  onBringToFront: () => void;
+  onSendToBack: () => void;
 }
 
+// Font data - simplified without hardcoded weights
 const fonts = [
   { label: "Arial", value: "Arial" },
   { label: "Canva Sans", value: "Canva Sans" },
@@ -47,24 +57,100 @@ const fonts = [
   { label: "Open Sans", value: "Open Sans" },
 ];
 
+// Common font weights - browser will handle fallbacks
+const FONT_WEIGHTS = [
+  { value: "100", label: "Thin" },
+  { value: "200", label: "Extra Light" },
+  { value: "300", label: "Light" },
+  { value: "400", label: "Regular" },
+  { value: "500", label: "Medium" },
+  { value: "600", label: "Semi Bold" },
+  { value: "700", label: "Bold" },
+  { value: "800", label: "Extra Bold" },
+  { value: "900", label: "Black" }
+];
+
+// Font styles
+const FONT_STYLES = [
+  { value: "normal", label: "Regular" },
+  { value: "italic", label: "Italic" },
+  { value: "oblique", label: "Oblique" }
+];
+
+// Sticky note colors
+const STICKY_NOTE_COLORS = [
+  { value: "#ffeb3b", label: "Yellow" },
+  { value: "#e3f2fd", label: "Blue" },
+  { value: "#e8f5e8", label: "Green" },
+  { value: "#fce4ec", label: "Pink" },
+  { value: "#fff3e0", label: "Orange" },
+  { value: "#f3e5f5", label: "Purple" },
+  { value: "#e0f2f1", label: "Teal" },
+  { value: "#fafafa", label: "White" }
+];
+
 const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72];
 const strokeWidths = [1, 2, 3, 4, 5, 6, 8, 10, 12];
 const borderRadiusValues = [0, 2, 4, 6, 8, 12, 16, 20, 24, 32];
 
+const getKonvaFontWeight = (weight: string): string => {
+  const weightMap: { [key: string]: string } = {
+    "normal": "400",
+    "bold": "700",
+    "lighter": "300", 
+    "bolder": "800",
+    "100": "100",
+    "200": "200",
+    "300": "300",
+    "400": "400",
+    "500": "500",
+    "600": "600",
+    "700": "700",
+    "800": "800",
+    "900": "900"
+  };
+  return weightMap[weight] || "400";
+};
+
 const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   selectedShape,
   onChange,
+  onBringForward,
+  onSendBackward,
+  onBringToFront,
+  onSendToBack,
 }) => {
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [formats, setFormats] = useState<string[]>([]);
+
+  const handleBringForward = () => {
+    console.log('🎯 Bring Forward button clicked');
+    console.log('🎯 Selected shape:', selectedShape);
+    onBringForward();
+  };
+
+  const handleSendBackward = () => {
+    console.log('🎯 Send Backward button clicked');
+    console.log('🎯 Selected shape:', selectedShape);
+    onSendBackward();
+  };
+
+  const handleBringToFront = () => {
+    console.log('🎯 Bring to Front button clicked');
+    console.log('🎯 Selected shape:', selectedShape);
+    onBringToFront();
+  };
+
+  const handleSendToBack = () => {
+    console.log('🎯 Send to Back button clicked');
+    console.log('🎯 Selected shape:', selectedShape);
+    onSendToBack();
+  };
 
   useEffect(() => {
     if (!selectedShape) return;
     
     const activeFormats: string[] = [];
-    if (selectedShape.fontWeight === "bold" || selectedShape.fontWeight === "700") 
-      activeFormats.push("bold");
-    if (selectedShape.fontStyle === "italic") 
-      activeFormats.push("italic");
     if (selectedShape.textDecoration === "underline") 
       activeFormats.push("underline");
     
@@ -74,34 +160,49 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   if (!selectedShape) return null;
   
   const isText = selectedShape.type === "text";
+  const isStickyNote = selectedShape.type === "stickyNote";
   const isShape = ["rect", "circle", "ellipse", "triangle", "arrow"].includes(selectedShape.type);
   const hasStroke = isShape || selectedShape.type === "stage";
   const hasCorners = ["rect", "stage"].includes(selectedShape.type);
   
-  const currentFontSize = selectedShape.fontSize || 16;
-  const currentFontFamily = selectedShape.fontFamily || "Canva Sans";
-  const currentColor = selectedShape.fill || "#000000";
+  // FIXED: Proper color handling for different shape types
+  const currentFontSize = selectedShape.fontSize || (isStickyNote ? 16 : 20);
+  const currentFontFamily = selectedShape.fontFamily || "Arial";
+  const currentFontWeight = selectedShape.fontWeight || "400";
+  const currentFontStyle = selectedShape.fontStyle || "normal";
+  const currentFillColor = selectedShape.fill || "#000000"; // For shapes and text
+  const currentTextColor = isStickyNote ? (selectedShape.textColor || "#000000") : (selectedShape.fill || "#000000"); // For text in sticky notes
+  const currentBackgroundColor = isStickyNote ? (selectedShape.backgroundColor || "#ffeb3b") : "#000000";
   const currentAlign = selectedShape.align || "left";
   const currentStroke = selectedShape.stroke || "#000000";
   const currentStrokeWidth = selectedShape.strokeWidth || 0;
   const currentCornerRadius = selectedShape.cornerRadius || 0;
 
+  // Get display label for current weight
+  const getWeightLabel = (weight: string) => {
+    const weightObj = FONT_WEIGHTS.find(w => w.value === weight);
+    return weightObj ? weightObj.label : "Regular";
+  };
+
+  // Get display label for current style
+  const getStyleLabel = (style: string) => {
+    const styleObj = FONT_STYLES.find(s => s.value === style);
+    return styleObj ? styleObj.label : "Regular";
+  };
+
+  // Get display label for sticky note color
+  const getStickyNoteColorLabel = (color: string) => {
+    const colorObj = STICKY_NOTE_COLORS.find(c => c.value === color);
+    return colorObj ? colorObj.label : "Custom";
+  };
+
   const handleFormatChange = (values: string[]) => {
     setFormats(values);
-    const updates: Record<string, any> = {};
     
-    if (values.includes("bold") !== formats.includes("bold")) {
-      updates.fontWeight = values.includes("bold") ? "bold" : "normal";
-    }
-    if (values.includes("italic") !== formats.includes("italic")) {
-      updates.fontStyle = values.includes("italic") ? "italic" : "normal";
-    }
     if (values.includes("underline") !== formats.includes("underline")) {
-      updates.textDecoration = values.includes("underline") ? "underline" : "none";
-    }
-    
-    if (Object.keys(updates).length > 0) {
-      onChange(updates);
+      onChange({ 
+        textDecoration: values.includes("underline") ? "underline" : "none" 
+      });
     }
   };
 
@@ -113,8 +214,21 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     onChange({ align });
   };
 
-  const handleColorChange = (color: string) => {
+  // FIXED: Proper color handling
+  const handleFillColorChange = (color: string) => {
     onChange({ fill: color });
+  };
+
+  const handleTextColorChange = (color: string) => {
+    if (isStickyNote) {
+      onChange({ textColor: color });
+    } else {
+      onChange({ fill: color });
+    }
+  };
+
+  const handleBackgroundColorChange = (color: string) => {
+    onChange({ backgroundColor: color });
   };
 
   const handleStrokeColorChange = (color: string) => {
@@ -133,11 +247,57 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     onChange({ fontFamily });
   };
 
+  const handleFontWeightChange = (weight: string) => {
+    const konvaWeight = getKonvaFontWeight(weight);
+    onChange({ fontWeight: konvaWeight });
+  };
+
+  const handleFontStyleChange = (style: string) => {
+    onChange({ fontStyle: style });
+  };
+
   return (
     <TooltipProvider>
       <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm shadow-lg border rounded-xl px-4 py-2 min-h-[52px]">
+        {/* Sticky Note Color Picker */}
+        {isStickyNote && (
+          <>
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[120px] justify-start">
+                      <StickyNote className="h-4 w-4" style={{ color: currentBackgroundColor }} />
+                      <span className="truncate">{getStickyNoteColorLabel(currentBackgroundColor)}</span>
+                      <ChevronDown className="h-4 w-4 ml-auto" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Note Color</TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="start" className="w-48">
+                {STICKY_NOTE_COLORS.map((color) => (
+                  <DropdownMenuItem
+                    key={color.value}
+                    onSelect={() => handleBackgroundColorChange(color.value)}
+                    className="flex items-center gap-2"
+                  >
+                    <div 
+                      className="w-4 h-4 rounded border"
+                      style={{ backgroundColor: color.value }}
+                    />
+                    {color.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Separator orientation="vertical" className="h-6" />
+          </>
+        )}
+
         {/* Font Family */}
-        {isText && (
+        {(isText || isStickyNote) && (
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -166,10 +326,80 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
           </DropdownMenu>
         )}
 
-        {isText && <Separator orientation="vertical" className="h-6" />}
+        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6" />}
+
+        {/* Font Weight */}
+        {(isText || isStickyNote) && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[100px] justify-start">
+                    <ArrowUpWideNarrow className="h-4 w-4" />
+                    <span className="truncate">{getWeightLabel(currentFontWeight)}</span>
+                    <ChevronDown className="h-4 w-4 ml-auto" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Font Weight</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-32">
+              {FONT_WEIGHTS.map((weight) => (
+                <DropdownMenuItem
+                  key={weight.value}
+                  onSelect={() => handleFontWeightChange(weight.value)}
+                  className="flex justify-between"
+                  style={{ 
+                    fontWeight: weight.value,
+                    fontFamily: currentFontFamily 
+                  }}
+                >
+                  {weight.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6" />}
+
+        {/* Font Style */}
+        {(isText || isStickyNote) && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[80px] justify-start">
+                    <Italic className="h-4 w-4" />
+                    <span className="truncate">{getStyleLabel(currentFontStyle)}</span>
+                    <ChevronDown className="h-4 w-4 ml-auto" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Font Style</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-28">
+              {FONT_STYLES.map((style) => (
+                <DropdownMenuItem
+                  key={style.value}
+                  onSelect={() => handleFontStyleChange(style.value)}
+                  className="flex justify-between"
+                  style={{ 
+                    fontStyle: style.value,
+                    fontFamily: currentFontFamily 
+                  }}
+                >
+                  {style.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6" />}
 
         {/* Font Size */}
-        {isText && (
+        {(isText || isStickyNote) && (
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -196,34 +426,16 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
           </DropdownMenu>
         )}
 
-        {isText && <Separator orientation="vertical" className="h-6" />}
+        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6" />}
 
-        {/* Text Formatting */}
-        {isText && (
+        {/* Underline Toggle */}
+        {(isText || isStickyNote) && (
           <ToggleGroup
-            type="multiple"
-            value={formats}
-            onValueChange={handleFormatChange}
+            type="single"
+            value={formats.includes("underline") ? "underline" : ""}
+            onValueChange={(value) => handleFormatChange(value ? ["underline"] : [])}
             className="flex gap-0 rounded-lg border bg-background p-1"
           >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem value="bold" aria-label="Bold" className="h-8 w-8 p-0">
-                  <Bold className="h-4 w-4" />
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent>Bold</TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem value="italic" aria-label="Italic" className="h-8 w-8 p-0">
-                  <Italic className="h-4 w-4" />
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent>Italic</TooltipContent>
-            </Tooltip>
-            
             <Tooltip>
               <TooltipTrigger asChild>
                 <ToggleGroupItem value="underline" aria-label="Underline" className="h-8 w-8 p-0">
@@ -235,10 +447,10 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
           </ToggleGroup>
         )}
 
-        {isText && <Separator orientation="vertical" className="h-6" />}
+        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6" />}
 
         {/* Text Alignment */}
-        {isText && (
+        {(isText || isStickyNote) && (
           <ToggleGroup
             type="single"
             value={currentAlign}
@@ -276,27 +488,59 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
 
         <Separator orientation="vertical" className="h-6" />
 
-        {/* Fill Color Picker */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="relative">
-              <Input
-                type="color"
-                value={currentColor}
-                onChange={(e) => handleColorChange(e.target.value)}
-                className="w-10 h-8 p-0 border-none cursor-pointer absolute opacity-0"
-              />
-              <div className="w-10 h-8 rounded-md border flex items-center justify-center cursor-pointer bg-background hover:bg-accent">
-                <div 
-                  className="w-6 h-6 rounded border"
-                  style={{ backgroundColor: currentColor }}
+        {/* FILL COLOR PICKER - For Shapes */}
+        {isShape && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <ColorPicker
+                  value={currentFillColor}
+                  onChange={handleFillColorChange}
+                  label="Fill Color"
                 />
-                <Palette className="h-3 w-3 absolute bottom-1 right-1 text-muted-foreground" />
               </div>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>Fill Color</TooltipContent>
-        </Tooltip>
+            </TooltipTrigger>
+            <TooltipContent>Fill Color</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* TEXT COLOR PICKER - For Text and Sticky Notes */}
+        {(isText || isStickyNote) && (
+          <>
+            {isShape && <Separator orientation="vertical" className="h-6" />}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <ColorPicker
+                    value={currentTextColor}
+                    onChange={handleTextColorChange}
+                    label="Text Color"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Text Color</TooltipContent>
+            </Tooltip>
+          </>
+        )}
+
+        {/* Background Color Picker for Sticky Notes */}
+        {isStickyNote && (
+          <>
+            <Separator orientation="vertical" className="h-6" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <ColorPicker
+                    value={currentBackgroundColor}
+                    onChange={handleBackgroundColorChange}
+                    label="Note Color"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Note Background</TooltipContent>
+            </Tooltip>
+          </>
+        )}
 
         {/* Stroke/Border Controls */}
         {hasStroke && (
@@ -306,23 +550,13 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
             {/* Stroke Color */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="relative">
-                  <Input
-                    type="color"
+                <div>
+                  <ColorPicker
                     value={currentStroke}
-                    onChange={(e) => handleStrokeColorChange(e.target.value)}
-                    className="w-10 h-8 p-0 border-none cursor-pointer absolute opacity-0"
+                    onChange={handleStrokeColorChange}
+                    label="Border Color"
+                    className="border-dashed"
                   />
-                  <div className="w-10 h-8 rounded-md border flex items-center justify-center cursor-pointer bg-background hover:bg-accent">
-                    <div 
-                      className="w-4 h-4 rounded border-2"
-                      style={{ 
-                        borderColor: currentStroke,
-                        backgroundColor: 'transparent'
-                      }}
-                    />
-                    <Minus className="h-3 w-3 absolute bottom-1 right-1 text-muted-foreground" />
-                  </div>
                 </div>
               </TooltipTrigger>
               <TooltipContent>Border Color</TooltipContent>
@@ -390,7 +624,7 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
         )}
 
         {/* Custom Font Size Input */}
-        {isText && (
+        {(isText || isStickyNote) && (
           <>
             <Separator orientation="vertical" className="h-6" />
             <div className="flex items-center gap-2">
@@ -406,7 +640,104 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
             </div>
           </>
         )}
+
+        {/* Settings Button */}
+        {isText && (
+          <>
+            <Separator orientation="vertical" className="h-6" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={showAdvanced ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
+              </TooltipContent>
+            </Tooltip>
+          </>
+        )}
+
+        {/* Layer Controls */}
+        {(isText || isStickyNote || isShape) && (
+          <>
+            <Separator orientation="vertical" className="h-6" />
+            
+            {/* Layer Controls Group */}
+            <div className="flex items-center gap-1 rounded-lg border bg-background p-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSendToBack}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Layers className="h-4 w-4 rotate-90" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Send to Back</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSendBackward}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Send Backward</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBringForward}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Bring Forward</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBringToFront}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Layers className="h-4 w-4 -rotate-90" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Bring to Front</TooltipContent>
+              </Tooltip>
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Advanced Controls Panel */}
+      {showAdvanced && isText && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm shadow-lg border rounded-xl px-4 py-2 min-h-[52px]">
+          <AdvancedTextControls
+            selectedShape={selectedShape}
+            onChange={onChange}
+          />
+        </div>
+      )}
     </TooltipProvider>
   );
 };

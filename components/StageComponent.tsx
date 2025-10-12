@@ -1,3 +1,4 @@
+// components/StageComponent.tsx
 import React, { useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Konva from "konva";
@@ -6,6 +7,7 @@ import GridLayer from "@/components/gridLayer";
 import EditableTextComponent from "@/components/editableTextCompoent";
 import { ReactShape, Tool } from "../types/board-types";
 import { KonvaShape } from "@/hooks/useShapes";
+import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 
 // Dynamic import for Stage
 const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
@@ -61,32 +63,58 @@ const StageComponent: React.FC<StageComponentProps> = ({
   updateShape,
   setStageInstance,
 }) => {
-  // Create refs for all shapes
+  // Create refs for all shapes (both Konva shapes and React shapes)
   const shapeRefs = useRef<{ [key: string]: any }>({});
 
-  // Update transformer when selection changes - THIS IS THE KEY FIX
+  // Sync shape refs when shape lists change
   useEffect(() => {
-    if (!trRef.current || !selectedNodeId) {
-      if (trRef.current) {
-        trRef.current.nodes([]);
-      }
+    const allIds = [
+      ...shapes.map(s => s.id),
+      ...reactShapes.map(r => r.id)
+    ];
+    const map: { [key: string]: any } = {};
+    allIds.forEach(id => {
+      map[id] = shapeRefs.current[id] || React.createRef();
+    });
+    shapeRefs.current = map;
+  }, [shapes, reactShapes]);
+
+  // FIXED: Sort combined array by zIndex for proper layering
+  const combined = React.useMemo(() => {
+    // Combine all shapes and sort by zIndex for proper layering
+    const allShapes = [
+      ...shapes.map(s => ({ ...s, __kind: 'konva' as const })),
+      ...reactShapes.map(r => ({ ...r, __kind: 'react' as const }))
+    ];
+    
+    // Sort by zIndex - higher zIndex renders on top
+    return allShapes.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+  }, [shapes, reactShapes]);
+
+  useEffect(() => {
+    if (!trRef.current) return;
+    if (!selectedNodeId) {
+      trRef.current.nodes([]);
       return;
     }
-
-    const selectedShape = shapeRefs.current[selectedNodeId];
-    if (selectedShape && selectedShape.current) {
-      trRef.current.nodes([selectedShape.current]);
+    const ref = shapeRefs.current[selectedNodeId];
+    const selectedShape = combined.find(item => item.id === selectedNodeId);
+    if (selectedShape && selectedShape.__kind === 'react' && selectedShape.type === 'stickyNote') {
+      trRef.current.nodes([]);
+      trRef.current.getLayer()?.batchDraw();
+      return;
+    }
+    if (ref && ref.current) {
+      trRef.current.nodes([ref.current]);
       trRef.current.getLayer()?.batchDraw();
     }
-  }, [selectedNodeId, shapes]); // Re-run when selection or shapes change
+  }, [selectedNodeId, combined, trRef]);
 
-  // Simple click handler
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (e.target === e.target.getStage()) {
       setSelectedNodeId(null);
       return;
     }
-
     if (e.target.hasName('selectable-shape')) {
       setSelectedNodeId(e.target.id());
     }
@@ -121,163 +149,178 @@ const StageComponent: React.FC<StageComponentProps> = ({
       >
         <GridLayer stage={stageInstance} baseSize={30} color="#d6d4d4ff" />
         <Layer name="draw-layer">
-          {/* Render Konva shapes with refs */}
-          {/* Render Konva shapes with refs */}
-{shapes.map((shape) => {
-  // Create ref for this shape if it doesn't exist
-  if (!shapeRefs.current[shape.id]) {
-    shapeRefs.current[shape.id] = React.createRef();
-  }
+          {combined.map((item: any) => {
+            const id = item.id;
+            const commonProps = {
+              id,
+              x: item.x,
+              y: item.y,
+              draggable: item.draggable ?? true,
+              name: 'selectable-shape',
+              onDragEnd: (e: any) => {
+                if (item.__kind === 'konva') {
+                  updateShape(id, { x: e.target.x(), y: e.target.y() });
+                } else {
+                  setReactShapes(prev => prev.map(s => s.id === id ? { ...s, x: e.target.x(), y: e.target.y() } : s));
+                }
+              },
+              onClick: (e: any) => {
+                e.cancelBubble = true;
+                if (activeTool === "select") {
+                  setSelectedNodeId(id);
+                }
+              },
+              onTap: (e: any) => {
+                e.cancelBubble = true;
+                if (activeTool === "select") {
+                  setSelectedNodeId(id);
+                }
+              }
+            };
 
-  const commonProps = {
-    // REMOVE key and ref from here - they'll be passed directly
-    id: shape.id,
-    x: shape.x,
-    y: shape.y,
-    fill: shape.fill,
-    draggable: shape.draggable,
-    onDragEnd: (e: any) => {
-      updateShape(shape.id, {
-        x: e.target.x(),
-        y: e.target.y(),
-      });
-    },
-    onClick: (e: any) => {
-      e.cancelBubble = true;
-      if (activeTool === "select") {
-        setSelectedNodeId(shape.id);
-      }
-    },
-    onTap: (e: any) => {
-      e.cancelBubble = true;
-      if (activeTool === "select") {
-        setSelectedNodeId(shape.id);
-      }
-    },
-    name: 'selectable-shape',
-  };
-
-  switch (shape.type) {
-    case 'rect':
-      return (
-        <Rect
-          key={shape.id} // ✅ Pass key directly
-          ref={shapeRefs.current[shape.id]} // ✅ Pass ref directly
-          {...commonProps}
-          width={shape.width || 100}
-          height={shape.height || 100}
-        />
-      );
-    case 'circle':
-      return (
-        <Circle
-          key={shape.id} // ✅ Pass key directly
-          ref={shapeRefs.current[shape.id]} // ✅ Pass ref directly
-          {...commonProps}
-          radius={shape.radius || 50}
-        />
-      );
-    case 'ellipse':
-      return (
-        <Ellipse
-          key={shape.id} // ✅ Pass key directly
-          ref={shapeRefs.current[shape.id]} // ✅ Pass ref directly
-          {...commonProps}
-          radiusX={shape.radiusX || 80}
-          radiusY={shape.radiusY || 50}
-        />
-      );
-      case 'triangle':
-      return (
-        <RegularPolygon
-          key={shape.id}
-          ref={shapeRefs.current[shape.id]}
-          {...commonProps}
-          sides={3}
-          radius={50}
-        />
-      );
-    case 'arrow':
-      return (
-        <Arrow
-          key={shape.id} // ✅ Pass key directly
-          ref={shapeRefs.current[shape.id]} // ✅ Pass ref directly
-          {...commonProps}
-          points={shape.points || [0, 0, 100, 0]}
-          stroke={shape.fill}
-          fill={shape.fill}
-          strokeWidth={2}
-          pointerLength={10}
-          pointerWidth={10}
-        />
-      );
-    default:
-      return null;
-  }
-})}
-
-          {/* Rest of your existing code for lines and reactShapes remains the same */}
-         {lines.map((line, i) => (
-          <Line
-            key={i}
-            points={line.points} // Raw screen coordinates - no transformation needed
-            stroke={line.tool === 'brush' ? '#000000' : '#ffffff'}
-            strokeWidth={5}
-            tension={0.5}
-            lineCap="round"
-            lineJoin="round"
-            globalCompositeOperation={
-              line.tool === 'eraser' ? 'destination-out' : 'source-over'
+            if (item.__kind === 'konva') {
+              switch (item.type) {
+                case 'rect':
+                  return (
+                    <Rect
+                      key={id}
+                      ref={shapeRefs.current[id]}
+                      {...commonProps}
+                      width={item.width || 100}
+                      height={item.height || 100}
+                      fill={item.fill}
+                    />
+                  );
+                case 'circle':
+                  return (
+                    <Circle
+                      key={id}
+                      ref={shapeRefs.current[id]}
+                      {...commonProps}
+                      radius={item.radius || 50}
+                      fill={item.fill}
+                    />
+                  );
+                case 'ellipse':
+                  return (
+                    <Ellipse
+                      key={id}
+                      ref={shapeRefs.current[id]}
+                      {...commonProps}
+                      radiusX={item.radiusX || 80}
+                      radiusY={item.radiusY || 50}
+                      fill={item.fill}
+                    />
+                  );
+                case 'triangle':
+                  return (
+                    <RegularPolygon
+                      key={id}
+                      ref={shapeRefs.current[id]}
+                      {...commonProps}
+                      sides={3}
+                      radius={50}
+                      fill={item.fill}
+                    />
+                  );
+                case 'arrow':
+                  return (
+                    <Arrow
+                      key={id}
+                      ref={shapeRefs.current[id]}
+                      {...commonProps}
+                      points={item.points || [0, 0, 100, 0]}
+                      stroke={item.fill}
+                      fill={item.fill}
+                      strokeWidth={2}
+                      pointerLength={10}
+                      pointerWidth={10}
+                    />
+                  );
+                default:
+                  return null;
+              }
+            } else {
+              if (item.type === 'text') {
+                return (
+                  <EditableTextComponent
+                    key={id}
+                    ref={shapeRefs.current[id]}
+                    id={id}
+                    x={item.x}
+                    y={item.y}
+                    text={item.text || "Double click to edit"}
+                    fontSize={item.fontSize || 20}
+                    fill={item.fill || "black"}
+                    fontFamily={item.fontFamily || "Arial"}
+                    fontWeight={item.fontWeight || "normal"}
+                    fontStyle={item.fontStyle || "normal"}
+                    textDecoration={item.textDecoration || "none"}
+                    align={item.align || "left"}
+                    letterSpacing={item.letterSpacing || 0}
+                    lineHeight={item.lineHeight || 1.2}
+                    textTransform={item.textTransform || "none"}
+                    textShadow={item.textShadow}
+                    isSelected={selectedNodeId === id}
+                    activeTool={activeTool}
+                    onSelect={() => {
+                      if (activeTool === "select") {
+                        setSelectedNodeId(id);
+                      }
+                    }}
+                    onUpdate={(newAttrs: any) => {
+                      setReactShapes(prev => prev.map(shape => shape.id === id ? { ...shape, ...newAttrs } : shape));
+                    }}
+                  />
+                );
+              } else if (item.type === 'stickyNote') {
+                return (
+                  <EditableStickyNoteComponent
+                    key={id}
+                    ref={shapeRefs.current[id]}
+                    shapeData={item}
+                    isSelected={selectedNodeId === id}
+                    activeTool={activeTool}
+                    onSelect={() => {
+                      if (activeTool === "select") {
+                        setSelectedNodeId(id);
+                      }
+                    }}
+                    onUpdate={(newAttrs: any) => {
+                      setReactShapes(prev => prev.map(shape => shape.id === id ? { ...shape, ...newAttrs } : shape));
+                    }}
+                  />
+                );
+              } else {
+                return null;
+              }
             }
-            listening={false}
-          />
-        ))}
-          {/* // In your StageComponent, update the EditableTextComponent usage: */}
-{reactShapes.map((shapeData) => {
-  if (shapeData.type === 'text') {
-    return (
-      <EditableTextComponent
-        key={shapeData.id}
-        id={shapeData.id}
-        x={shapeData.x}
-        y={shapeData.y}
-        text={shapeData.text || "Double click to edit"}
-        fontSize={shapeData.fontSize || 20}
-        fill={shapeData.fill || "black"}
-        // PASS ALL THE FORMATTING PROPERTIES
-        fontFamily={shapeData.fontFamily || "Arial"}
-        fontWeight={shapeData.fontWeight || "normal"}
-        fontStyle={shapeData.fontStyle || "normal"}
-        textDecoration={shapeData.textDecoration || "none"}
-        align={shapeData.align || "left"}
-        isSelected={selectedNodeId === shapeData.id}
-        activeTool={activeTool}
-        onSelect={() => {
-          if (activeTool === "select") {
-            setSelectedNodeId(shapeData.id);
-          }
-        }}
-        onUpdate={(newAttrs) => {
-          setReactShapes(prev => 
-            prev.map(shape => 
-              shape.id === shapeData.id 
-                ? { ...shape, ...newAttrs }
-                : shape
-            )
-          );
-        }}
-      />
-    );
-  }
-  return null;
-})}
-          {/* Transformer - this will now work properly */}
+          })}
+
+          {/* Lines - keep on top of items in the same layer */}
+          {lines.map((line, i) => (
+            <Line
+              key={`line-${i}`}
+              points={line.points}
+              stroke={line.tool === 'brush' ? '#000000' : '#ffffff'}
+              strokeWidth={5}
+              tension={0.5}
+              lineCap="round"
+              lineJoin="round"
+              globalCompositeOperation={
+                line.tool === 'eraser' ? 'destination-out' : 'source-over'
+              }
+              listening={false}
+            />
+          ))}
+
+          {/* Transformer */}
           <Transformer
             ref={trRef}
             enabledAnchors={[
-              "top-left", "top-right", 
+              "top-left", "top-right",
               "bottom-left", "bottom-right",
-              "middle-top", "middle-bottom", 
+              "top-center", "bottom-center",
               "middle-left", "middle-right"
             ]}
             boundBoxFunc={(oldBox, newBox) => ({

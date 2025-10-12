@@ -1,3 +1,4 @@
+// hooks/useShapes.ts
 import { useState, useCallback } from 'react';
 import { Tool } from '@/types/board-types';
 
@@ -11,25 +12,27 @@ export interface KonvaShape {
   radius?: number;
   radiusX?: number;
   radiusY?: number;
-  points?: number[]; // Add this for triangle and arrow
+  points?: number[];
   fill: string;
   draggable: boolean;
+  zIndex?: number;
 }
 
 export const useShapes = () => {
   const [shapes, setShapes] = useState<KonvaShape[]>([]);
 
   const addShape = useCallback((type: Tool, center: { x: number; y: number }, draggable: boolean) => {
-  const shapeId = `shape-${Date.now()}`;
-    
+    const shapeId = `shape-${Date.now()}`;
+
     const baseShape = {
-    id: shapeId,
-    type,
-    x: center.x,
-    y: center.y,
-    fill: "#aae3ff",
-    draggable: draggable, // Use the passed parameter
-  };
+      id: shapeId,
+      type,
+      x: center.x,
+      y: center.y,
+      fill: "#aae3ff",
+      draggable: draggable,
+      zIndex: Date.now(), // Use timestamp for initial zIndex
+    };
 
     let newShape: KonvaShape;
 
@@ -43,11 +46,11 @@ export const useShapes = () => {
           height: 100,
         };
         break;
-        case "triangle":
+      case "triangle":
         newShape = {
           ...baseShape,
-          points: [0, 0, 100, 0, 50, 86.6], // Equilateral triangle points
-          fill: "#ffaae3", // Different color for triangle
+          points: [0, 0, 100, 0, 50, 86.6],
+          fill: "#ffaae3",
         };
         break;
       case "circle":
@@ -76,7 +79,7 @@ export const useShapes = () => {
     }
 
     setShapes(prev => [...prev, newShape]);
-    return shapeId;
+    return { shapeId, shapeData: newShape }; // Return both ID and data
   }, []);
 
   const updateShape = useCallback((id: string, attrs: Partial<KonvaShape>) => {
@@ -89,11 +92,57 @@ export const useShapes = () => {
     setShapes(prev => prev.filter(shape => shape.id !== id));
   }, []);
 
+  // FIXED: Z-index operations - only modify zIndex, preserve all other properties
+  const bringForward = useCallback((shapeId: string) => {
+    setShapes(prev => {
+      const index = prev.findIndex(s => s.id === shapeId);
+      if (index === -1 || index === prev.length - 1) return prev;
+      const newShapes = [...prev];
+      const currZ = newShapes[index].zIndex ?? 0;
+      const nextZ = newShapes[index + 1].zIndex ?? 0;
+      newShapes[index] = { ...newShapes[index], zIndex: nextZ };
+      newShapes[index + 1] = { ...newShapes[index + 1], zIndex: currZ };
+      return newShapes;
+    });
+  }, []);
+
+  const sendBackward = useCallback((shapeId: string) => {
+    setShapes(prev => {
+      const index = prev.findIndex(s => s.id === shapeId);
+      if (index <= 0) return prev;
+      const newShapes = [...prev];
+      const currZ = newShapes[index].zIndex ?? 0;
+      const prevZ = newShapes[index - 1].zIndex ?? 0;
+      newShapes[index] = { ...newShapes[index], zIndex: prevZ };
+      newShapes[index - 1] = { ...newShapes[index - 1], zIndex: currZ };
+      return newShapes;
+    });
+  }, []);
+
+  const bringToFront = useCallback((shapeId: string) => {
+    setShapes(prev => {
+      const maxZ = Math.max(...prev.map(s => s.zIndex ?? 0)) + 1;
+      return prev.map(shape => shape.id === shapeId ? { ...shape, zIndex: maxZ } : shape);
+    });
+  }, []);
+
+  const sendToBack = useCallback((shapeId: string) => {
+    setShapes(prev => {
+      const minZ = Math.min(...prev.map(s => s.zIndex ?? 0)) - 1;
+      return prev.map(shape => shape.id === shapeId ? { ...shape, zIndex: minZ } : shape);
+    });
+  }, []);
+
   return {
     shapes,
     addShape,
     updateShape,
     removeShape,
     setShapes,
+    // Z-index operations
+    bringForward,
+    sendBackward,
+    bringToFront,
+    sendToBack,
   };
 };

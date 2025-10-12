@@ -5,7 +5,7 @@ import ResourceCard from "./resourceCard"
 import { SidebarInput } from "./ui/sidebar"
 import { useEffect, useState } from "react"
 import { useRecommendations } from '@/context/RecommendationsContext'
-import SelectOptions from './SelectOptions' // Import your existing Select component
+import SelectOptions from './SelectOptions'
 
 interface Resource {
   id: string
@@ -22,7 +22,7 @@ interface Resource {
 interface SearchResults {
   books: Resource[]
   videos: Resource[]
-  images: Resource[] // Combined photos + vectors
+  images: Resource[]
   websites: Resource[]
 }
 
@@ -31,14 +31,12 @@ interface ResourceListProps {
   boardCategory?: string
 }
 
-// Image type options for the filter
 const ImageTypes = [
   { value: "all", label: "All Images" },
   { value: "photo", label: "📷 Photos" },
   { value: "vector", label: "🎨 Vectors" }
 ]
 
-// Default empty results
 const emptyResults: SearchResults = {
   books: [],
   videos: [],
@@ -52,21 +50,25 @@ const ResourceList = ({ boardTitle, boardCategory }: ResourceListProps) => {
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("books")
   const [manualSearchResults, setManualSearchResults] = useState<SearchResults | null>(null)
-  const [imageTypeFilter, setImageTypeFilter] = useState("all") // "all", "photo", "vector"
+  const [imageTypeFilter, setImageTypeFilter] = useState("all")
+  const [refreshCount, setRefreshCount] = useState(0) // Track refresh attempts
 
   // Use stored recommendations by default, manual search results when user searches
   const displayResources = manualSearchResults || recommendations
 
-  // Fetch resources ONLY for manual search
-  const fetchResources = async (query: string) => {
-    if (!query.trim()) {
+  // Fetch resources with refresh capability
+  const fetchResources = async (query: string, isRefresh = false) => {
+    if (!query.trim() && !isRefresh) {
       setManualSearchResults(null)
       return
     }
     
     setLoading(true)
     try {
-      const response = await fetch(`/api/recommendations/search?query=${encodeURIComponent(query)}`)
+      // Add refresh parameter and count to vary results
+      const url = `/api/recommendations/search?query=${encodeURIComponent(query)}&refresh=${isRefresh ? 'true' : 'false'}&refreshCount=${refreshCount}`
+      
+      const response = await fetch(url)
       
       if (response.ok) {
         const data = await response.json() as SearchResults
@@ -83,6 +85,18 @@ const ResourceList = ({ boardTitle, boardCategory }: ResourceListProps) => {
     }
   }
 
+  // Handle refresh - increment count and refetch
+  const handleRefresh = () => {
+    const currentQuery = searchQuery || (boardTitle && boardTitle !== "Untitled Board" 
+      ? boardTitle + (boardCategory ? ` ${boardCategory}` : '')
+      : '');
+
+    if (currentQuery) {
+      setRefreshCount(prev => prev + 1)
+      fetchResources(currentQuery, true)
+    }
+  }
+
   // Handle search input
   const handleSearch = (value: string) => {
     setSearchQuery(value)
@@ -91,12 +105,23 @@ const ResourceList = ({ boardTitle, boardCategory }: ResourceListProps) => {
     }
   }
 
-  // Search when user presses Enter - ONLY for manual searches
+  // Search when user presses Enter
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
+      setRefreshCount(0) // Reset refresh count for new search
       fetchResources(searchQuery)
     }
   }
+
+  // Auto-fetch when component mounts AND we have board data
+  useEffect(() => {
+    if (boardTitle && boardTitle !== "Untitled Board" && !manualSearchResults) {
+      const query = boardTitle + (boardCategory ? ` ${boardCategory}` : '')
+      setSearchQuery(query)
+      setRefreshCount(0)
+      fetchResources(query)
+    }
+  }, [boardTitle, boardCategory, manualSearchResults])
 
   // Get URL for resource based on type
   const getResourceUrl = (resource: Resource): string | undefined => {
@@ -220,15 +245,40 @@ const ResourceList = ({ boardTitle, boardCategory }: ResourceListProps) => {
           <TabsTrigger value="images">🖼️ Images</TabsTrigger>
         </TabsList>
         
-        <SidebarInput 
-          id="search" 
-          placeholder="Search learning resources..."
-          className="h-8 pl-7 mt-3"
-          value={searchQuery}
-          onChange={(e) => handleSearch(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={loading}
-        />
+        {/* Search and Refresh Container */}
+        <div className="flex gap-2 mt-3">
+          <SidebarInput 
+            id="search" 
+            placeholder="Search learning resources..."
+            className="h-8 pl-7 flex-1"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={loading}
+          />
+          
+          {/* Refresh Button - Modern placement */}
+          <button
+            onClick={handleRefresh}
+            disabled={loading || (!searchQuery.trim() && (!boardTitle || boardTitle === "Untitled Board"))}
+            className={`
+              h-8 px-3 rounded-md border border-gray-300 bg-white text-sm font-medium
+              flex items-center justify-center min-w-8
+              transition-all duration-200
+              ${loading || (!searchQuery.trim() && (!boardTitle || boardTitle === "Untitled Board"))
+                ? 'opacity-50 cursor-not-allowed text-gray-400' 
+                : 'text-gray-700 hover:bg-gray-50 hover:border-gray-400 hover:shadow-sm cursor-pointer'
+              }
+            `}
+            title="Get new results"
+          >
+            {loading ? (
+              <span className="animate-spin">⟳</span>
+            ) : (
+              <span>↻</span>
+            )}
+          </button>
+        </div>
         
         {/* Image Type Filter - Only show on Images tab */}
         {activeTab === 'images' && (
@@ -244,13 +294,19 @@ const ResourceList = ({ boardTitle, boardCategory }: ResourceListProps) => {
         
         {/* Show what we're displaying */}
         {manualSearchResults ? (
-          <div className="mt-2 text-sm text-gray-600">
-            Showing results for: <span className="font-medium">"{searchQuery}"</span>
-            {loading && " (loading...)"}
+          <div className="mt-2 text-sm text-gray-600 flex items-center gap-2">
+            <span>Showing results for: <span className="font-medium">"{searchQuery}"</span></span>
+            {loading && (
+              <span className="flex items-center gap-1">
+                <span className="animate-spin text-xs">⟳</span>
+                <span>loading new results...</span>
+              </span>
+            )}
           </div>
         ) : boardTitle && boardTitle !== "Untitled Board" ? (
           <div className="mt-2 text-sm text-gray-600">
             Recommendations for: <span className="font-medium">"{boardTitle}"</span>
+            {loading && " (loading...)"}  
           </div>
         ) : null}
         
