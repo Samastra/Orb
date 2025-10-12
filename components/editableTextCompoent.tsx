@@ -9,12 +9,8 @@ import React, {
   useImperativeHandle,
 } from "react";
 import { Text, Transformer } from "react-konva";
-import TextEditor from "@/components/TextEditor";
 import Konva from "konva";
 
-// ------------------
-// Type definitions
-// ------------------
 interface TextAttributes {
   x?: number;
   y?: number;
@@ -26,7 +22,7 @@ interface TextAttributes {
   fontWeight?: string;
   fontStyle?: string;
   textDecoration?: string;
-  align?: string;
+  align?: "left" | "center" | "right" | "justify";
   letterSpacing?: number;
   lineHeight?: number;
   textTransform?: string;
@@ -53,11 +49,11 @@ export interface EditableTextComponentProps {
   fontWeight?: string;
   fontStyle?: string;
   textDecoration?: string;
-  align?: string;
+  align?: "left" | "center" | "right" | "justify";
   letterSpacing?: number;
   lineHeight?: number;
   textTransform?: string;
-  width? :number;
+  width?: number;
   textShadow?: {
     color: string;
     blur: number;
@@ -66,11 +62,9 @@ export interface EditableTextComponentProps {
   };
 }
 
-// ------------------
 // Inner component
-// ------------------
 const EditableTextComponentInner: React.FC<
-   EditableTextComponentProps & { textRef: React.RefObject<Konva.Text | null>  }
+  EditableTextComponentProps & { textRef: React.RefObject<Konva.Text | null> }
 > = ({
   id,
   x,
@@ -82,8 +76,8 @@ const EditableTextComponentInner: React.FC<
   activeTool,
   onSelect,
   onUpdate,
-  fontFamily = "Arial",
-  fontWeight = "normal",
+  fontFamily = "Inter, Arial, sans-serif",
+  fontWeight = "400",
   fontStyle = "normal",
   textDecoration = "none",
   align = "left",
@@ -92,12 +86,15 @@ const EditableTextComponentInner: React.FC<
   textTransform = "none",
   textShadow,
   textRef,
+  width,
 }) => {
   const trRef = useRef<Konva.Transformer>(null);
-  const [isEditing, setIsEditing] = useState(text === "");
-  const [textWidth, setTextWidth] = useState(200);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(text);
+  const [textWidth, setTextWidth] = useState(width || 200);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Helper for text transform
+  // Transform text for display
   const getTransformedText = useCallback((txt: string, transform: string) => {
     switch (transform) {
       case "uppercase":
@@ -111,31 +108,10 @@ const EditableTextComponentInner: React.FC<
     }
   }, []);
 
-  // Re-render when style changes
   useEffect(() => {
-    if (textRef.current) {
-      textRef.current.getLayer()?.batchDraw();
-    }
-  }, [fontFamily, fontWeight, fontStyle, textDecoration, align, letterSpacing, lineHeight, textTransform, textShadow]);
+    setEditValue(text);
+  }, [text]);
 
-  // Apply shadow blur
-  useEffect(() => {
-    if (textRef.current && textShadow && textShadow.blur > 0) {
-      textRef.current.cache();
-    }
-  }, [textShadow]);
-
-  // Cursor control
-  useEffect(() => {
-    if (textRef.current) {
-      const stage = textRef.current.getStage();
-      if (stage && stage.container()) {
-        stage.container().style.cursor = activeTool === "text" ? "text" : "default";
-      }
-    }
-  }, [activeTool]);
-
-  // Transformer binding
   useEffect(() => {
     if (isSelected && trRef.current && textRef.current && !isEditing) {
       trRef.current.nodes([textRef.current]);
@@ -143,70 +119,184 @@ const EditableTextComponentInner: React.FC<
     } else if (trRef.current) {
       trRef.current.nodes([]);
     }
-  }, [isSelected, isEditing]);
+  }, [isSelected, isEditing, textRef]);
 
-  const handleTextDblClick = useCallback(() => {
-    setIsEditing(true);
+  useEffect(() => {
+    if (textRef.current) {
+      const stage = textRef.current.getStage();
+      if (stage && stage.container()) {
+        stage.container().style.cursor = activeTool === "text" ? "text" : "default";
+      }
+    }
+  }, [activeTool, textRef]);
+
+  // Auto-resize textarea as user types
+  const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
   }, []);
 
-  const handleTextChange = useCallback(
-    (newText: string) => {
-      onUpdate({ text: newText });
-    },
-    [onUpdate]
-  );
+  // Double-click text to edit
+  const handleTextDblClick = useCallback(() => {
+    const textNode = textRef.current;
+    if (!textNode) return;
+    const stage = textNode.getStage();
+    if (!stage) return;
+
+    setIsEditing(true);
+
+    const absPos = textNode.absolutePosition();
+    const stageBox = stage.container().getBoundingClientRect();
+
+    const areaPosition = {
+      x: stageBox.left + absPos.x,
+      y: stageBox.top + absPos.y,
+    };
+
+    const textarea = document.createElement("textarea");
+    document.body.appendChild(textarea);
+    textareaRef.current = textarea;
+
+    textarea.value = textNode.text() || "";
+    textarea.style.position = "absolute";
+    textarea.style.top = areaPosition.y + "px";
+    textarea.style.left = areaPosition.x + "px";
+    textarea.style.width = textNode.width() - textNode.padding() * 2 + "px";
+    textarea.style.minHeight = textNode.height() - textNode.padding() * 2 + "px";
+    textarea.style.fontSize = textNode.fontSize() + "px";
+    textarea.style.fontFamily = textNode.fontFamily();
+    textarea.style.fontStyle = textNode.fontStyle();
+    textarea.style.fontWeight = fontWeight;
+    textarea.style.color = typeof textNode.fill() === "string" ? (textNode.fill() as string) : "#000";
+    textarea.style.border = "2px solid #0099e5";
+    textarea.style.padding = "4px 8px";
+    textarea.style.margin = "0";
+    textarea.style.background = "transparent"; // Slightly transparent white
+    textarea.style.outline = "none";
+    textarea.style.resize = "none";
+    textarea.style.overflow = "hidden";
+    textarea.style.lineHeight = textNode.lineHeight().toString();
+    textarea.style.textAlign = textNode.align();
+    textarea.style.zIndex = "1000";
+    textarea.style.borderRadius = "4px";
+    textarea.style.boxSizing = "border-box";
+    textarea.style.backdropFilter = "blur(0.5px)"; // Very subtle blur
+
+    // Auto-resize initially
+    autoResizeTextarea(textarea);
+
+    textarea.focus();
+    textarea.select();
+
+    const removeTextarea = () => {
+      window.removeEventListener("click", handleOutsideClick, true);
+      textarea.removeEventListener("keydown", handleKey);
+      textarea.removeEventListener("input", handleInput);
+      if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
+      textareaRef.current = null;
+      setIsEditing(false);
+    };
+
+    const commit = () => {
+      onUpdate({ text: textarea.value });
+      removeTextarea();
+    };
+
+    const cancel = () => {
+      removeTextarea();
+    };
+
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (e.target === textarea) return;
+      commit();
+    };
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    };
+
+    const handleInput = (e: Event) => {
+      autoResizeTextarea(textarea);
+    };
+
+    textarea.addEventListener("keydown", handleKey);
+    textarea.addEventListener("input", handleInput);
+    
+    setTimeout(() => {
+      window.addEventListener("click", handleOutsideClick, true);
+    }, 0);
+  }, [onUpdate, textRef, fontWeight, autoResizeTextarea]);
+
+  // Fixed transformation logic
+  const handleTransform = useCallback(() => {
+    const node = textRef.current;
+    if (!node) return;
+
+    const activeAnchor = trRef.current?.getActiveAnchor() || "";
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
+
+    let newWidth = textWidth;
+    let newFontSize = fontSize;
+
+    // Store original values before transformation
+    const originalWidth = textWidth;
+    const originalFontSize = fontSize;
+
+    if (activeAnchor.includes("middle-left") || activeAnchor.includes("middle-right")) {
+      // Side anchors: Only adjust text box width
+      newWidth = Math.max(30, Math.round(originalWidth * scaleX));
+      newFontSize = originalFontSize; // Keep font size same
+    } 
+    else if (activeAnchor.includes("middle-top") || activeAnchor.includes("middle-bottom")) {
+      // Top/bottom anchors: Only adjust font size vertically
+      newWidth = originalWidth; // Keep width same
+      newFontSize = Math.max(5, Math.round(originalFontSize * scaleY));
+    }
+    else {
+      // Corner anchors: Scale proportionally
+      const uniformScale = (scaleX + scaleY) / 2;
+      newFontSize = Math.max(5, Math.round(originalFontSize * uniformScale));
+      newWidth = Math.max(30, Math.round(originalWidth * uniformScale));
+    }
+
+    // Update the node properties immediately for visual feedback
+    node.width(newWidth);
+    node.fontSize(newFontSize);
+    
+    // Reset scale
+    node.scaleX(1);
+    node.scaleY(1);
+
+    // Update state
+    setTextWidth(newWidth);
+  }, [textRef, textWidth, fontSize]);
 
   const handleTransformEnd = useCallback(() => {
     const node = textRef.current;
     if (!node) return;
 
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
-    const activeAnchor = trRef.current?.getActiveAnchor();
-
-    let newWidth = textWidth;
-    let newFontSize = fontSize;
-
-    if (
-      activeAnchor?.includes("top-left") ||
-      activeAnchor?.includes("top-right") ||
-      activeAnchor?.includes("bottom-left") ||
-      activeAnchor?.includes("bottom-right")
-    ) {
-      const uniformScale = (scaleX + scaleY) / 2;
-      newFontSize = Math.max(5, Math.round(fontSize * uniformScale));
-      newWidth = Math.max(30, Math.round(textWidth * uniformScale));
-      setTextWidth(newWidth);
-    } else if (activeAnchor === "middle-left" || activeAnchor === "middle-right") {
-      newWidth = Math.max(30, Math.round(textWidth * scaleX));
-      setTextWidth(newWidth);
-    } else if (activeAnchor === "middle-top" || activeAnchor === "middle-bottom") {
-      newFontSize = Math.max(5, Math.round(fontSize * scaleY));
-    }
-
-    node.scaleX(1);
-    node.scaleY(1);
-
     onUpdate({
-      width: newWidth,
-      fontSize: newFontSize,
       x: node.x(),
       y: node.y(),
+      width: textWidth,
+      fontSize: node.fontSize(),
     });
-  }, [onUpdate, textWidth, fontSize]);
+  }, [onUpdate, textRef, textWidth]);
 
-  // Optional: preload fonts to prevent flicker
-  const loadFont = useCallback((family: string, weight: string) => {
-    const font = new FontFace(family, "", { weight, style: "normal" });
-    font
-      .load()
-      .then(() => document.fonts.add(font))
-      .catch((err) => console.warn(`Font load failed: ${family} ${weight}`, err));
-  }, []);
-
-  useEffect(() => {
-    if (fontFamily && fontWeight) loadFont(fontFamily, fontWeight);
-  }, [fontFamily, fontWeight, loadFont]);
+  const handleDragEnd = useCallback(
+    (e: any) => {
+      if (isEditing) return;
+      onUpdate({ x: e.target.x(), y: e.target.y() });
+    },
+    [onUpdate, isEditing]
+  );
 
   return (
     <>
@@ -220,8 +310,6 @@ const EditableTextComponentInner: React.FC<
         fill={fill}
         fontFamily={fontFamily}
         fontStyle={fontStyle}
-        fontVariant="normal"
-        fontWeight={fontWeight}
         textDecoration={textDecoration}
         align={align}
         verticalAlign="middle"
@@ -231,29 +319,20 @@ const EditableTextComponentInner: React.FC<
         shadowBlur={textShadow?.blur || 0}
         shadowOffsetX={textShadow?.offsetX || 0}
         shadowOffsetY={textShadow?.offsetY || 0}
-        shadowOpacity={1}
+        shadowOpacity={textShadow?.blur ? 1 : 0}
         shadowEnabled={!!textShadow && textShadow.blur > 0}
         perfectDrawEnabled={false}
-        draggable
+        draggable={!isEditing}
         width={textWidth}
+        wrap="word"
         onDblClick={handleTextDblClick}
         onDblTap={handleTextDblClick}
-        onClick={onSelect}
-        onTap={onSelect}
-        onDragEnd={(e) => {
-          onUpdate({ x: e.target.x(), y: e.target.y() });
-        }}
-        onTransform={handleTransformEnd}
-        visible={!isEditing}
+        onClick={() => !isEditing && onSelect()}
+        onTap={() => !isEditing && onSelect()}
+        onDragEnd={handleDragEnd}
+        onTransform={handleTransform}
+        onTransformEnd={handleTransformEnd}
       />
-
-      {isEditing && textRef.current && (
-        <TextEditor
-          textNode={textRef.current}
-          onChange={handleTextChange}
-          onClose={() => setIsEditing(false)}
-        />
-      )}
 
       {isSelected && !isEditing && (
         <Transformer
@@ -274,15 +353,15 @@ const EditableTextComponentInner: React.FC<
             height: Math.max(20, newBox.height),
           })}
           keepRatio={false}
+          rotateEnabled={true}
+          resizeEnabled={true}
         />
       )}
     </>
   );
 };
 
-// ------------------
-// ForwardRef Wrapper
-// ------------------
+// ForwardRef wrapper
 const EditableTextComponent = forwardRef<Konva.Text, EditableTextComponentProps>(
   (props, ref) => {
     const internalRef = useRef<Konva.Text>(null);
@@ -292,5 +371,4 @@ const EditableTextComponent = forwardRef<Konva.Text, EditableTextComponentProps>
 );
 
 EditableTextComponent.displayName = "EditableTextComponent";
-
 export default EditableTextComponent;
