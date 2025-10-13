@@ -123,29 +123,25 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [formats, setFormats] = useState<string[]>([]);
 
-  const handleBringForward = () => {
-    console.log('🎯 Bring Forward button clicked');
-    console.log('🎯 Selected shape:', selectedShape);
-    onBringForward();
-  };
+    const handleBringForward = () => {
+  console.log('🎯 Bring Forward button CLICKED'); // Add this back temporarily
+  onBringForward();
+};
 
-  const handleSendBackward = () => {
-    console.log('🎯 Send Backward button clicked');
-    console.log('🎯 Selected shape:', selectedShape);
-    onSendBackward();
-  };
+const handleSendBackward = () => {
+  console.log('🎯 Send Backward button CLICKED'); // Add this back temporarily
+  onSendBackward();
+};
 
-  const handleBringToFront = () => {
-    console.log('🎯 Bring to Front button clicked');
-    console.log('🎯 Selected shape:', selectedShape);
-    onBringToFront();
-  };
+const handleBringToFront = () => {
+  console.log('🎯 Bring to Front button CLICKED'); // Add this back temporarily
+  onBringToFront();
+};
 
-  const handleSendToBack = () => {
-    console.log('🎯 Send to Back button clicked');
-    console.log('🎯 Selected shape:', selectedShape);
-    onSendToBack();
-  };
+const handleSendToBack = () => {
+  console.log('🎯 Send to Back button CLICKED'); // Add this back temporarily
+  onSendToBack();
+};
 
   useEffect(() => {
     if (!selectedShape) return;
@@ -431,7 +427,7 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
         {/* Underline Toggle */}
         {(isText || isStickyNote) && (
           <ToggleGroup
-            type="single"
+            type="single" 
             value={formats.includes("underline") ? "underline" : ""}
             onValueChange={(value) => handleFormatChange(value ? ["underline"] : [])}
             className="flex gap-0 rounded-lg border bg-background p-1"

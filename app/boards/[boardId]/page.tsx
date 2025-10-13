@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
 import { useParams } from "next/navigation";
@@ -15,7 +15,7 @@ import { deleteBoard } from "@/lib/actions/board-actions";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useKonvaTools } from "@/hooks/useKonvaTools";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { useShapes } from "@/hooks/useShapes";
+// REMOVED: import { useShapes } from "@/hooks/useShapes";
 import FormattingToolbar from "@/components/FormattingToolbar";
 
 // Utils
@@ -49,88 +49,32 @@ const BoardPage = () => {
   const stageRef = useRef<Konva.Stage | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
   
-  // State management
+  const [stageKey, setStageKey] = useState(0);
+
+  // State management - ALL shape state now comes from useBoardState
   const boardState = useBoardState();
   
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
-    isConnecting, reactShapes, selectedNodeId, stageInstance, tempDimensions,
+    isConnecting, reactShapes, konvaShapes, selectedNodeId, stageInstance, tempDimensions,
     showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
     setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
-    setIsConnecting, setReactShapes, setSelectedNodeId, setStageInstance,
+    setIsConnecting, setReactShapes, setKonvaShapes, setSelectedNodeId, setStageInstance,
     setTempDimensions, setShowSaveModal, setShowSetupDialog, setBoardInfo,
-    bringForward: bringForwardReact,
-    sendBackward: sendBackwardReact,
-    bringToFront: bringToFrontReact,
-    sendToBack: sendToBackReact
+    // Layer functions
+    bringForward,
+    sendBackward, 
+    bringToFront,
+    sendToBack,
+    // Shape functions
+    addShape,
+    updateShape,
+    addKonvaShape,
   } = boardState;
 
-  // Shapes management with z-index functions
-  const { 
-    shapes, 
-    addShape: addKonvaShape, 
-    updateShape, 
-    setShapes,
-    bringForward: bringForwardKonva,
-    sendBackward: sendBackwardKonva, 
-    bringToFront: bringToFrontKonva, 
-    sendToBack: sendToBackKonva 
-  } = useShapes();
+  // REMOVED: useShapes hook entirely - all shape state is in useBoardState now
 
-  // Z-index handlers that work with both shape systems
-  const handleBringForward = useCallback(() => {
-    if (!selectedNodeId) return;
-    
-    const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-    const isKonvaShape = shapes.some((s) => s.id === selectedNodeId);
-    
-    if (isReactShape) {
-      bringForwardReact();
-    } else if (isKonvaShape) {
-      bringForwardKonva(selectedNodeId);
-    }
-  }, [selectedNodeId, reactShapes, shapes, bringForwardReact, bringForwardKonva]);
-
-  const handleSendBackward = useCallback(() => {
-    if (!selectedNodeId) return;
-    
-    const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-    const isKonvaShape = shapes.some((s) => s.id === selectedNodeId);
-    
-    if (isReactShape) {
-      sendBackwardReact();
-    } else if (isKonvaShape) {
-      sendBackwardKonva(selectedNodeId);
-    }
-  }, [selectedNodeId, reactShapes, shapes, sendBackwardReact, sendBackwardKonva]);
-
-  const handleBringToFront = useCallback(() => {
-    if (!selectedNodeId) return;
-    
-    const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-    const isKonvaShape = shapes.some((s) => s.id === selectedNodeId);
-    
-    if (isReactShape) {
-      bringToFrontReact();
-    } else if (isKonvaShape) {
-      bringToFrontKonva(selectedNodeId);
-    }
-  }, [selectedNodeId, reactShapes, shapes, bringToFrontReact, bringToFrontKonva]);
-
-  const handleSendToBack = useCallback(() => {
-    if (!selectedNodeId) return;
-    
-    const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-    const isKonvaShape = shapes.some((s) => s.id === selectedNodeId);
-    
-    if (isReactShape) {
-      sendToBackReact();
-    } else if (isKonvaShape) {
-      sendToBackKonva(selectedNodeId);
-    }
-  }, [selectedNodeId, reactShapes, shapes, sendToBackReact, sendToBackKonva]);
-
-   const debouncedUpdateShape = useDebounce((shapeId: string, updates: Record<string, any>) => {
+  const debouncedUpdateShape = useDebounce((shapeId: string, updates: Partial<any>) => {
     const isReactShape = reactShapes.some((s) => s.id === shapeId);
     
     if (isReactShape) {
@@ -161,13 +105,34 @@ const BoardPage = () => {
     }
   }, 50);
 
-  // Handle shape updates from formatting toolbar
-  const handleShapeUpdate = useCallback((updates: Record<string, any>) => {
+  // Handler for StageComponent (expects: (id: string, attrs: Partial<KonvaShape>) => void)
+  const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<any>) => {
+    if (!id) return;
+    
+    // Check if it's a React shape (text/sticky note) or Konva shape
+    const isReactShape = reactShapes.some((s) => s.id === id);
+    const isKonvaShape = konvaShapes.some((s) => s.id === id);
+    
+    if (isReactShape) {
+      // Apply to React shapes
+      setReactShapes(prev => 
+        prev.map(shape => 
+          shape.id === id ? { ...shape, ...attrs } : shape
+        )
+      );
+    } else if (isKonvaShape) {
+      // Apply to Konva shapes
+      debouncedUpdateShape(id, attrs);
+    }
+  }, [debouncedUpdateShape, reactShapes, konvaShapes]);
+
+  // Handler for FormattingToolbar (expects: (updates: Record<string, any>) => void)
+  const handleFormattingToolbarUpdate = useCallback((updates: Record<string, any>) => {
     if (!selectedNodeId) return;
     
     // Check if it's a React shape (text/sticky note) or Konva shape
     const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-    const isKonvaShape = shapes.some((s) => s.id === selectedNodeId);
+    const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
     
     if (isReactShape) {
       // Apply to React shapes
@@ -180,7 +145,7 @@ const BoardPage = () => {
       // Apply to Konva shapes
       debouncedUpdateShape(selectedNodeId, updates);
     }
-  }, [selectedNodeId, debouncedUpdateShape, reactShapes, shapes]);
+  }, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes]);
 
   // Undo/Redo functionality
   const { addAction, undo, redo } = useUndoRedo(
@@ -189,34 +154,34 @@ const BoardPage = () => {
     boardState.undoneActions,
     reactShapes,
     lines,
-    shapes,
+    konvaShapes, // ← Now using konvaShapes from boardState
     boardState.setActions,
     boardState.setUndoneActions,
     setReactShapes,
     setLines,
-    setShapes
+    setKonvaShapes // ← Now using setKonvaShapes from boardState
   );
     
   // Tool functionality
   const toolHandlers = useKonvaTools(
-    stageRef,               
-    activeTool,             
-    scale,                  
-    position,                 
-    drawingMode,            
-    lines,                  
-    connectionStart,          
-    tempConnection,             
-    isConnecting,            
-    selectedNodeId,            
-    setActiveTool,             
-    setDrawingMode,          
-    setLines,                  
-    setConnectionStart,       
-    setTempConnection,          
-    setIsConnecting,          
-    setSelectedNodeId,      
-    addAction                   
+    stageRef, 
+    activeTool, 
+    scale, 
+    position, 
+    drawingMode, 
+    lines, 
+    connectionStart, 
+    tempConnection, 
+    isConnecting, 
+    selectedNodeId, 
+    setActiveTool, 
+    setDrawingMode, 
+    setLines, 
+    setConnectionStart, 
+    setTempConnection, 
+    setIsConnecting, 
+    setSelectedNodeId, 
+    addAction 
   );
 
   // Memoize selected shape to prevent unnecessary re-renders
@@ -228,126 +193,24 @@ const BoardPage = () => {
     if (reactShape) return reactShape;
     
     // Check konva shapes
-    const konvaShape = shapes.find((s) => s.id === selectedNodeId);
+    const konvaShape = konvaShapes.find((s) => s.id === selectedNodeId);
     return konvaShape || null;
-  }, [selectedNodeId, reactShapes, shapes]);
+  }, [selectedNodeId, reactShapes, konvaShapes]);
 
-  // FIXED: Improved update function with proper state updates
- 
-
-  // DEBUG: Log shape updates to see what's happening
-  useEffect(() => {
-    if (selectedNodeId) {
-      const shape = reactShapes.find(s => s.id === selectedNodeId);
-      if (shape) {
-        console.log('Selected Text Shape:', {
-          id: shape.id,
-          text: shape.text,
-          fontSize: shape.fontSize,
-          fontFamily: shape.fontFamily,
-          fontWeight: shape.fontWeight,
-          fontStyle: shape.fontStyle,
-          textDecoration: shape.textDecoration,
-          align: shape.align
-        });
-      }
-    }
-  }, [selectedNodeId, reactShapes]);
-
-  // Shape creation - FIXED: Add zIndex to all new shapes
-  const addShape = useCallback((type: Tool) => {
+  // Shape creation - using addShape from boardState
+  const handleAddShape = useCallback((type: Tool) => {
     if (!stageRef.current) return;
     const stage = stageRef.current;
 
+    const safePosition = position ?? { x: 0, y: 0 }; 
+
     const center = {
-      x: stage.width() / 2 / scale - position.x / scale,
-      y: stage.height() / 2 / scale - position.y / scale,
+      x: stage.width() / 2 / scale - safePosition.x / scale,
+      y: stage.height() / 2 / scale - safePosition.y / scale,
     };
 
-    if (type === "text") {
-      const shapeId = `shape-${Date.now()}`;
-      
-      const newTextShape: ReactShape = {
-        id: shapeId,
-        type: 'text',
-        x: center.x,
-        y: center.y,
-        text: "Double click to edit",
-        fontSize: 20,
-        fill: "#000000",
-        fontFamily: "Arial",
-        fontWeight: "400",
-        fontStyle: "normal",
-        textDecoration: "none",
-        align: "left",
-        // ADD Z-INDEX
-        zIndex: Date.now(),
-      };
-      
-      setReactShapes(prev => [...prev, newTextShape]);
-      addAction({ 
-        type: "add-react-shape", 
-        shapeType: 'text', 
-        data: newTextShape 
-      });
-      
-      if (activeTool === "select") {
-        setSelectedNodeId(shapeId);
-      }
-    } else if (type === "stickyNote") {
-      const shapeId = `sticky-${Date.now()}`;
-      
-      // Create a modern sticky note
-      const newStickyNote: ReactShape = {
-        id: shapeId,
-        type: 'stickyNote',
-        x: center.x - 100,
-        y: center.y - 75,
-        text: "Double click to edit...",
-        fontSize: 16,
-        width: 200,
-        height: 150,
-        backgroundColor: "#ffeb3b",
-        textColor: "#000000",
-        fontFamily: "Arial",
-        draggable: true,
-        // ADD Z-INDEX
-        zIndex: Date.now(),
-      };
-      
-      setReactShapes(prev => [...prev, newStickyNote]);
-      addAction({ 
-        type: "add-react-shape", 
-        shapeType: 'stickyNote', 
-        data: newStickyNote 
-      });
-      
-      if (activeTool === "select") {
-        setSelectedNodeId(shapeId);
-      }
-    } else {
-      const result = addKonvaShape(type, center, true);
-      if (result && activeTool === "select") {
-        setSelectedNodeId(result.shapeId);
-        
-        // Set default stroke and cornerRadius for new shapes
-        if (["rect", "circle", "ellipse", "triangle", "arrow", "stage"].includes(type)) {
-          const shapeUpdates: Record<string, any> = {
-            stroke: "#000000",
-            strokeWidth: 0,
-          };
-          
-          if (["rect", "stage"].includes(type)) {
-            shapeUpdates.cornerRadius = 0;
-          }
-          
-          setTimeout(() => {
-            debouncedUpdateShape(result.shapeId, shapeUpdates);
-          }, 100);
-        }
-      }
-    }
-  }, [stageRef, scale, position, activeTool, addKonvaShape, addAction, setSelectedNodeId, setReactShapes, debouncedUpdateShape]);
+    addShape(type); // ← Using addShape from boardState
+  }, [stageRef, scale, position, addShape]);
 
   // Stage dimensions
   const handleApplyStage = useCallback(() => {
@@ -413,7 +276,7 @@ const BoardPage = () => {
           tempDimensions={tempDimensions}
           handleToolChange={toolHandlers.handleToolChange}
           setDrawingMode={setDrawingMode}
-          addShape={addShape}
+          addShape={handleAddShape} // ← Using our wrapper function
           setTempDimensions={setTempDimensions}
           handleApplyStage={handleApplyStage}
           undo={undo}
@@ -430,23 +293,24 @@ const BoardPage = () => {
         {/* Formatting Toolbar */}
         <FormattingToolbar
           selectedShape={selectedShape}
-          onChange={handleShapeUpdate}
-          onBringForward={handleBringForward}
-          onSendBackward={handleSendBackward}
-          onBringToFront={handleBringToFront}
-          onSendToBack={handleSendToBack}
+          onChange={handleFormattingToolbarUpdate}
+          onBringForward={bringForward}
+          onSendBackward={sendBackward}
+          onBringToFront={bringToFront}
+          onSendToBack={sendToBack}
         />
 
         {/* Stage */}
         <StageComponent
+          key={`stage-${stageKey}`}
           stageRef={stageRef}
           trRef={trRef}
           scale={scale}
           position={position}
           activeTool={activeTool}
           lines={lines}
+          shapes={konvaShapes} // ← Now using konvaShapes from boardState
           reactShapes={reactShapes}
-          shapes={shapes}
           selectedNodeId={selectedNodeId}
           stageInstance={stageInstance}
           handleWheel={toolHandlers.handleWheel}
@@ -458,8 +322,8 @@ const BoardPage = () => {
           handleTouchMove={toolHandlers.handleTouchMove}
           setSelectedNodeId={setSelectedNodeId}
           setReactShapes={setReactShapes}
-          setShapes={setShapes}
-          updateShape={updateShape}
+          setShapes={setKonvaShapes} // ← Now using setKonvaShapes from boardState
+          updateShape={handleStageShapeUpdate}
           setStageInstance={setStageInstance}
         />
       </div>
