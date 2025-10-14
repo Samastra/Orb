@@ -41,7 +41,7 @@ export const useBoardState = () => {
   const [currentBoardId, setCurrentBoardId] = useState<string>("");
   const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [boardInfo, setBoardInfo] = useState(defaultBoardInfo);
-
+  const [stageFrames, setStageFrames] = useState<KonvaShape[]>([]);
   // Add Konva shape (moved from useShapes)
   const addKonvaShape = useCallback((type: Tool, center: { x: number; y: number }, draggable: boolean) => {
     const shapeId = `shape-${Date.now()}`;
@@ -279,6 +279,28 @@ export const useBoardState = () => {
   }
 }, [stageInstance, scale, position, activeTool, addKonvaShape, setSelectedNodeId]);
 
+const addStageFrame = useCallback((width: number, height: number) => {
+  const shapeId = `stage-${Date.now()}`;
+  
+  const stageFrame: KonvaShape = {
+    id: shapeId,
+    type: 'stage',
+    x: 50, // Or center it
+    y: 50,
+    width: width,
+    height: height,
+    fill: "#ffffff",
+    stroke: "#cccccc",
+    strokeWidth: 2,
+    draggable: true,
+  };
+  
+  console.log('➕ Adding Stage Frame:', stageFrame);
+  setStageFrames(prev => [...prev, stageFrame]);
+  
+  return shapeId;
+}, []);
+
   const updateShape = useCallback(
     (id: string, attrs: Partial<any>) => {
       setReactShapes((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
@@ -355,7 +377,7 @@ export const useBoardState = () => {
     currentBoardId,
     showSetupDialog,
     boardInfo,
-
+    stageFrames,
     // Setters
     setStageDimensions,
     setTempDimensions,
@@ -400,5 +422,6 @@ export const useBoardState = () => {
     addKonvaShape,
     updateKonvaShape,
     removeKonvaShape,
+    addStageFrame,
   };
 };

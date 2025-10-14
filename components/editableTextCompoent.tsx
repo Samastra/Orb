@@ -93,7 +93,7 @@ const EditableTextComponentInner: React.FC<
   const [editValue, setEditValue] = useState(text);
   const [textWidth, setTextWidth] = useState(width || 200);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-
+  const [isShiftPressed, setIsShiftPressed] = useState(false);
   // Transform text for display
   const getTransformedText = useCallback((txt: string, transform: string) => {
     switch (transform) {
@@ -107,6 +107,45 @@ const EditableTextComponentInner: React.FC<
         return txt;
     }
   }, []);
+
+  // Add this function to reset transforms
+      const resetTransform = useCallback(() => {
+        const node = textRef.current;
+        if (!node) return;
+
+        node.width(200); // Default width
+        node.fontSize(20); // Default font size
+        node.rotation(0);
+        node.skewX(0);
+        node.skewY(0);
+        
+        setTextWidth(200);
+        onUpdate({ width: 200, fontSize: 20 });
+      }, [onUpdate, textRef]);
+
+
+  // Detect Shift key for proportional scaling
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Shift') {
+          setIsShiftPressed(true);
+        }
+      };
+
+      const handleKeyUp = (e: KeyboardEvent) => {
+        if (e.key === 'Shift') {
+          setIsShiftPressed(false);
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keyup', handleKeyUp);
+
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keyup', handleKeyUp);
+      };
+    }, []);
 
   useEffect(() => {
     setEditValue(text);
@@ -234,61 +273,76 @@ const EditableTextComponentInner: React.FC<
   }, [onUpdate, textRef, fontWeight, autoResizeTextarea]);
 
   // Fixed transformation logic
-  const handleTransform = useCallback(() => {
-    const node = textRef.current;
-    if (!node) return;
+ const handleTransform = useCallback(() => {
+  const node = textRef.current;
+  const transformer = trRef.current;
+  if (!node || !transformer) return;
 
-    const activeAnchor = trRef.current?.getActiveAnchor() || "";
-    const scaleX = node.scaleX();
-    const scaleY = node.scaleY();
+  const activeAnchor = transformer.getActiveAnchor() || "";
+  const scaleX = node.scaleX();
+  const scaleY = node.scaleY();
 
-    let newWidth = textWidth;
-    let newFontSize = fontSize;
+  const originalWidth = textWidth;
+  const originalFontSize = fontSize;
 
-    // Store original values before transformation
-    const originalWidth = textWidth;
-    const originalFontSize = fontSize;
+  let newWidth = originalWidth;
+  let newFontSize = originalFontSize;
 
+  // Adobe-style scaling with modifiers
+  if (isShiftPressed) {
+    // Shift pressed: Always scale proportionally (like Illustrator)
+    const uniformScale = (scaleX + scaleY) / 2;
+    newFontSize = Math.max(8, Math.round(originalFontSize * uniformScale));
+    newWidth = Math.max(30, Math.round(originalWidth * uniformScale));
+  } else {
+    // No modifier: Context-aware scaling
     if (activeAnchor.includes("middle-left") || activeAnchor.includes("middle-right")) {
-      // Side anchors: Only adjust text box width
+      // Horizontal only
       newWidth = Math.max(30, Math.round(originalWidth * scaleX));
-      newFontSize = originalFontSize; // Keep font size same
+      newFontSize = originalFontSize;
     } 
     else if (activeAnchor.includes("middle-top") || activeAnchor.includes("middle-bottom")) {
-      // Top/bottom anchors: Only adjust font size vertically
-      newWidth = originalWidth; // Keep width same
-      newFontSize = Math.max(5, Math.round(originalFontSize * scaleY));
+      // Vertical only
+      newFontSize = Math.max(8, Math.round(originalFontSize * scaleY));
+      newWidth = originalWidth;
     }
     else {
-      // Corner anchors: Scale proportionally
+      // Corner: Proportional by default
       const uniformScale = (scaleX + scaleY) / 2;
-      newFontSize = Math.max(5, Math.round(originalFontSize * uniformScale));
+      newFontSize = Math.max(8, Math.round(originalFontSize * uniformScale));
       newWidth = Math.max(30, Math.round(originalWidth * uniformScale));
     }
+  }
 
-    // Update the node properties immediately for visual feedback
-    node.width(newWidth);
-    node.fontSize(newFontSize);
-    
-    // Reset scale
-    node.scaleX(1);
-    node.scaleY(1);
+  // Apply changes
+  node.width(newWidth);
+  node.fontSize(newFontSize);
+  node.scaleX(1);
+  node.scaleY(1);
 
-    // Update state
-    setTextWidth(newWidth);
-  }, [textRef, textWidth, fontSize]);
+  setTextWidth(newWidth);
+}, [textRef, textWidth, fontSize, isShiftPressed]);
 
   const handleTransformEnd = useCallback(() => {
-    const node = textRef.current;
-    if (!node) return;
+  const node = textRef.current;
+  if (!node) return;
 
-    onUpdate({
-      x: node.x(),
-      y: node.y(),
-      width: textWidth,
-      fontSize: node.fontSize(),
-    });
-  }, [onUpdate, textRef, textWidth]);
+  // Final update with all transformed properties
+  onUpdate({
+    x: node.x(),
+    y: node.y(),
+    width: textWidth,
+    fontSize: node.fontSize(),
+    // Preserve other attributes
+    text: text,
+    fill: fill,
+    fontFamily: fontFamily,
+    fontWeight: fontWeight,
+    fontStyle: fontStyle,
+    textDecoration: textDecoration,
+    align: align,
+  });
+}, [onUpdate, textRef, textWidth, text, fill, fontFamily, fontWeight, fontStyle, textDecoration, align]);
 
   const handleDragEnd = useCallback(
     (e: any) => {
@@ -336,25 +390,41 @@ const EditableTextComponentInner: React.FC<
 
       {isSelected && !isEditing && (
         <Transformer
-          ref={trRef}
-          enabledAnchors={[
-            "middle-left",
-            "middle-right",
-            "top-left",
-            "top-right",
-            "bottom-left",
-            "bottom-right",
-            "middle-top",
-            "middle-bottom",
-          ]}
-          boundBoxFunc={(oldBox, newBox) => ({
-            ...newBox,
-            width: Math.max(30, newBox.width),
-            height: Math.max(20, newBox.height),
-          })}
-          keepRatio={false}
-          rotateEnabled={true}
-          resizeEnabled={true}
+            ref={trRef}
+            enabledAnchors={[
+              "middle-left", "middle-right",
+              "top-left", "top-right", 
+              "bottom-left", "bottom-right",
+              "middle-top", "middle-bottom",
+            ]}
+            boundBoxFunc={(oldBox, newBox) => ({
+              ...newBox,
+              width: Math.max(30, newBox.width),
+              height: Math.max(20, newBox.height),
+            })}
+            keepRatio={false} // Let our custom logic handle proportions
+            rotateEnabled={true}
+            resizeEnabled={true}
+            anchorSize={12}
+            anchorCornerRadius={6}
+            borderStroke="#0099e5"
+            borderStrokeWidth={2}
+            anchorStroke="#0099e5"
+            anchorFill="#ffffff"
+            anchorStrokeWidth={1.5}
+          />
+      )}
+
+      {/* // Add this component inside your return statement, after the Transformer */}
+      {isSelected && isShiftPressed && (
+        <Text
+          x={x}
+          y={y - 30}
+          text="⇧ Proportional Scaling"
+          fontSize={12}
+          fill="#0099e5"
+          fontFamily="Arial"
+          listening={false}
         />
       )}
     </>

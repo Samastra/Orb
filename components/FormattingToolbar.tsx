@@ -153,8 +153,10 @@ const handleSendToBack = () => {
     setFormats(activeFormats);
   }, [selectedShape]);
 
-  if (!selectedShape) return null;
-  
+  if (!selectedShape || selectedShape.type === "stage") {
+  return null; // Don't show formatting toolbar for stage frames or when nothing is selected
+  }
+    
   const isText = selectedShape.type === "text";
   const isStickyNote = selectedShape.type === "stickyNote";
   const isShape = ["rect", "circle", "ellipse", "triangle", "arrow"].includes(selectedShape.type);
@@ -659,7 +661,7 @@ const handleSendToBack = () => {
         )}
 
         {/* Layer Controls */}
-        {(isText || isStickyNote || isShape) && (
+        {(isText || isStickyNote || isShape) && selectedShape.type !== "stage" && (
           <>
             <Separator orientation="vertical" className="h-6" />
             

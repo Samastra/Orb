@@ -5,6 +5,8 @@ import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
 import { useParams } from "next/navigation";
 import { Tool, ReactShape } from "@/types/board-types";
+// Add this import at the top if not already there:
+import { defaultStageDimensions } from "@/constants/tool-constants";
 // Components
 import Toolbar from "@/components/Toolbar";
 import BoardHeader from "@/components/BoardHeader";
@@ -19,7 +21,7 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import FormattingToolbar from "@/components/FormattingToolbar";
 
 // Utils
-import { addStageWithDimensions } from "@/utils/shape-helpers";
+// import { addStageWithDimensions } from "@/utils/shape-helpers";
 import { fetchBoard } from "@/lib/actions/board-actions";
 
 // Fix text rendering
@@ -56,7 +58,7 @@ const BoardPage = () => {
   
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
-    isConnecting, reactShapes, konvaShapes, selectedNodeId, stageInstance, tempDimensions,
+    isConnecting, reactShapes, konvaShapes,stageFrames, selectedNodeId, stageInstance, tempDimensions,
     showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
     setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
     setIsConnecting, setReactShapes, setKonvaShapes, setSelectedNodeId, setStageInstance,
@@ -70,6 +72,7 @@ const BoardPage = () => {
     addShape,
     updateShape,
     addKonvaShape,
+    addStageFrame,
   } = boardState;
 
   // REMOVED: useShapes hook entirely - all shape state is in useBoardState now
@@ -214,18 +217,18 @@ const BoardPage = () => {
 
   // Stage dimensions
   const handleApplyStage = useCallback(() => {
-    addStageWithDimensions(
-      tempDimensions.width,
-      tempDimensions.height,
-      stageRef,
-      scale,
-      position,
-      activeTool,
-      addAction,
-      setSelectedNodeId
-    );
-  }, [tempDimensions, scale, position, activeTool, addAction, setSelectedNodeId]);
-
+  console.log('🎯 Creating stage frame:', tempDimensions);
+  
+  if (tempDimensions.width > 0 && tempDimensions.height > 0) {
+    const stageFrameId = addStageFrame(tempDimensions.width, tempDimensions.height);
+    console.log('✅ Stage frame created:', stageFrameId);
+    
+    // Optional: Clear the temp dimensions after creation
+    setTempDimensions(defaultStageDimensions);
+  } else {
+    console.log('❌ Invalid stage dimensions');
+  }
+}, [tempDimensions, addStageFrame, setTempDimensions]);
   // Close without save
   const handleCloseWithoutSave = useCallback(async () => {
     try {
@@ -312,6 +315,7 @@ const BoardPage = () => {
           shapes={konvaShapes} // ← Now using konvaShapes from boardState
           reactShapes={reactShapes}
           selectedNodeId={selectedNodeId}
+          stageFrames={stageFrames}
           stageInstance={stageInstance}
           handleWheel={toolHandlers.handleWheel}
           handleMouseDown={toolHandlers.handleMouseDown}

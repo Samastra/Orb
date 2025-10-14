@@ -13,7 +13,6 @@ import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
   ssr: false,
 });
-
 interface StageComponentProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   trRef: React.RefObject<Konva.Transformer | null>;
@@ -23,6 +22,7 @@ interface StageComponentProps {
   lines: Array<{tool: 'brush' | 'eraser', points: number[]}>;
   reactShapes: ReactShape[];
   shapes: KonvaShape[];
+  stageFrames: KonvaShape[]; 
   selectedNodeId: string | null;
   stageInstance: Konva.Stage | null;
   handleWheel: (e: Konva.KonvaEventObject<WheelEvent>) => void;
@@ -42,7 +42,8 @@ interface StageComponentProps {
 // Simple combined shape type
 type CombinedShape = 
   | (KonvaShape & { __kind: 'konva' })
-  | (ReactShape & { __kind: 'react' });
+  | (ReactShape & { __kind: 'react' })
+  | (KonvaShape & { __kind: 'stage' }); 
 
 const StageComponent: React.FC<StageComponentProps> = ({
   stageRef,
@@ -53,6 +54,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   lines,
   reactShapes,
   shapes,
+  stageFrames,
   selectedNodeId,
   stageInstance,
   handleWheel,
@@ -72,38 +74,41 @@ const StageComponent: React.FC<StageComponentProps> = ({
 
   // Sync shape refs while preserving existing refs to avoid remounts
   useEffect(() => {
-    const allIds = [
-      ...shapes.map(s => s.id),
-      ...reactShapes.map(r => r.id)
-    ];
-    const map: { [key: string]: any } = { ...shapeRefs.current };
-    // ensure refs exist for all current ids, preserve existing refs
-    allIds.forEach(id => {
-      if (!map[id]) map[id] = React.createRef();
-    });
-    // remove refs that no longer exist to keep ref map tidy
-    Object.keys(map).forEach(k => {
-      if (!allIds.includes(k)) delete map[k];
-    });
-    shapeRefs.current = map;
-  }, [shapes, reactShapes]);
+  const allIds = [
+    ...stageFrames.map(s => s.id), // ← ADD STAGE FRAMES
+    ...shapes.map(s => s.id),
+    ...reactShapes.map(r => r.id)
+  ];
+  const map: { [key: string]: any } = { ...shapeRefs.current };
+  // ensure refs exist for all current ids, preserve existing refs
+  allIds.forEach(id => {
+    if (!map[id]) map[id] = React.createRef();
+  });
+  // remove refs that no longer exist to keep ref map tidy
+  Object.keys(map).forEach(k => {
+    if (!allIds.includes(k)) delete map[k];
+  });
+  shapeRefs.current = map;
+}, [stageFrames, shapes, reactShapes]);
+
 
   // NEW SIMPLE APPROACH: Combine shapes and render in array order (like study code)
-  // The array order determines the z-order (last item = top layer)
-  const allShapesToRender = React.useMemo(() => {
-    console.log('🔄 StageComponent re-rendering with shapes:', {
-      konvaShapes: shapes.length,
-      reactShapes: reactShapes.length,
-      total: shapes.length + reactShapes.length
-    });
-    
-    // Simple combination - no z-index sorting needed!
-    // Array order = render order = z-order
-    return [
-      ...shapes.map(s => ({ ...s, __kind: 'konva' as const })),
-      ...reactShapes.map(s => ({ ...s, __kind: 'react' as const })),
-    ];
-  }, [shapes, reactShapes]); // This will re-run when shapes arrays change
+// The array order determines the z-order (last item = top layer)
+const allShapesToRender = React.useMemo(() => {
+  console.log('🔄 StageComponent re-rendering with shapes:', {
+    stageFrames: stageFrames.length, // ← ADD THIS
+    konvaShapes: shapes.length,
+    reactShapes: reactShapes.length,
+    total: stageFrames.length + shapes.length + reactShapes.length
+  });
+  
+  // Fixed rendering order: stageFrames → konvaShapes → reactShapes
+  return [
+    ...stageFrames.map(s => ({ ...s, __kind: 'stage' as const })), // ← ALWAYS AT BOTTOM
+    ...shapes.map(s => ({ ...s, __kind: 'konva' as const })),
+    ...reactShapes.map(s => ({ ...s, __kind: 'react' as const })),
+  ];
+}, [stageFrames, shapes, reactShapes]); // ← ADD STAGE FRAMES DEPENDENCY
 
   // Transformer management
   useEffect(() => {
@@ -180,14 +185,16 @@ const StageComponent: React.FC<StageComponentProps> = ({
   };
 
   // Debug: Log when shapes change to verify re-renders
-  useEffect(() => {
-    console.log('🎨 Shapes updated - rendering:', allShapesToRender.length, 'shapes');
-    console.log('📊 Shape breakdown:', {
-      konva: shapes.length,
-      react: reactShapes.length,
-      selected: selectedNodeId
-    });
-  }, [allShapesToRender.length, shapes.length, reactShapes.length, selectedNodeId]);
+        useEffect(() => {
+          console.log('🎨 Shapes updated - rendering:', allShapesToRender.length, 'shapes');
+          console.log('📊 Shape breakdown:', {
+            stageFrames: stageFrames.length, // ← ADD THIS
+            konva: shapes.length,
+            react: reactShapes.length,
+            selected: selectedNodeId
+          });
+        }, [allShapesToRender.length, stageFrames.length, shapes.length, reactShapes.length, selectedNodeId]);
+
 
   return (
     <div className="absolute inset-0 z-0">
@@ -226,12 +233,32 @@ const StageComponent: React.FC<StageComponentProps> = ({
               id: item.id,
               x: item.x,
               y: item.y,
-              draggable: item.draggable ?? true,
+              draggable: (item.draggable ?? true) && activeTool === "select",
               name: 'selectable-shape',
               onDragEnd: (e: any) => handleShapeDragEnd(item, e),
               onClick: (e: any) => handleShapeClick(item, e),
               onTap: (e: any) => handleShapeClick(item, e),
             };
+
+
+            if (item.__kind === 'stage') {
+              const stageItem = item as KonvaShape;
+              return (
+                <Rect
+                  key={item.id}
+                  ref={shapeRefs.current[item.id]}
+                  {...commonProps}
+                  width={stageItem.width ?? 800}
+                  height={stageItem.height ?? 600}
+                  fill={stageItem.fill || "#ffffff"}
+                  stroke={stageItem.stroke || "#cccccc"}
+                  strokeWidth={stageItem.strokeWidth || 2}
+                  cornerRadius={0}
+                  name="stage-frame" // Special name for identification
+                />
+              );
+          }
+
 
             if (item.__kind === 'konva') {
               // Use type assertions for Konva properties
