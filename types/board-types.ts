@@ -9,8 +9,8 @@ export type Action =
   | { type: "add"; node: Konva.Shape | Konva.Group }
   | { type: "add-react-shape"; shapeType: string; data: ReactShape }
   | { type: "add-line"; line: { tool: 'brush' | 'eraser', points: number[] } }
-  | { type: "add-konva-shape"; shapeType: Tool; data: KonvaShape } // NEW
-  | { type: "delete-konva-shape"; data: KonvaShape } // NEW
+  | { type: "add-konva-shape"; shapeType: Tool; data: KonvaShape }
+  | { type: "delete-konva-shape"; data: KonvaShape }
   | {
       type: "update";
       id: string;
@@ -21,8 +21,12 @@ export type Action =
   | { type: "delete-react-shape"; data: any }
   | { type: "delete-line"; lineIndex: number }
   | { type: "add-stage-with-text"; stageGroup: Konva.Group; textShape: ReactShape }
-  | { type: "update-react-shape"; id: string; prevData: ReactShape; newData: ReactShape } // NEW
-  | { type: "update-konva-shape"; id: string; prevData: KonvaShape; newData: KonvaShape }; // NEW
+  | { type: "update-react-shape"; id: string; prevData: ReactShape; newData: ReactShape }
+  | { type: "update-konva-shape"; id: string; prevData: KonvaShape; newData: KonvaShape }
+  | { type: "add-stage-frame"; data: KonvaShape } // ← ADD THIS
+  | { type: "delete-stage-frame"; data: KonvaShape }; // ← ADD THIS
+
+
 // ---------- Tool Types ----------
 export type Tool =
   | "select"
@@ -89,6 +93,8 @@ export type BoardState = {
   selectedNodeId: string | null;
   drawingMode: 'brush' | 'eraser';
   lines: Array<{tool: 'brush' | 'eraser', points: number[]}>;
+  stageFrames: KonvaShape[];
+  setStageFrames: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
   stageDimensions: { width: number; height: number };
   tempDimensions: { width: number; height: number };
   connectionStart: { x: number; y: number } | null;

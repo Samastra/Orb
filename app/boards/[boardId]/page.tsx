@@ -5,7 +5,6 @@ import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
 import { useParams } from "next/navigation";
 import { Tool, ReactShape } from "@/types/board-types";
-// Add this import at the top if not already there:
 import { defaultStageDimensions } from "@/constants/tool-constants";
 // Components
 import Toolbar from "@/components/Toolbar";
@@ -17,11 +16,8 @@ import { deleteBoard } from "@/lib/actions/board-actions";
 import { useBoardState } from "@/hooks/useBoardState";
 import { useKonvaTools } from "@/hooks/useKonvaTools";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-// REMOVED: import { useShapes } from "@/hooks/useShapes";
 import FormattingToolbar from "@/components/FormattingToolbar";
-
 // Utils
-// import { addStageWithDimensions } from "@/utils/shape-helpers";
 import { fetchBoard } from "@/lib/actions/board-actions";
 
 // Fix text rendering
@@ -58,10 +54,10 @@ const BoardPage = () => {
   
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
-    isConnecting, reactShapes, konvaShapes,stageFrames, selectedNodeId, stageInstance, tempDimensions,
+    isConnecting, reactShapes, konvaShapes, stageFrames, selectedNodeId, stageInstance, tempDimensions,
     showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
     setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
-    setIsConnecting, setReactShapes, setKonvaShapes, setSelectedNodeId, setStageInstance,
+    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setSelectedNodeId, setStageInstance,
     setTempDimensions, setShowSaveModal, setShowSetupDialog, setBoardInfo,
     // Layer functions
     bringForward,
@@ -75,7 +71,44 @@ const BoardPage = () => {
     addStageFrame,
   } = boardState;
 
-  // REMOVED: useShapes hook entirely - all shape state is in useBoardState now
+  // Undo/Redo functionality - MUST BE DEFINED BEFORE HANDLERS THAT USE IT
+  const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
+    stageRef,
+    boardState.actions,
+    boardState.undoneActions,
+    reactShapes,
+    lines,
+    konvaShapes,
+    stageFrames,
+    boardState.setActions,
+    boardState.setUndoneActions,
+    setReactShapes,
+    setLines,
+    setKonvaShapes,
+    setStageFrames
+  );
+
+  // Tool functionality
+  const toolHandlers = useKonvaTools(
+    stageRef, 
+    activeTool, 
+    scale, 
+    position, 
+    drawingMode, 
+    lines, 
+    connectionStart, 
+    tempConnection, 
+    isConnecting, 
+    selectedNodeId, 
+    setActiveTool, 
+    setDrawingMode, 
+    setLines, 
+    setConnectionStart, 
+    setTempConnection, 
+    setIsConnecting, 
+    setSelectedNodeId, 
+    undoRedoAddAction // Use the renamed addAction
+  );
 
   const debouncedUpdateShape = useDebounce((shapeId: string, updates: Partial<any>) => {
     const isReactShape = reactShapes.some((s) => s.id === shapeId);
@@ -97,7 +130,7 @@ const BoardPage = () => {
           drawLayer.batchDraw();
           
           // Add to undo history with CORRECT action structure
-          addAction({
+          undoRedoAddAction({
             type: "update",
             id: shapeId,
             prevAttrs,
@@ -150,43 +183,6 @@ const BoardPage = () => {
     }
   }, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes]);
 
-  // Undo/Redo functionality
-  const { addAction, undo, redo } = useUndoRedo(
-    stageRef,
-    boardState.actions,
-    boardState.undoneActions,
-    reactShapes,
-    lines,
-    konvaShapes, // ← Now using konvaShapes from boardState
-    boardState.setActions,
-    boardState.setUndoneActions,
-    setReactShapes,
-    setLines,
-    setKonvaShapes // ← Now using setKonvaShapes from boardState
-  );
-    
-  // Tool functionality
-  const toolHandlers = useKonvaTools(
-    stageRef, 
-    activeTool, 
-    scale, 
-    position, 
-    drawingMode, 
-    lines, 
-    connectionStart, 
-    tempConnection, 
-    isConnecting, 
-    selectedNodeId, 
-    setActiveTool, 
-    setDrawingMode, 
-    setLines, 
-    setConnectionStart, 
-    setTempConnection, 
-    setIsConnecting, 
-    setSelectedNodeId, 
-    addAction 
-  );
-
   // Memoize selected shape to prevent unnecessary re-renders
   const selectedShape = useMemo(() => {
     if (!selectedNodeId) return null;
@@ -212,23 +208,24 @@ const BoardPage = () => {
       y: stage.height() / 2 / scale - safePosition.y / scale,
     };
 
-    addShape(type); // ← Using addShape from boardState
-  }, [stageRef, scale, position, addShape]);
+    addShape(type, undoRedoAddAction); // Pass the undo/redo addAction
+  }, [stageRef, scale, position, addShape, undoRedoAddAction]);
 
   // Stage dimensions
   const handleApplyStage = useCallback(() => {
-  console.log('🎯 Creating stage frame:', tempDimensions);
-  
-  if (tempDimensions.width > 0 && tempDimensions.height > 0) {
-    const stageFrameId = addStageFrame(tempDimensions.width, tempDimensions.height);
-    console.log('✅ Stage frame created:', stageFrameId);
+    console.log('🎯 Creating stage frame:', tempDimensions);
     
-    // Optional: Clear the temp dimensions after creation
-    setTempDimensions(defaultStageDimensions);
-  } else {
-    console.log('❌ Invalid stage dimensions');
-  }
-}, [tempDimensions, addStageFrame, setTempDimensions]);
+    if (tempDimensions.width > 0 && tempDimensions.height > 0) {
+      const stageFrameId = addStageFrame(tempDimensions.width, tempDimensions.height, undoRedoAddAction);
+      console.log('✅ Stage frame created:', stageFrameId);
+      
+      // Clear the temp dimensions after creation
+      setTempDimensions(defaultStageDimensions);
+    } else {
+      console.log('❌ Invalid stage dimensions');
+    }
+  }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction]);
+
   // Close without save
   const handleCloseWithoutSave = useCallback(async () => {
     try {
@@ -279,7 +276,7 @@ const BoardPage = () => {
           tempDimensions={tempDimensions}
           handleToolChange={toolHandlers.handleToolChange}
           setDrawingMode={setDrawingMode}
-          addShape={handleAddShape} // ← Using our wrapper function
+          addShape={handleAddShape}
           setTempDimensions={setTempDimensions}
           handleApplyStage={handleApplyStage}
           undo={undo}
@@ -312,10 +309,10 @@ const BoardPage = () => {
           position={position}
           activeTool={activeTool}
           lines={lines}
-          shapes={konvaShapes} // ← Now using konvaShapes from boardState
+          shapes={konvaShapes}
           reactShapes={reactShapes}
-          selectedNodeId={selectedNodeId}
           stageFrames={stageFrames}
+          selectedNodeId={selectedNodeId}
           stageInstance={stageInstance}
           handleWheel={toolHandlers.handleWheel}
           handleMouseDown={toolHandlers.handleMouseDown}
@@ -326,7 +323,7 @@ const BoardPage = () => {
           handleTouchMove={toolHandlers.handleTouchMove}
           setSelectedNodeId={setSelectedNodeId}
           setReactShapes={setReactShapes}
-          setShapes={setKonvaShapes} // ← Now using setKonvaShapes from boardState
+          setShapes={setKonvaShapes}
           updateShape={handleStageShapeUpdate}
           setStageInstance={setStageInstance}
         />

@@ -6,6 +6,7 @@ import { BoardState, Tool, Action, ReactShape } from "../types/board-types";
 import { defaultStageDimensions, defaultBoardInfo } from "../constants/tool-constants";
 import { KonvaShape } from "./useShapes";
 
+
 // Simple reorder function from study code
 const reorderArray = <T,>(arr: T[], from: number, to: number): T[] => {
   if (to < 0 || to > arr.length - 1) return arr;
@@ -203,8 +204,9 @@ export const useBoardState = () => {
     applyReorderedShapes(updatedShapes);
   };
 
-  // Shape management
- const addShape = useCallback((type: Tool) => {
+// Shape management
+// Change addShape function signature and implementation
+const addShape = useCallback((type: Tool, addAction: (action: Action) => void) => {
   console.log('🎯 addShape called with type:', type);
   
   if (!stageInstance) {
@@ -242,6 +244,13 @@ export const useBoardState = () => {
     console.log('➕ Adding Text shape:', newTextShape);
     setReactShapes(prev => [...prev, newTextShape]);
     
+    // ADD ACTION RECORDING
+    addAction({
+      type: "add-react-shape",
+      shapeType: 'text',
+      data: newTextShape
+    });
+    
     if (activeTool === "select") {
       setSelectedNodeId(shapeId);
     }
@@ -251,7 +260,7 @@ export const useBoardState = () => {
     const newStickyNote: ReactShape = {
       id: shapeId,
       type: 'stickyNote',
-      x: center.x - 100, // Center the sticky note
+      x: center.x - 100,
       y: center.y - 75,
       text: "Double click to edit...",
       fontSize: 16,
@@ -266,6 +275,13 @@ export const useBoardState = () => {
     console.log('➕ Adding Sticky Note:', newStickyNote);
     setReactShapes(prev => [...prev, newStickyNote]);
     
+    // ADD ACTION RECORDING
+    addAction({
+      type: "add-react-shape",
+      shapeType: 'stickyNote',
+      data: newStickyNote
+    });
+    
     if (activeTool === "select") {
       setSelectedNodeId(shapeId);
     }
@@ -273,19 +289,29 @@ export const useBoardState = () => {
     // For Konva shapes (rect, circle, etc.)
     console.log('➕ Adding Konva shape:', type);
     const result = addKonvaShape(type, center, true);
-    if (result && activeTool === "select") {
-      setSelectedNodeId(result.shapeId);
+    
+    // ADD ACTION RECORDING
+    if (result) {
+      addAction({
+        type: "add-konva-shape",
+        shapeType: type,
+        data: result.shapeData
+      });
+      
+      if (activeTool === "select") {
+        setSelectedNodeId(result.shapeId);
+      }
     }
   }
 }, [stageInstance, scale, position, activeTool, addKonvaShape, setSelectedNodeId]);
 
-const addStageFrame = useCallback((width: number, height: number) => {
+const addStageFrame = useCallback((width: number, height: number, addAction: (action: Action) => void) => {
   const shapeId = `stage-${Date.now()}`;
   
   const stageFrame: KonvaShape = {
     id: shapeId,
     type: 'stage',
-    x: 50, // Or center it
+    x: 50,
     y: 50,
     width: width,
     height: height,
@@ -297,6 +323,12 @@ const addStageFrame = useCallback((width: number, height: number) => {
   
   console.log('➕ Adding Stage Frame:', stageFrame);
   setStageFrames(prev => [...prev, stageFrame]);
+  
+  // ADD ACTION RECORDING
+  addAction({
+    type: "add-stage-frame",
+    data: stageFrame
+  });
   
   return shapeId;
 }, []);
@@ -401,6 +433,7 @@ const addStageFrame = useCallback((width: number, height: number) => {
     setCurrentBoardId,
     setShowSetupDialog,
     setBoardInfo,
+    setStageFrames,
 
     // Shape actions
     addShape,

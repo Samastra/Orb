@@ -9,12 +9,14 @@ export const useUndoRedo = (
   undoneActions: Action[],
   reactShapes: ReactShape[],
   lines: Array<{tool: 'brush' | 'eraser', points: number[]}>,
-  shapes: KonvaShape[], // ADD THIS
+  shapes: KonvaShape[],
+  stageFrames: KonvaShape[],
   setActions: React.Dispatch<React.SetStateAction<Action[]>>,
   setUndoneActions: React.Dispatch<React.SetStateAction<Action[]>>,
   setReactShapes: React.Dispatch<React.SetStateAction<ReactShape[]>>,
   setLines: React.Dispatch<React.SetStateAction<Array<{tool: 'brush' | 'eraser', points: number[]}>>>,
-  setShapes: React.Dispatch<React.SetStateAction<KonvaShape[]>> // ADD THIS
+  setShapes: React.Dispatch<React.SetStateAction<KonvaShape[]>>,
+  setStageFrames: React.Dispatch<React.SetStateAction<KonvaShape[]>>
 ) => {
   const addAction = useCallback((action: Action) => {
     console.log('💾 Saving action:', action.type, action);
@@ -50,6 +52,10 @@ export const useUndoRedo = (
       case "add-konva-shape":
         setShapes(prev => prev.filter(shape => shape.id !== lastAction.data.id));
         break;
+
+      case "add-stage-frame":
+        setStageFrames(prev => prev.filter(frame => frame.id !== lastAction.data.id));
+        break;
         
       case "add-line":
         setLines(prev => prev.slice(0, -1));
@@ -76,6 +82,10 @@ export const useUndoRedo = (
           shape.id === lastAction.id ? lastAction.prevData : shape
         ));
         break;
+
+      case "delete-stage-frame":
+        setStageFrames(prev => [...prev, lastAction.data]);
+        break;
         
       case "delete":
         if (drawLayer) {
@@ -100,7 +110,7 @@ export const useUndoRedo = (
         });
         break;
     }
-  }, [actions, stageRef, setActions, setUndoneActions, setReactShapes, setLines, setShapes, lines]);
+  }, [actions, stageRef, setActions, setUndoneActions, setReactShapes, setLines, setShapes, setStageFrames, lines]);
 
   const redo = useCallback(() => {
     if (undoneActions.length === 0) return;
@@ -126,6 +136,10 @@ export const useUndoRedo = (
         
       case "add-konva-shape":
         setShapes(prev => [...prev, lastAction.data]);
+        break;
+
+      case "add-stage-frame":
+        setStageFrames(prev => [...prev, lastAction.data]);
         break;
         
       case "add-line":
@@ -153,6 +167,10 @@ export const useUndoRedo = (
           shape.id === lastAction.id ? lastAction.newData : shape
         ));
         break;
+
+      case "delete-stage-frame":
+        setStageFrames(prev => prev.filter(frame => frame.id !== lastAction.data.id));
+        break;
         
       case "delete":
         if (drawLayer) {
@@ -176,7 +194,7 @@ export const useUndoRedo = (
         setLines(prev => prev.filter((_, index) => index !== lastAction.lineIndex));
         break;
     }
-  }, [undoneActions, stageRef, setActions, setUndoneActions, setReactShapes, setLines, setShapes]);
+  }, [undoneActions, stageRef, setActions, setUndoneActions, setReactShapes, setLines, setShapes, setStageFrames]);
 
   return {
     addAction,
