@@ -19,6 +19,8 @@ import { useUndoRedo } from "@/hooks/useUndoRedo";
 import FormattingToolbar from "@/components/FormattingToolbar";
 // Utils
 import { fetchBoard } from "@/lib/actions/board-actions";
+import { useWindowSize } from "@/hooks/useWindowSize";
+import { cn } from "@/lib/utils";
 
 // Fix text rendering
 if (typeof window !== 'undefined') {
@@ -42,6 +44,7 @@ const useDebounce = (callback: Function, delay: number) => {
 
 const BoardPage = () => {
   const params = useParams();
+  const { width: windowWidth, height: windowHeight } = useWindowSize();
   
   // Refs
   const stageRef = useRef<Konva.Stage | null>(null);
@@ -49,15 +52,15 @@ const BoardPage = () => {
   
   const [stageKey, setStageKey] = useState(0);
 
-  // State management - ALL shape state now comes from useBoardState
+  // State management
   const boardState = useBoardState();
   
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
-    isConnecting, reactShapes, konvaShapes, stageFrames, selectedNodeId, stageInstance, tempDimensions,
+    isConnecting, reactShapes, konvaShapes, stageFrames, images, selectedNodeId, stageInstance, tempDimensions, // ADD images HERE
     showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
     setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
-    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setSelectedNodeId, setStageInstance,
+    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setSelectedNodeId, setStageInstance, // ADD setImages HERE
     setTempDimensions, setShowSaveModal, setShowSetupDialog, setBoardInfo,
     // Layer functions
     bringForward,
@@ -69,9 +72,10 @@ const BoardPage = () => {
     updateShape,
     addKonvaShape,
     addStageFrame,
+    addImage, // ADD THIS
   } = boardState;
 
-  // Undo/Redo functionality - MUST BE DEFINED BEFORE HANDLERS THAT USE IT
+  // Undo/Redo functionality - UPDATED WITH IMAGES
   const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
     stageRef,
     boardState.actions,
@@ -80,12 +84,14 @@ const BoardPage = () => {
     lines,
     konvaShapes,
     stageFrames,
+    images, // ADD THIS
     boardState.setActions,
     boardState.setUndoneActions,
     setReactShapes,
     setLines,
     setKonvaShapes,
-    setStageFrames
+    setStageFrames,
+    setImages // ADD THIS
   );
 
   // Tool functionality
@@ -107,8 +113,39 @@ const BoardPage = () => {
     setTempConnection, 
     setIsConnecting, 
     setSelectedNodeId, 
-    undoRedoAddAction // Use the renamed addAction
+    undoRedoAddAction
   );
+
+  // ADD ZOOM FUNCTIONS THAT ACTUALLY WORK
+  const handleZoomIn = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const scaleBy = 1.2;
+    const oldScale = stage.scaleX();
+    const newScale = Math.min(oldScale * scaleBy, 5); // Max zoom 500%
+
+    stage.scale({ x: newScale, y: newScale });
+    stage.batchDraw();
+    
+    // FORCE UPDATE THE SCALE IN STATE
+    boardState.setScale(newScale);
+  }, [stageRef, boardState.setScale]);
+
+  const handleZoomOut = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const scaleBy = 1.2;
+    const oldScale = stage.scaleX();
+    const newScale = Math.max(oldScale / scaleBy, 0.1); // Min zoom 10%
+
+    stage.scale({ x: newScale, y: newScale });
+    stage.batchDraw();
+    
+    // FORCE UPDATE THE SCALE IN STATE
+    boardState.setScale(newScale);
+  }, [stageRef, boardState.setScale]);
 
   const debouncedUpdateShape = useDebounce((shapeId: string, updates: Partial<any>) => {
     const isReactShape = reactShapes.some((s) => s.id === shapeId);
@@ -120,7 +157,6 @@ const BoardPage = () => {
         )
       );
     } else {
-      // For Konva shapes, find the node and create proper update action
       const drawLayer = stageRef.current?.findOne(".draw-layer") as Konva.Layer;
       if (drawLayer) {
         const node = drawLayer.findOne(`#${shapeId}`) as Konva.Shape | Konva.Group;
@@ -129,7 +165,6 @@ const BoardPage = () => {
           node.setAttrs(updates);
           drawLayer.batchDraw();
           
-          // Add to undo history with CORRECT action structure
           undoRedoAddAction({
             type: "update",
             id: shapeId,
@@ -141,62 +176,60 @@ const BoardPage = () => {
     }
   }, 50);
 
-  // Handler for StageComponent (expects: (id: string, attrs: Partial<KonvaShape>) => void)
+  // Handler for StageComponent
   const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<any>) => {
     if (!id) return;
     
-    // Check if it's a React shape (text/sticky note) or Konva shape
     const isReactShape = reactShapes.some((s) => s.id === id);
     const isKonvaShape = konvaShapes.some((s) => s.id === id);
     
     if (isReactShape) {
-      // Apply to React shapes
       setReactShapes(prev => 
         prev.map(shape => 
           shape.id === id ? { ...shape, ...attrs } : shape
         )
       );
     } else if (isKonvaShape) {
-      // Apply to Konva shapes
       debouncedUpdateShape(id, attrs);
     }
   }, [debouncedUpdateShape, reactShapes, konvaShapes]);
 
-  // Handler for FormattingToolbar (expects: (updates: Record<string, any>) => void)
+  // Handler for FormattingToolbar
   const handleFormattingToolbarUpdate = useCallback((updates: Record<string, any>) => {
     if (!selectedNodeId) return;
     
-    // Check if it's a React shape (text/sticky note) or Konva shape
     const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
     const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
     
     if (isReactShape) {
-      // Apply to React shapes
       setReactShapes(prev => 
         prev.map(shape => 
           shape.id === selectedNodeId ? { ...shape, ...updates } : shape
         )
       );
     } else if (isKonvaShape) {
-      // Apply to Konva shapes
       debouncedUpdateShape(selectedNodeId, updates);
     }
   }, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes]);
 
-  // Memoize selected shape to prevent unnecessary re-renders
+  // Memoize selected shape
   const selectedShape = useMemo(() => {
-    if (!selectedNodeId) return null;
-    
-    // Check react shapes first (text shapes)
-    const reactShape = reactShapes.find((s) => s.id === selectedNodeId);
-    if (reactShape) return reactShape;
-    
-    // Check konva shapes
-    const konvaShape = konvaShapes.find((s) => s.id === selectedNodeId);
-    return konvaShape || null;
-  }, [selectedNodeId, reactShapes, konvaShapes]);
+  if (!selectedNodeId) return null;
+  
+  // Check react shapes
+  const reactShape = reactShapes.find((s) => s.id === selectedNodeId);
+  if (reactShape) return reactShape;
+  
+  // Check konva shapes
+  const konvaShape = konvaShapes.find((s) => s.id === selectedNodeId);
+  if (konvaShape) return konvaShape;
+  
+  // Check images - ADD THIS
+  const imageShape = images.find((img) => img.id === selectedNodeId);
+  return imageShape || null;
+}, [selectedNodeId, reactShapes, konvaShapes, images]);
 
-  // Shape creation - using addShape from boardState
+  // Shape creation
   const handleAddShape = useCallback((type: Tool) => {
     if (!stageRef.current) return;
     const stage = stageRef.current;
@@ -208,7 +241,7 @@ const BoardPage = () => {
       y: stage.height() / 2 / scale - safePosition.y / scale,
     };
 
-    addShape(type, undoRedoAddAction); // Pass the undo/redo addAction
+    addShape(type, undoRedoAddAction);
   }, [stageRef, scale, position, addShape, undoRedoAddAction]);
 
   // Stage dimensions
@@ -219,12 +252,28 @@ const BoardPage = () => {
       const stageFrameId = addStageFrame(tempDimensions.width, tempDimensions.height, undoRedoAddAction);
       console.log('✅ Stage frame created:', stageFrameId);
       
-      // Clear the temp dimensions after creation
       setTempDimensions(defaultStageDimensions);
     } else {
       console.log('❌ Invalid stage dimensions');
     }
   }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction]);
+
+  const handleImageUpload = useCallback(async (file: File) => {
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const src = e.target?.result as string;
+        if (src) {
+          // Add image to board
+          addImage(src, undoRedoAddAction); // USE addImage FROM DESTRUCTURING
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+    }
+  }, [addImage, undoRedoAddAction]); // UPDATE DEPENDENCY
 
   // Close without save
   const handleCloseWithoutSave = useCallback(async () => {
@@ -278,17 +327,11 @@ const BoardPage = () => {
           setDrawingMode={setDrawingMode}
           addShape={handleAddShape}
           setTempDimensions={setTempDimensions}
+          onImageUpload={handleImageUpload}
           handleApplyStage={handleApplyStage}
           undo={undo}
           redo={redo}
         />
-
-        {/* Zoom Indicator */}
-        <div className="absolute z-10 bottom-0 right-0 flex items-center bg-white rounded-md m-4 p-3 shadow-md">
-          <img src="/image/connect-nodes2.svg" alt="zoom-out" />
-          <p>{Math.round(scale * 100)}%</p>
-          <img src="/image/add-icon.svg" alt="zoom-in" />
-        </div>
 
         {/* Formatting Toolbar */}
         <FormattingToolbar
@@ -300,7 +343,64 @@ const BoardPage = () => {
           onSendToBack={sendToBack}
         />
 
-        {/* Stage */}
+        {/* BOTTOM CONTROLS - THE ONE YOU LIKED! */}
+        <div className={cn(
+          "absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-4",
+          "bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-lg border border-gray-200",
+          "transition-all duration-300"
+        )}>
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleZoomOut}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Zoom Out"
+            >
+              <img src="/image/connect-nodes2.svg" alt="zoom-out" className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center gap-2 min-w-[80px] justify-center">
+              <span className="text-sm font-medium text-gray-700">
+                {Math.round(scale * 100)}% {/* THIS WILL NOW UPDATE! */}
+              </span>
+            </div>
+            
+            <button 
+              onClick={handleZoomIn}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Zoom In"
+            >
+              <img src="/image/add-icon.svg" alt="zoom-in" className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Quick Actions - UNDO/REDO YOU LIKED */}
+          <div className="w-px h-6 bg-gray-300"></div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={undo}
+              disabled={boardState.actions.length === 0}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Undo"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+            <button
+              onClick={redo}
+              disabled={boardState.undoneActions.length === 0}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Redo"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Stage - UPDATED WITH IMAGE PROPS */}
         <StageComponent
           key={`stage-${stageKey}`}
           stageRef={stageRef}
@@ -312,6 +412,7 @@ const BoardPage = () => {
           shapes={konvaShapes}
           reactShapes={reactShapes}
           stageFrames={stageFrames}
+          images={images} // ADD THIS
           selectedNodeId={selectedNodeId}
           stageInstance={stageInstance}
           handleWheel={toolHandlers.handleWheel}
@@ -324,6 +425,7 @@ const BoardPage = () => {
           setSelectedNodeId={setSelectedNodeId}
           setReactShapes={setReactShapes}
           setShapes={setKonvaShapes}
+          setImages={setImages} // ADD THIS
           updateShape={handleStageShapeUpdate}
           setStageInstance={setStageInstance}
         />

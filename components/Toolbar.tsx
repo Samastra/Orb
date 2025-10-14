@@ -5,6 +5,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Popover,
   PopoverContent,
@@ -32,6 +33,9 @@ interface ToolbarProps {
   handleApplyStage: () => void;
   undo: () => void;
   redo: () => void;
+  compact?: boolean;
+  // ADD IMAGE UPLOAD PROP
+  onImageUpload?: (file: File) => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -45,9 +49,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
   handleApplyStage,
   undo,
   redo,
+  compact = false,
+  onImageUpload, // ADD THIS
 }) => {
+  // Handle image upload
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && onImageUpload) {
+      onImageUpload(file);
+    }
+    // Reset input to allow uploading same file again
+    event.target.value = '';
+  };
+
   return (
-    <div className="fixed md:absolute left-0 top-20 md:top-20 flex flex-col items-center z-50">
+    <div className={cn(
+      "fixed md:absolute left-0 top-20 md:top-20 flex flex-col items-center z-50",
+      compact ? "scale-90 origin-left" : ""
+    )}>
       {/* Main Tools */}
       <div className="flex flex-row md:flex-col items-center space-y-0 md:space-y-4 space-x-2 md:space-x-0 bg-white p-2 md:p-3 m-2 md:m-5 rounded-md shadow-md border border-gray-200">
         {/* Select Tool */}
@@ -96,6 +115,27 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={5}>
             <p className="text-xs md:text-sm">Sticky Note</p>
+          </TooltipContent>
+        </Tooltip>
+
+        {/* IMAGE UPLOAD BUTTON - ADD THIS */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                title="Upload image"
+              />
+              <button className="flex items-center justify-center my-1 w-8 h-8 md:w-10 md:h-10 rounded hover:bg-gray-300 transition-colors border-2 border-transparent">
+                <img src="/image/upload-icon.svg" alt="upload" className="w-4 h-4 md:w-6 md:h-6" />
+              </button>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={5}>
+            <p className="text-xs md:text-sm">Upload Image</p>
           </TooltipContent>
         </Tooltip>
 
@@ -249,37 +289,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-
-      {/* Undo/Redo Buttons */}
-      <div className="flex flex-row md:flex-col items-center space-y-0 md:space-y-4 space-x-2 md:space-x-0 bg-white p-2 md:p-3 m-2 md:m-5 rounded-md shadow-md border border-gray-200">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={undo}
-              className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded hover:bg-gray-300 transition-colors"
-            >
-              <img src="/image/undo.svg" alt="undo" className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={5}>
-            <p className="text-xs md:text-sm">Undo</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={redo}
-              className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded hover:bg-gray-300 transition-colors"
-            >
-              <img src="/image/redo.svg" alt="redo" className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={5}>
-            <p className="text-xs md:text-sm">Redo</p>
-          </TooltipContent>
-        </Tooltip>
       </div>
     </div>
   );

@@ -462,6 +462,30 @@ export const useKonvaTools = (
     
     drawLayer.batchDraw();
   }, [activeTool, drawingMode, setActiveTool, stageRef]);
+  const handleZoomIn = useCallback(() => {
+  const stage = stageRef.current;
+  if (!stage) return;
+
+  const scaleBy = 1.2;
+  const oldScale = stage.scaleX();
+  const newScale = Math.min(oldScale * scaleBy, 5); // Max zoom 500%
+
+  stage.scale({ x: newScale, y: newScale });
+  stage.batchDraw();
+}, [stageRef]);
+
+const handleZoomOut = useCallback(() => {
+  const stage = stageRef.current;
+  if (!stage) return;
+
+  const scaleBy = 1.2;
+  const oldScale = stage.scaleX();
+  const newScale = Math.max(oldScale / scaleBy, 0.1); // Min zoom 10%
+
+  stage.scale({ x: newScale, y: newScale });
+  stage.batchDraw();
+}, [stageRef]);
+
 
   return {
     // Handlers
@@ -479,7 +503,8 @@ export const useKonvaTools = (
     handleDrawingMouseMove,
     handleDrawingMouseUp,
     handleWheel,
-    
+    handleZoomIn,    // ← ADD THIS
+    handleZoomOut,
     // Refs
     isDrawing,
   };

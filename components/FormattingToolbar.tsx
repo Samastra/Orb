@@ -123,25 +123,25 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [formats, setFormats] = useState<string[]>([]);
 
-    const handleBringForward = () => {
-  console.log('🎯 Bring Forward button CLICKED'); // Add this back temporarily
-  onBringForward();
-};
+  const handleBringForward = () => {
+    console.log('🎯 Bring Forward button CLICKED');
+    onBringForward();
+  };
 
-const handleSendBackward = () => {
-  console.log('🎯 Send Backward button CLICKED'); // Add this back temporarily
-  onSendBackward();
-};
+  const handleSendBackward = () => {
+    console.log('🎯 Send Backward button CLICKED');
+    onSendBackward();
+  };
 
-const handleBringToFront = () => {
-  console.log('🎯 Bring to Front button CLICKED'); // Add this back temporarily
-  onBringToFront();
-};
+  const handleBringToFront = () => {
+    console.log('🎯 Bring to Front button CLICKED');
+    onBringToFront();
+  };
 
-const handleSendToBack = () => {
-  console.log('🎯 Send to Back button CLICKED'); // Add this back temporarily
-  onSendToBack();
-};
+  const handleSendToBack = () => {
+    console.log('🎯 Send to Back button CLICKED');
+    onSendToBack();
+  };
 
   useEffect(() => {
     if (!selectedShape) return;
@@ -153,8 +153,11 @@ const handleSendToBack = () => {
     setFormats(activeFormats);
   }, [selectedShape]);
 
+  // CRITICAL FIX: Define isImage BEFORE the early return condition
+  const isImage = selectedShape?.type === "image";
+
   if (!selectedShape || selectedShape.type === "stage") {
-  return null; // Don't show formatting toolbar for stage frames or when nothing is selected
+    return null; // Don't show formatting toolbar for stage frames or when nothing is selected
   }
     
   const isText = selectedShape.type === "text";
@@ -253,6 +256,11 @@ const handleSendToBack = () => {
   const handleFontStyleChange = (style: string) => {
     onChange({ fontStyle: style });
   };
+
+  // FIXED: Include images in the supported types check
+  if (!isText && !isStickyNote && !isShape && !isImage) {
+    return null;
+  }
 
   return (
     <TooltipProvider>
@@ -660,8 +668,8 @@ const handleSendToBack = () => {
           </>
         )}
 
-        {/* Layer Controls */}
-        {(isText || isStickyNote || isShape) && selectedShape.type !== "stage" && (
+        {/* Layer Controls - FIXED: Now includes images */}
+        {(isText || isStickyNote || isShape || isImage) && selectedShape.type !== "stage" && (
           <>
             <Separator orientation="vertical" className="h-6" />
             

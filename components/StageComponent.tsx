@@ -2,10 +2,10 @@
 import React, { useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Konva from "konva";
-import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, RegularPolygon } from "react-konva";
+import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, RegularPolygon, Image } from "react-konva";
 import GridLayer from "@/components/gridLayer";
 import EditableTextComponent from "@/components/editableTextCompoent";
-import { ReactShape, Tool } from "../types/board-types";
+import { ReactShape, Tool, ImageShape } from "../types/board-types";
 import { KonvaShape } from "@/hooks/useShapes";
 import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 
@@ -13,6 +13,7 @@ import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
   ssr: false,
 });
+
 interface StageComponentProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   trRef: React.RefObject<Konva.Transformer | null>;
@@ -23,8 +24,11 @@ interface StageComponentProps {
   reactShapes: ReactShape[];
   shapes: KonvaShape[];
   stageFrames: KonvaShape[]; 
+  images: ImageShape[];
   selectedNodeId: string | null;
   stageInstance: Konva.Stage | null;
+  width?: number;
+  height?: number;
   handleWheel: (e: Konva.KonvaEventObject<WheelEvent>) => void;
   handleMouseDown: (e: Konva.KonvaEventObject<MouseEvent>) => void;
   handleMouseUp: (e: Konva.KonvaEventObject<MouseEvent>) => void;
@@ -35,6 +39,7 @@ interface StageComponentProps {
   setSelectedNodeId: React.Dispatch<React.SetStateAction<string | null>>;
   setReactShapes: React.Dispatch<React.SetStateAction<ReactShape[]>>;
   setShapes: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
+  setImages: React.Dispatch<React.SetStateAction<ImageShape[]>>;
   updateShape: (id: string, attrs: Partial<KonvaShape>) => void;
   setStageInstance: (stage: Konva.Stage | null) => void;
 }
@@ -43,7 +48,77 @@ interface StageComponentProps {
 type CombinedShape = 
   | (KonvaShape & { __kind: 'konva' })
   | (ReactShape & { __kind: 'react' })
-  | (KonvaShape & { __kind: 'stage' }); 
+  | (KonvaShape & { __kind: 'stage' })
+  | (ImageShape & { __kind: 'image' });
+
+// Image Component - Using native Konva Image (NO react-konva-image)
+const ImageElement = React.forwardRef(({ 
+  imageShape, 
+  onDragEnd 
+}: { 
+  imageShape: ImageShape;
+  onDragEnd: (e: any) => void;
+}, ref: any) => {
+  const [image, setImage] = React.useState<HTMLImageElement | null>(null);
+  const [imageDimensions, setImageDimensions] = React.useState<{width: number, height: number} | null>(null);
+  const internalRef = React.useRef<Konva.Image>(null);
+
+  // Combine internal ref with forwarded ref
+  React.useImperativeHandle(ref, () => internalRef.current);
+
+  // Load image using native JavaScript and get natural dimensions
+  React.useEffect(() => {
+    const img = new (window as any).Image();
+    img.src = imageShape.src;
+    img.onload = () => {
+      setImage(img);
+      setImageDimensions({
+        width: img.naturalWidth,
+        height: img.naturalHeight
+      });
+    };
+    img.onerror = () => {
+      console.error('Failed to load image:', imageShape.src);
+    };
+  }, [imageShape.src]);
+
+  if (!image || !imageDimensions) {
+    return (
+      <Rect
+        ref={internalRef}
+        x={imageShape.x}
+        y={imageShape.y}
+        width={200}
+        height={150}
+        fill="#f0f0f0"
+        stroke="#ccc"
+        strokeWidth={1}
+        draggable={imageShape.draggable}
+        onDragEnd={onDragEnd}
+        name="selectable-shape"
+      />
+    );
+  }
+
+  return (
+    <Image
+      ref={internalRef}
+      image={image}
+      x={imageShape.x}
+      y={imageShape.y}
+      width={imageDimensions.width}
+      height={imageDimensions.height}
+      rotation={imageShape.rotation}
+      draggable={imageShape.draggable}
+      onDragEnd={onDragEnd}
+      name="selectable-shape"
+      // Add explicit ID for selection
+      id={imageShape.id}
+    />
+  );
+});
+
+ImageElement.displayName = 'ImageElement';
 
 const StageComponent: React.FC<StageComponentProps> = ({
   stageRef,
@@ -55,8 +130,11 @@ const StageComponent: React.FC<StageComponentProps> = ({
   reactShapes,
   shapes,
   stageFrames,
+  images,
   selectedNodeId,
   stageInstance,
+  width,
+  height,
   handleWheel,
   handleMouseDown,
   handleMouseUp,
@@ -67,6 +145,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setSelectedNodeId,
   setReactShapes,
   setShapes,
+  setImages,
   updateShape,
   setStageInstance,
 }) => {
@@ -74,41 +153,44 @@ const StageComponent: React.FC<StageComponentProps> = ({
 
   // Sync shape refs while preserving existing refs to avoid remounts
   useEffect(() => {
-  const allIds = [
-    ...stageFrames.map(s => s.id), // ← ADD STAGE FRAMES
-    ...shapes.map(s => s.id),
-    ...reactShapes.map(r => r.id)
-  ];
-  const map: { [key: string]: any } = { ...shapeRefs.current };
-  // ensure refs exist for all current ids, preserve existing refs
-  allIds.forEach(id => {
-    if (!map[id]) map[id] = React.createRef();
-  });
-  // remove refs that no longer exist to keep ref map tidy
-  Object.keys(map).forEach(k => {
-    if (!allIds.includes(k)) delete map[k];
-  });
-  shapeRefs.current = map;
-}, [stageFrames, shapes, reactShapes]);
+    const allIds = [
+      ...stageFrames.map(s => s.id),
+      ...shapes.map(s => s.id),
+      ...reactShapes.map(r => r.id),
+      ...images.map(i => i.id)
+    ];
+    const map: { [key: string]: any } = { ...shapeRefs.current };
+    
+    // ensure refs exist for all current ids, preserve existing refs
+    allIds.forEach(id => {
+      if (!map[id]) map[id] = React.createRef();
+    });
+    
+    // remove refs that no longer exist to keep ref map tidy
+    Object.keys(map).forEach(k => {
+      if (!allIds.includes(k)) delete map[k];
+    });
+    shapeRefs.current = map;
+  }, [stageFrames, shapes, reactShapes, images]);
 
-
-  // NEW SIMPLE APPROACH: Combine shapes and render in array order (like study code)
-// The array order determines the z-order (last item = top layer)
-const allShapesToRender = React.useMemo(() => {
-  console.log('🔄 StageComponent re-rendering with shapes:', {
-    stageFrames: stageFrames.length, // ← ADD THIS
-    konvaShapes: shapes.length,
-    reactShapes: reactShapes.length,
-    total: stageFrames.length + shapes.length + reactShapes.length
-  });
-  
-  // Fixed rendering order: stageFrames → konvaShapes → reactShapes
-  return [
-    ...stageFrames.map(s => ({ ...s, __kind: 'stage' as const })), // ← ALWAYS AT BOTTOM
-    ...shapes.map(s => ({ ...s, __kind: 'konva' as const })),
-    ...reactShapes.map(s => ({ ...s, __kind: 'react' as const })),
-  ];
-}, [stageFrames, shapes, reactShapes]); // ← ADD STAGE FRAMES DEPENDENCY
+  // NEW SIMPLE APPROACH: Combine shapes and render in array order
+  const allShapesToRender = React.useMemo(() => {
+    console.log('🔄 StageComponent re-rendering with shapes:', {
+      stageFrames: stageFrames.length,
+      konvaShapes: shapes.length,
+      reactShapes: reactShapes.length,
+      images: images.length,
+      total: stageFrames.length + shapes.length + reactShapes.length + images.length
+    });
+    
+    // Fixed rendering order: stageFrames → konvaShapes → images → reactShapes
+    return [
+      ...stageFrames.map(s => ({ ...s, __kind: 'stage' as const })),
+      ...shapes.map(s => ({ ...s, __kind: 'konva' as const })),
+      ...images.map(s => ({ ...s, __kind: 'image' as const })),
+      ...reactShapes.map(s => ({ ...s, __kind: 'react' as const })),
+    ];
+  }, [stageFrames, shapes, reactShapes, images]);
 
   // Transformer management
   useEffect(() => {
@@ -125,8 +207,10 @@ const allShapesToRender = React.useMemo(() => {
     const ref = shapeRefs.current[selectedNodeId];
     const selectedShape = allShapesToRender.find(item => item.id === selectedNodeId);
     
-    // Don't show transformer for sticky notes
-    if (selectedShape && selectedShape.__kind === 'react' && selectedShape.type === 'stickyNote') {
+    // FIXED: Only exclude sticky notes, NOT images
+    if (selectedShape && (
+      selectedShape.__kind === 'react' && selectedShape.type === 'stickyNote'
+    )) {
       trRef.current.nodes([]);
       trRef.current.getLayer()?.batchDraw();
       return;
@@ -148,28 +232,44 @@ const allShapesToRender = React.useMemo(() => {
   }, [selectedNodeId, allShapesToRender, trRef]);
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    const stage = e.target.getStage();
-    if (!stage) return;
+  const stage = e.target.getStage();
+  if (!stage) return;
 
-    if (e.target === stage) {
-      setSelectedNodeId(null);
-      return;
-    }
-    
-    if (e.target.hasName('selectable-shape')) {
-      setSelectedNodeId(e.target.id());
-    }
-  };
+  console.log('🖱️ Stage click - target:', {
+    name: e.target.name(),
+    id: e.target.id(),
+    className: e.target.className,
+    attrs: e.target.attrs
+  });
+
+  if (e.target === stage) {
+    setSelectedNodeId(null);
+    return;
+  }
+  
+  if (e.target.hasName('selectable-shape')) {
+    console.log('✅ Selecting shape:', e.target.id());
+    setSelectedNodeId(e.target.id());
+  } else {
+    console.log('❌ Not a selectable shape:', e.target.name());
+  }
+};
 
   const handleShapeDragEnd = (item: CombinedShape, e: any) => {
     try {
       const nx = e.target.x();
       const ny = e.target.y();
+      
       if (item.__kind === 'konva') {
         updateShape(item.id, { x: nx, y: ny });
-      } else {
+      } else if (item.__kind === 'react') {
         setReactShapes(prev => prev.map(s => 
           s.id === item.id ? { ...s, x: nx, y: ny } : s
+        ));
+      } else if (item.__kind === 'image') {
+        // Handle image drag
+        setImages(prev => prev.map(img => 
+          img.id === item.id ? { ...img, x: nx, y: ny } : img
         ));
       }
     } catch (error) {
@@ -184,23 +284,41 @@ const allShapesToRender = React.useMemo(() => {
     }
   };
 
-  // Debug: Log when shapes change to verify re-renders
-        useEffect(() => {
-          console.log('🎨 Shapes updated - rendering:', allShapesToRender.length, 'shapes');
-          console.log('📊 Shape breakdown:', {
-            stageFrames: stageFrames.length, // ← ADD THIS
-            konva: shapes.length,
-            react: reactShapes.length,
-            selected: selectedNodeId
-          });
-        }, [allShapesToRender.length, stageFrames.length, shapes.length, reactShapes.length, selectedNodeId]);
-
+  // Handle image drag end
+  const handleImageDragEnd = (imageShape: ImageShape, e: any) => {
+  const node = e.target;
+  
+  // Check if this was a resize (transform) or just a move
+  const wasResized = node.width() !== imageShape.width || node.height() !== imageShape.height;
+  
+  if (wasResized) {
+    // Image was resized - update both position and size
+    setImages(prev => prev.map(img => 
+      img.id === imageShape.id 
+        ? { 
+            ...img, 
+            x: node.x(), 
+            y: node.y(),
+            width: node.width(),
+            height: node.height()
+          }
+        : img
+    ));
+  } else {
+    // Image was just moved - update position only
+    setImages(prev => prev.map(img => 
+      img.id === imageShape.id 
+        ? { ...img, x: node.x(), y: node.y() }
+        : img
+    ));
+  }
+};
 
   return (
     <div className="absolute inset-0 z-0">
       <Stage
-        width={typeof window !== "undefined" ? window.innerWidth : 800}
-        height={typeof window !== "undefined" ? window.innerHeight : 600}
+        width={width || (typeof window !== "undefined" ? window.innerWidth : 800)}
+        height={height || (typeof window !== "undefined" ? window.innerHeight : 600)}
         scaleX={scale}
         scaleY={scale}
         x={position.x}
@@ -225,7 +343,7 @@ const allShapesToRender = React.useMemo(() => {
       >
         <GridLayer stage={stageInstance} baseSize={30} color="#d6d4d4ff" />
         <Layer name="draw-layer">
-          {/* SIMPLE RENDERING: Render all shapes in array order (determines z-order) */}
+          {/* SIMPLE RENDERING: Render all shapes in array order */}
           {allShapesToRender.map((item) => {
             console.log(`🎯 Rendering shape: ${item.id} (${item.__kind}:${item.type})`);
 
@@ -240,7 +358,6 @@ const allShapesToRender = React.useMemo(() => {
               onTap: (e: any) => handleShapeClick(item, e),
             };
 
-
             if (item.__kind === 'stage') {
               const stageItem = item as KonvaShape;
               return (
@@ -254,13 +371,20 @@ const allShapesToRender = React.useMemo(() => {
                   stroke={stageItem.stroke || "#cccccc"}
                   strokeWidth={stageItem.strokeWidth || 2}
                   cornerRadius={0}
-                  name="stage-frame" // Special name for identification
+                  name="stage-frame"
                 />
               );
-          }
-
-
-            if (item.__kind === 'konva') {
+            } else if (item.__kind === 'image') {
+                const imageItem = item as ImageShape;
+                return (
+                  <ImageElement
+                    key={item.id}
+                    ref={shapeRefs.current[item.id]}
+                    imageShape={imageItem}
+                    onDragEnd={(e) => handleImageDragEnd(imageItem, e)}
+                  />
+                );
+              } else if (item.__kind === 'konva') {
               // Use type assertions for Konva properties
               const konvaItem = item as any;
               
@@ -395,7 +519,7 @@ const allShapesToRender = React.useMemo(() => {
               }
             }
           })}
-
+          
           {/* Lines */}
           {lines.map((line, i) => (
             <Line
@@ -415,29 +539,59 @@ const allShapesToRender = React.useMemo(() => {
 
           {/* Transformer */}
           <Transformer
-            ref={trRef}
-            enabledAnchors={[
-              "top-left", "top-right",
-              "bottom-left", "bottom-right",
-              "top-center", "bottom-center",
-              "middle-left", "middle-right"
-            ]}
-            boundBoxFunc={(oldBox, newBox) => ({
-              ...newBox,
-              width: Math.max(20, newBox.width),
-              height: Math.max(20, newBox.height),
-            })}
-            keepRatio={false}
-            rotateEnabled={true}
-            resizeEnabled={true}
-            anchorSize={10}
-            anchorStrokeWidth={1}
-            borderStroke="#0099e5"
-            borderStrokeWidth={2}
-            anchorCornerRadius={4}
-            anchorStroke="#0099e5"
-            anchorFill="#ffffff"
-          />
+  ref={trRef}
+  enabledAnchors={[
+    "top-left", "top-right",
+    "bottom-left", "bottom-right",
+    "middle-left", "middle-right",   // ← ADD THESE
+    "middle-top", "middle-bottom"
+    // Remove center anchors to prevent skewing
+  ]}
+  boundBoxFunc={(oldBox, newBox) => {
+    const selectedShape = allShapesToRender.find(item => item.id === selectedNodeId);
+    
+    // If it's an image, maintain aspect ratio
+    if (selectedShape && selectedShape.__kind === 'image') {
+      const imageShape = selectedShape as ImageShape;
+      const aspectRatio = imageShape.width / imageShape.height;
+      
+      let width = newBox.width;
+      let height = newBox.height;
+      
+      // Maintain aspect ratio
+      if (Math.abs(width - oldBox.width) > Math.abs(height - oldBox.height)) {
+        // Width changed more, adjust height to match aspect ratio
+        height = width / aspectRatio;
+      } else {
+        // Height changed more, adjust width to match aspect ratio
+        width = height * aspectRatio;
+      }
+      
+      return {
+        ...newBox,
+        width: Math.max(20, width), // Minimum size
+        height: Math.max(20, height),
+      };
+    }
+    
+    // For other shapes, use normal behavior
+    return {
+      ...newBox,
+      width: Math.max(20, newBox.width),
+      height: Math.max(20, newBox.height),
+    };
+  }}
+  keepRatio={false} // We handle ratio manually for images
+  rotateEnabled={true}
+  resizeEnabled={true}
+  anchorSize={10}
+  anchorStrokeWidth={1}
+  borderStroke="#0099e5"
+  borderStrokeWidth={2}
+  anchorCornerRadius={4}
+  anchorStroke="#0099e5"
+  anchorFill="#ffffff"
+/>
         </Layer>
       </Stage>
     </div>

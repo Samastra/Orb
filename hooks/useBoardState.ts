@@ -2,10 +2,9 @@
 import { useState, useEffect, useCallback } from "react";
 import Konva from "konva";
 import { useParams } from "next/navigation";
-import { BoardState, Tool, Action, ReactShape } from "../types/board-types";
+import { BoardState, Tool, Action, ReactShape, ImageShape } from "../types/board-types";
 import { defaultStageDimensions, defaultBoardInfo } from "../constants/tool-constants";
 import { KonvaShape } from "./useShapes";
-
 
 // Simple reorder function from study code
 const reorderArray = <T,>(arr: T[], from: number, to: number): T[] => {
@@ -32,7 +31,7 @@ export const useBoardState = () => {
   const [undoneActions, setUndoneActions] = useState<Action[]>([]);
   const [stageInstance, setStageInstance] = useState<Konva.Stage | null>(null);
   const [reactShapes, setReactShapes] = useState<ReactShape[]>([]);
-  const [konvaShapes, setKonvaShapes] = useState<KonvaShape[]>([]); // MOVED HERE
+  const [konvaShapes, setKonvaShapes] = useState<KonvaShape[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [drawingMode, setDrawingMode] = useState<"brush" | "eraser">("brush");
   const [lines, setLines] = useState<Array<{ tool: "brush" | "eraser"; points: number[] }>>([]);
@@ -43,7 +42,77 @@ export const useBoardState = () => {
   const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [boardInfo, setBoardInfo] = useState(defaultBoardInfo);
   const [stageFrames, setStageFrames] = useState<KonvaShape[]>([]);
-  // Add Konva shape (moved from useShapes)
+  const [images, setImages] = useState<ImageShape[]>([]);
+
+  // Add image function
+const addImage = useCallback((src: string, addAction: (action: Action) => void) => {
+  const imageId = `image-${Date.now()}`;
+  
+  const img = new (window as any).Image();
+  img.src = src;
+  
+  img.onload = () => {
+    const maxWidth = 600;
+    const maxHeight = 400;
+    
+    let width = img.naturalWidth;
+    let height = img.naturalHeight;
+    const aspectRatio = width / height;
+    
+    // Scale down if image is too large
+    if (width > maxWidth || height > maxHeight) {
+      const ratio = Math.min(maxWidth / width, maxHeight / height);
+      width = width * ratio;
+      height = height * ratio;
+    }
+    
+    const newImage: ImageShape = {
+      id: imageId,
+      type: 'image',
+      x: 100,
+      y: 100,
+      width: width,
+      height: height,
+      src: src,
+      rotation: 0,
+      draggable: true,
+      originalWidth: img.naturalWidth,
+      originalHeight: img.naturalHeight,
+      aspectRatio: aspectRatio
+    };
+    setImages(prev => [...prev, newImage]);
+    
+    addAction({
+      type: "add-image",
+      data: newImage
+    });
+  };
+  
+  img.onerror = () => {
+    console.error('Failed to load image for dimensions:', src);
+    const fallbackImage: ImageShape = {
+      id: imageId,
+      type: 'image',
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 150,
+      src: src,
+      rotation: 0,
+      draggable: true,
+    };
+    
+    setImages(prev => [...prev, fallbackImage]);
+    
+    addAction({
+      type: "add-image",
+      data: fallbackImage
+    });
+  };
+  
+  return imageId;
+}, []);
+
   const addKonvaShape = useCallback((type: Tool, center: { x: number; y: number }, draggable: boolean) => {
     const shapeId = `shape-${Date.now()}`;
 
@@ -116,36 +185,50 @@ export const useBoardState = () => {
     setKonvaShapes(prev => prev.filter(shape => shape.id !== id));
   }, []);
 
-  // Apply reordered shapes
-  const applyReorderedShapes = useCallback((updatedShapes: Array<KonvaShape | ReactShape>) => {
+  // Apply reordered shapes - UPDATED TO INCLUDE IMAGES
+  const applyReorderedShapes = useCallback((updatedShapes: Array<KonvaShape | ReactShape | ImageShape>) => {
     console.log('🔄 Applying reordered shapes:', updatedShapes.length);
     
     const newKonvaShapes: KonvaShape[] = [];
     const newReactShapes: ReactShape[] = [];
+    const newImages: ImageShape[] = [];
 
     updatedShapes.forEach(shape => {
-      const isKonvaShape = 'type' in shape && ['rect', 'circle', 'ellipse', 'triangle', 'arrow'].includes(shape.type);
-      
-      if (isKonvaShape) {
-        newKonvaShapes.push(shape as KonvaShape);
-      } else {
-        newReactShapes.push(shape as ReactShape);
+      if ('type' in shape) {
+        if (shape.type === 'image') {
+          newImages.push(shape as ImageShape);
+        } else if (['rect', 'circle', 'ellipse', 'triangle', 'arrow', 'stage'].includes(shape.type)) {
+          newKonvaShapes.push(shape as KonvaShape);
+        } else {
+          newReactShapes.push(shape as ReactShape);
+        }
       }
     });
 
-    console.log('📊 Split into:', { konva: newKonvaShapes.length, react: newReactShapes.length });
+    console.log('📊 Split into:', { 
+      konva: newKonvaShapes.length, 
+      react: newReactShapes.length, 
+      images: newImages.length 
+    });
     
     setKonvaShapes(newKonvaShapes);
     setReactShapes(newReactShapes);
+    setImages(newImages);
   }, []);
 
-  // SIMPLE LAYER FUNCTIONS
+  // SIMPLE LAYER FUNCTIONS - FIXED TO INCLUDE IMAGES
   const bringForward = () => {
     console.log('🎯 BRING FORWARD called, selected:', selectedNodeId);
     if (!selectedNodeId) return;
     
-    const allShapes = [...konvaShapes, ...reactShapes];
-    console.log('📋 All shapes:', { konva: konvaShapes.length, react: reactShapes.length, total: allShapes.length });
+    // FIX: Include images in the array
+    const allShapes = [...konvaShapes, ...reactShapes, ...images];
+    console.log('📋 All shapes:', { 
+      konva: konvaShapes.length, 
+      react: reactShapes.length, 
+      images: images.length,
+      total: allShapes.length 
+    });
     
     const shapeIndex = allShapes.findIndex(shape => shape.id === selectedNodeId);
     console.log('📊 Shape index:', shapeIndex, 'Total shapes:', allShapes.length);
@@ -160,8 +243,14 @@ export const useBoardState = () => {
     console.log('🎯 SEND BACKWARD called, selected:', selectedNodeId);
     if (!selectedNodeId) return;
     
-    const allShapes = [...konvaShapes, ...reactShapes];
-    console.log('📋 All shapes:', { konva: konvaShapes.length, react: reactShapes.length, total: allShapes.length });
+    // FIX: Include images in the array
+    const allShapes = [...konvaShapes, ...reactShapes, ...images];
+    console.log('📋 All shapes:', { 
+      konva: konvaShapes.length, 
+      react: reactShapes.length, 
+      images: images.length,
+      total: allShapes.length 
+    });
     
     const shapeIndex = allShapes.findIndex(shape => shape.id === selectedNodeId);
     console.log('📊 Shape index:', shapeIndex, 'Total shapes:', allShapes.length);
@@ -176,8 +265,14 @@ export const useBoardState = () => {
     console.log('🎯 BRING TO FRONT called, selected:', selectedNodeId);
     if (!selectedNodeId) return;
     
-    const allShapes = [...konvaShapes, ...reactShapes];
-    console.log('📋 All shapes:', { konva: konvaShapes.length, react: reactShapes.length, total: allShapes.length });
+    // FIX: Include images in the array
+    const allShapes = [...konvaShapes, ...reactShapes, ...images];
+    console.log('📋 All shapes:', { 
+      konva: konvaShapes.length, 
+      react: reactShapes.length, 
+      images: images.length,
+      total: allShapes.length 
+    });
     
     const shapeIndex = allShapes.findIndex(shape => shape.id === selectedNodeId);
     console.log('📊 Shape index:', shapeIndex, 'Total shapes:', allShapes.length);
@@ -192,8 +287,14 @@ export const useBoardState = () => {
     console.log('🎯 SEND TO BACK called, selected:', selectedNodeId);
     if (!selectedNodeId) return;
     
-    const allShapes = [...konvaShapes, ...reactShapes];
-    console.log('📋 All shapes:', { konva: konvaShapes.length, react: reactShapes.length, total: allShapes.length });
+    // FIX: Include images in the array
+    const allShapes = [...konvaShapes, ...reactShapes, ...images];
+    console.log('📋 All shapes:', { 
+      konva: konvaShapes.length, 
+      react: reactShapes.length, 
+      images: images.length,
+      total: allShapes.length 
+    });
     
     const shapeIndex = allShapes.findIndex(shape => shape.id === selectedNodeId);
     console.log('📊 Shape index:', shapeIndex, 'Total shapes:', allShapes.length);
@@ -205,7 +306,6 @@ export const useBoardState = () => {
   };
 
 // Shape management
-// Change addShape function signature and implementation
 const addShape = useCallback((type: Tool, addAction: (action: Action) => void) => {
   console.log('🎯 addShape called with type:', type);
   
@@ -355,13 +455,14 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
   }, []);
 
   const getSelectedShape = useCallback(() => {
-    const all = [...konvaShapes, ...reactShapes];
+    const all = [...konvaShapes, ...reactShapes, ...images];
     return all.find((s: any) => s.id === selectedNodeId) || null;
-  }, [konvaShapes, reactShapes, selectedNodeId]);
+  }, [konvaShapes, reactShapes, images, selectedNodeId]);
 
   const resetBoard = useCallback(() => {
     setKonvaShapes([]);
     setReactShapes([]);
+    setImages([]);
     setSelectedNodeId(null);
     setActiveTool(null);
   }, []);
@@ -410,6 +511,7 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
     showSetupDialog,
     boardInfo,
     stageFrames,
+    images,
     // Setters
     setStageDimensions,
     setTempDimensions,
@@ -434,7 +536,8 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
     setShowSetupDialog,
     setBoardInfo,
     setStageFrames,
-
+    setImages,
+    
     // Shape actions
     addShape,
     updateShape,
@@ -456,5 +559,6 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
     updateKonvaShape,
     removeKonvaShape,
     addStageFrame,
+    addImage,
   };
 };
