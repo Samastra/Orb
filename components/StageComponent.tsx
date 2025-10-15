@@ -2,11 +2,12 @@
 import React, { useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Konva from "konva";
-import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, RegularPolygon, Image } from "react-konva";
+import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, RegularPolygon, Image, Path } from "react-konva";
 import GridLayer from "@/components/gridLayer";
 import EditableTextComponent from "@/components/editableTextCompoent";
 import { ReactShape, Tool, ImageShape } from "../types/board-types";
 import { KonvaShape } from "@/hooks/useShapes";
+import { Connection } from "@/hooks/useBoardState";
 import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 
 // Dynamic import for Stage
@@ -25,6 +26,7 @@ interface StageComponentProps {
   shapes: KonvaShape[];
   stageFrames: KonvaShape[]; 
   images: ImageShape[];
+  connections: Connection[]; // NEW: Add connections prop
   selectedNodeId: string | null;
   stageInstance: Konva.Stage | null;
   width?: number;
@@ -40,16 +42,18 @@ interface StageComponentProps {
   setReactShapes: React.Dispatch<React.SetStateAction<ReactShape[]>>;
   setShapes: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
   setImages: React.Dispatch<React.SetStateAction<ImageShape[]>>;
+  setConnections: React.Dispatch<React.SetStateAction<Connection[]>>; // NEW: Add setConnections
   updateShape: (id: string, attrs: Partial<KonvaShape>) => void;
   setStageInstance: (stage: Konva.Stage | null) => void;
 }
 
-// Simple combined shape type
+// Simple combined shape type - UPDATED TO INCLUDE CONNECTIONS
 type CombinedShape = 
   | (KonvaShape & { __kind: 'konva' })
   | (ReactShape & { __kind: 'react' })
   | (KonvaShape & { __kind: 'stage' })
-  | (ImageShape & { __kind: 'image' });
+  | (ImageShape & { __kind: 'image' })
+  | (Connection & { __kind: 'connection' }); // NEW: Connection type
 
 // Image Component - Using native Konva Image (NO react-konva-image)
 const ImageElement = React.forwardRef(({ 
@@ -120,6 +124,55 @@ const ImageElement = React.forwardRef(({
 
 ImageElement.displayName = 'ImageElement';
 
+// NEW: Connection Component
+const ConnectionElement = React.forwardRef(({ 
+  connection, 
+  onDragEnd,
+  onClick 
+}: { 
+  connection: Connection;
+  onDragEnd: (e: any) => void;
+  onClick: (e: any) => void;
+}, ref: any) => {
+  const internalRef = React.useRef<Konva.Path>(null);
+
+  // Combine internal ref with forwarded ref
+  React.useImperativeHandle(ref, () => internalRef.current);
+
+  // Build path data from connection points
+  const buildConnectionPath = (conn: Connection) => {
+    const from = conn.from;
+    const to = conn.to;
+    
+    // Use stored control points or calculate straight line
+    if (conn.cp1x !== undefined && conn.cp1y !== undefined && 
+        conn.cp2x !== undefined && conn.cp2y !== undefined) {
+      return `M ${from.x} ${from.y} C ${conn.cp1x} ${conn.cp1y}, ${conn.cp2x} ${conn.cp2y}, ${to.x} ${to.y}`;
+    } else {
+      // Fallback to straight line
+      return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+    }
+  };
+
+  return (
+    <Path
+      ref={internalRef}
+      data={buildConnectionPath(connection)}
+      stroke={connection.stroke || '#333'}
+      strokeWidth={connection.strokeWidth || 2}
+      lineCap="round"
+      lineJoin="round"
+      listening={true} // Allow clicking on the connection
+      onClick={onClick}
+      onTap={onClick}
+      name="selectable-shape connection-path"
+      id={connection.id}
+    />
+  );
+});
+
+ConnectionElement.displayName = 'ConnectionElement';
+
 const StageComponent: React.FC<StageComponentProps> = ({
   stageRef,
   trRef,
@@ -131,6 +184,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   shapes,
   stageFrames,
   images,
+  connections, // NEW: Destructure connections
   selectedNodeId,
   stageInstance,
   width,
@@ -146,18 +200,20 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setReactShapes,
   setShapes,
   setImages,
+  setConnections, // NEW: Destructure setConnections
   updateShape,
   setStageInstance,
 }) => {
   const shapeRefs = useRef<{ [key: string]: any }>({});
 
-  // Sync shape refs while preserving existing refs to avoid remounts
+  // Sync shape refs while preserving existing refs to avoid remounts - UPDATED WITH CONNECTIONS
   useEffect(() => {
     const allIds = [
       ...stageFrames.map(s => s.id),
       ...shapes.map(s => s.id),
       ...reactShapes.map(r => r.id),
-      ...images.map(i => i.id)
+      ...images.map(i => i.id),
+      ...connections.map(c => c.id) // NEW: Include connections
     ];
     const map: { [key: string]: any } = { ...shapeRefs.current };
     
@@ -171,28 +227,30 @@ const StageComponent: React.FC<StageComponentProps> = ({
       if (!allIds.includes(k)) delete map[k];
     });
     shapeRefs.current = map;
-  }, [stageFrames, shapes, reactShapes, images]);
+  }, [stageFrames, shapes, reactShapes, images, connections]); // NEW: Add connections dependency
 
-  // NEW SIMPLE APPROACH: Combine shapes and render in array order
+  // UPDATED: Combine shapes and render in array order - INCLUDES CONNECTIONS
   const allShapesToRender = React.useMemo(() => {
     console.log('🔄 StageComponent re-rendering with shapes:', {
       stageFrames: stageFrames.length,
       konvaShapes: shapes.length,
       reactShapes: reactShapes.length,
       images: images.length,
-      total: stageFrames.length + shapes.length + reactShapes.length + images.length
+      connections: connections.length, // NEW: Log connections
+      total: stageFrames.length + shapes.length + reactShapes.length + images.length + connections.length
     });
     
-    // Fixed rendering order: stageFrames → konvaShapes → images → reactShapes
+    // Fixed rendering order: stageFrames → konvaShapes → images → connections → reactShapes
     return [
       ...stageFrames.map(s => ({ ...s, __kind: 'stage' as const })),
       ...shapes.map(s => ({ ...s, __kind: 'konva' as const })),
       ...images.map(s => ({ ...s, __kind: 'image' as const })),
+      ...connections.map(s => ({ ...s, __kind: 'connection' as const })), // NEW: Add connections
       ...reactShapes.map(s => ({ ...s, __kind: 'react' as const })),
     ];
-  }, [stageFrames, shapes, reactShapes, images]);
+  }, [stageFrames, shapes, reactShapes, images, connections]); // NEW: Add connections dependency
 
-  // Transformer management
+  // Transformer management - UPDATED FOR CONNECTIONS
   useEffect(() => {
     if (!trRef.current) {
       return;
@@ -207,9 +265,10 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const ref = shapeRefs.current[selectedNodeId];
     const selectedShape = allShapesToRender.find(item => item.id === selectedNodeId);
     
-    // FIXED: Only exclude sticky notes, NOT images
+    // FIXED: Only exclude sticky notes and connections from transformer
     if (selectedShape && (
-      selectedShape.__kind === 'react' && selectedShape.type === 'stickyNote'
+      (selectedShape.__kind === 'react' && selectedShape.type === 'stickyNote') ||
+      selectedShape.__kind === 'connection' // Connections don't use transformer
     )) {
       trRef.current.nodes([]);
       trRef.current.getLayer()?.batchDraw();
@@ -232,50 +291,55 @@ const StageComponent: React.FC<StageComponentProps> = ({
   }, [selectedNodeId, allShapesToRender, trRef]);
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-  const stage = e.target.getStage();
-  if (!stage) return;
+    const stage = e.target.getStage();
+    if (!stage) return;
 
-  console.log('🖱️ Stage click - target:', {
-    name: e.target.name(),
-    id: e.target.id(),
-    className: e.target.className,
-    attrs: e.target.attrs
-  });
+    console.log('🖱️ Stage click - target:', {
+      name: e.target.name(),
+      id: e.target.id(),
+      className: e.target.className,
+      attrs: e.target.attrs
+    });
 
-  if (e.target === stage) {
-    setSelectedNodeId(null);
-    return;
-  }
-  
-  if (e.target.hasName('selectable-shape')) {
-    console.log('✅ Selecting shape:', e.target.id());
-    setSelectedNodeId(e.target.id());
-  } else {
-    console.log('❌ Not a selectable shape:', e.target.name());
-  }
-};
-
-  const handleShapeDragEnd = (item: CombinedShape, e: any) => {
-    try {
-      const nx = e.target.x();
-      const ny = e.target.y();
-      
-      if (item.__kind === 'konva') {
-        updateShape(item.id, { x: nx, y: ny });
-      } else if (item.__kind === 'react') {
-        setReactShapes(prev => prev.map(s => 
-          s.id === item.id ? { ...s, x: nx, y: ny } : s
-        ));
-      } else if (item.__kind === 'image') {
-        // Handle image drag
-        setImages(prev => prev.map(img => 
-          img.id === item.id ? { ...img, x: nx, y: ny } : img
-        ));
-      }
-    } catch (error) {
-      console.error('Error handling shape drag end:', error);
+    if (e.target === stage) {
+      setSelectedNodeId(null);
+      return;
+    }
+    
+    if (e.target.hasName('selectable-shape')) {
+      console.log('✅ Selecting shape:', e.target.id());
+      setSelectedNodeId(e.target.id());
+    } else {
+      console.log('❌ Not a selectable shape:', e.target.name());
     }
   };
+
+ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
+  try {
+    // Only handle drag for shapes that have x,y coordinates (not connections)
+    if (item.__kind === 'connection') {
+      return; // Connections are not draggable themselves
+    }
+    
+    const nx = e.target.x();
+    const ny = e.target.y();
+    
+    if (item.__kind === 'konva') {
+      updateShape(item.id, { x: nx, y: ny });
+    } else if (item.__kind === 'react') {
+      setReactShapes(prev => prev.map(s => 
+        s.id === item.id ? { ...s, x: nx, y: ny } : s
+      ));
+    } else if (item.__kind === 'image') {
+      // Handle image drag
+      setImages(prev => prev.map(img => 
+        img.id === item.id ? { ...img, x: nx, y: ny } : img
+      ));
+    }
+  } catch (error) {
+    console.error('Error handling shape drag end:', error);
+  }
+};
 
   const handleShapeClick = (item: CombinedShape, e: any) => {
     e.cancelBubble = true;
@@ -284,35 +348,44 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
   };
 
+  // NEW: Handle connection click
+  const handleConnectionClick = (connection: Connection, e: any) => {
+    e.cancelBubble = true;
+    if (activeTool === "select") {
+      console.log('🔗 Connection clicked:', connection.id);
+      setSelectedNodeId(connection.id);
+    }
+  };
+
   // Handle image drag end
   const handleImageDragEnd = (imageShape: ImageShape, e: any) => {
-  const node = e.target;
-  
-  // Check if this was a resize (transform) or just a move
-  const wasResized = node.width() !== imageShape.width || node.height() !== imageShape.height;
-  
-  if (wasResized) {
-    // Image was resized - update both position and size
-    setImages(prev => prev.map(img => 
-      img.id === imageShape.id 
-        ? { 
-            ...img, 
-            x: node.x(), 
-            y: node.y(),
-            width: node.width(),
-            height: node.height()
-          }
-        : img
-    ));
-  } else {
-    // Image was just moved - update position only
-    setImages(prev => prev.map(img => 
-      img.id === imageShape.id 
-        ? { ...img, x: node.x(), y: node.y() }
-        : img
-    ));
-  }
-};
+    const node = e.target;
+    
+    // Check if this was a resize (transform) or just a move
+    const wasResized = node.width() !== imageShape.width || node.height() !== imageShape.height;
+    
+    if (wasResized) {
+      // Image was resized - update both position and size
+      setImages(prev => prev.map(img => 
+        img.id === imageShape.id 
+          ? { 
+              ...img, 
+              x: node.x(), 
+              y: node.y(),
+              width: node.width(),
+              height: node.height()
+            }
+          : img
+      ));
+    } else {
+      // Image was just moved - update position only
+      setImages(prev => prev.map(img => 
+        img.id === imageShape.id 
+          ? { ...img, x: node.x(), y: node.y() }
+          : img
+      ));
+    }
+  };
 
   return (
     <div className="absolute inset-0 z-0">
@@ -348,15 +421,18 @@ const StageComponent: React.FC<StageComponentProps> = ({
             console.log(`🎯 Rendering shape: ${item.id} (${item.__kind}:${item.type})`);
 
             const commonProps = {
-              id: item.id,
-              x: item.x,
-              y: item.y,
-              draggable: (item.draggable ?? true) && activeTool === "select",
-              name: 'selectable-shape',
-              onDragEnd: (e: any) => handleShapeDragEnd(item, e),
-              onClick: (e: any) => handleShapeClick(item, e),
-              onTap: (e: any) => handleShapeClick(item, e),
-            };
+                  id: item.id,
+                  // Only add x and y for shapes that have them (not connections)
+                  ...(item.__kind !== 'connection' && {
+                    x: item.x,
+                    y: item.y,
+                  }),
+                  draggable: (item.draggable ?? true) && activeTool === "select",
+                  name: 'selectable-shape',
+                  onDragEnd: (e: any) => handleShapeDragEnd(item, e),
+                  onClick: (e: any) => handleShapeClick(item, e),
+                  onTap: (e: any) => handleShapeClick(item, e),
+                };
 
             if (item.__kind === 'stage') {
               const stageItem = item as KonvaShape;
@@ -384,7 +460,19 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     onDragEnd={(e) => handleImageDragEnd(imageItem, e)}
                   />
                 );
-              } else if (item.__kind === 'konva') {
+              } else if (item.__kind === 'connection') {
+              // NEW: Render connection
+              const connectionItem = item as Connection;
+              return (
+                <ConnectionElement
+                  key={item.id}
+                  ref={shapeRefs.current[item.id]}
+                  connection={connectionItem}
+                  onDragEnd={(e) => handleShapeDragEnd(item, e)}
+                  onClick={(e) => handleConnectionClick(connectionItem, e)}
+                />
+              );
+            } else if (item.__kind === 'konva') {
               // Use type assertions for Konva properties
               const konvaItem = item as any;
               
@@ -539,59 +627,59 @@ const StageComponent: React.FC<StageComponentProps> = ({
 
           {/* Transformer */}
           <Transformer
-  ref={trRef}
-  enabledAnchors={[
-    "top-left", "top-right",
-    "bottom-left", "bottom-right",
-    "middle-left", "middle-right",   // ← ADD THESE
-    "middle-top", "middle-bottom"
-    // Remove center anchors to prevent skewing
-  ]}
-  boundBoxFunc={(oldBox, newBox) => {
-    const selectedShape = allShapesToRender.find(item => item.id === selectedNodeId);
-    
-    // If it's an image, maintain aspect ratio
-    if (selectedShape && selectedShape.__kind === 'image') {
-      const imageShape = selectedShape as ImageShape;
-      const aspectRatio = imageShape.width / imageShape.height;
-      
-      let width = newBox.width;
-      let height = newBox.height;
-      
-      // Maintain aspect ratio
-      if (Math.abs(width - oldBox.width) > Math.abs(height - oldBox.height)) {
-        // Width changed more, adjust height to match aspect ratio
-        height = width / aspectRatio;
-      } else {
-        // Height changed more, adjust width to match aspect ratio
-        width = height * aspectRatio;
-      }
-      
-      return {
-        ...newBox,
-        width: Math.max(20, width), // Minimum size
-        height: Math.max(20, height),
-      };
-    }
-    
-    // For other shapes, use normal behavior
-    return {
-      ...newBox,
-      width: Math.max(20, newBox.width),
-      height: Math.max(20, newBox.height),
-    };
-  }}
-  keepRatio={false} // We handle ratio manually for images
-  rotateEnabled={true}
-  resizeEnabled={true}
-  anchorSize={10}
-  anchorStrokeWidth={1}
-  borderStroke="#0099e5"
-  borderStrokeWidth={2}
-  anchorCornerRadius={4}
-  anchorStroke="#0099e5"
-  anchorFill="#ffffff"
-/>
+            ref={trRef}
+            enabledAnchors={[
+              "top-left", "top-right",
+              "bottom-left", "bottom-right",
+              "middle-left", "middle-right",   // ← ADD THESE
+              "middle-top", "middle-bottom"
+              // Remove center anchors to prevent skewing
+            ]}
+            boundBoxFunc={(oldBox, newBox) => {
+              const selectedShape = allShapesToRender.find(item => item.id === selectedNodeId);
+              
+              // If it's an image, maintain aspect ratio
+              if (selectedShape && selectedShape.__kind === 'image') {
+                const imageShape = selectedShape as ImageShape;
+                const aspectRatio = imageShape.width / imageShape.height;
+                
+                let width = newBox.width;
+                let height = newBox.height;
+                
+                // Maintain aspect ratio
+                if (Math.abs(width - oldBox.width) > Math.abs(height - oldBox.height)) {
+                  // Width changed more, adjust height to match aspect ratio
+                  height = width / aspectRatio;
+                } else {
+                  // Height changed more, adjust width to match aspect ratio
+                  width = height * aspectRatio;
+                }
+                
+                return {
+                  ...newBox,
+                  width: Math.max(20, width), // Minimum size
+                  height: Math.max(20, height),
+                };
+              }
+              
+              // For other shapes, use normal behavior
+              return {
+                ...newBox,
+                width: Math.max(20, newBox.width),
+                height: Math.max(20, newBox.height),
+              };
+            }}
+            keepRatio={false} // We handle ratio manually for images
+            rotateEnabled={true}
+            resizeEnabled={true}
+            anchorSize={10}
+            anchorStrokeWidth={1}
+            borderStroke="#0099e5"
+            borderStrokeWidth={2}
+            anchorCornerRadius={4}
+            anchorStroke="#0099e5"
+            anchorFill="#ffffff"
+          />
         </Layer>
       </Stage>
     </div>

@@ -57,10 +57,10 @@ const BoardPage = () => {
   
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
-    isConnecting, reactShapes, konvaShapes, stageFrames, images, selectedNodeId, stageInstance, tempDimensions, // ADD images HERE
+    isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeId, stageInstance, tempDimensions, // ADD connections HERE
     showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
     setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
-    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setSelectedNodeId, setStageInstance, // ADD setImages HERE
+    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setSelectedNodeId, setStageInstance, // ADD setConnections HERE
     setTempDimensions, setShowSaveModal, setShowSetupDialog, setBoardInfo,
     // Layer functions
     bringForward,
@@ -72,49 +72,57 @@ const BoardPage = () => {
     updateShape,
     addKonvaShape,
     addStageFrame,
-    addImage, // ADD THIS
+    addImage,
+    addConnection, // ADD THIS
+    updateConnection, // ADD THIS
+    removeConnection, // ADD THIS
   } = boardState;
 
-  // Undo/Redo functionality - UPDATED WITH IMAGES
-  const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
-    stageRef,
-    boardState.actions,
-    boardState.undoneActions,
-    reactShapes,
-    lines,
-    konvaShapes,
-    stageFrames,
-    images, // ADD THIS
-    boardState.setActions,
-    boardState.setUndoneActions,
-    setReactShapes,
-    setLines,
-    setKonvaShapes,
-    setStageFrames,
-    setImages // ADD THIS
-  );
+  // Undo/Redo functionality - UPDATED WITH IMAGES AND CONNECTIONS
+const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
+  stageRef,
+  boardState.actions,
+  boardState.undoneActions,
+  reactShapes,
+  lines,
+  konvaShapes,
+  stageFrames,
+  images,
+  connections, // ADD THIS - connection state
+  boardState.setActions,
+  boardState.setUndoneActions,
+  setReactShapes,
+  setLines,
+  setKonvaShapes,
+  setStageFrames,
+  setImages,
+  setConnections // ADD THIS
+  // 18 arguments total - matches the updated function signature
+);
 
-  // Tool functionality
-  const toolHandlers = useKonvaTools(
-    stageRef, 
-    activeTool, 
-    scale, 
-    position, 
-    drawingMode, 
-    lines, 
-    connectionStart, 
-    tempConnection, 
-    isConnecting, 
-    selectedNodeId, 
-    setActiveTool, 
-    setDrawingMode, 
-    setLines, 
-    setConnectionStart, 
-    setTempConnection, 
-    setIsConnecting, 
-    setSelectedNodeId, 
-    undoRedoAddAction
-  );
+  // Tool functionality - UPDATED WITH CONNECTION SUPPORT
+  // Tool functionality - UPDATED WITH CONNECTION SUPPORT
+const toolHandlers = useKonvaTools(
+  stageRef, 
+  activeTool, 
+  scale, 
+  position, 
+  drawingMode, 
+  lines, 
+  connectionStart, 
+  tempConnection, 
+  isConnecting, 
+  selectedNodeId, 
+  setActiveTool, 
+  setDrawingMode, 
+  setLines, 
+  setConnectionStart, 
+  setTempConnection, 
+  setIsConnecting, 
+  setSelectedNodeId, 
+  undoRedoAddAction
+  // 17 arguments total - matches the function signature
+);
 
   // ADD ZOOM FUNCTIONS THAT ACTUALLY WORK
   const handleZoomIn = useCallback(() => {
@@ -149,6 +157,8 @@ const BoardPage = () => {
 
   const debouncedUpdateShape = useDebounce((shapeId: string, updates: Partial<any>) => {
     const isReactShape = reactShapes.some((s) => s.id === shapeId);
+    const isKonvaShape = konvaShapes.some((s) => s.id === shapeId);
+    const isConnection = connections.some((c) => c.id === shapeId); // ADD THIS
     
     if (isReactShape) {
       setReactShapes(prev => 
@@ -156,7 +166,7 @@ const BoardPage = () => {
           shape.id === shapeId ? { ...shape, ...updates } : shape
         )
       );
-    } else {
+    } else if (isKonvaShape) {
       const drawLayer = stageRef.current?.findOne(".draw-layer") as Konva.Layer;
       if (drawLayer) {
         const node = drawLayer.findOne(`#${shapeId}`) as Konva.Shape | Konva.Group;
@@ -173,15 +183,19 @@ const BoardPage = () => {
           });
         }
       }
+    } else if (isConnection) {
+      // Handle connection updates
+      updateConnection(shapeId, updates);
     }
   }, 50);
 
-  // Handler for StageComponent
+  // Handler for StageComponent - UPDATED WITH CONNECTION SUPPORT
   const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<any>) => {
     if (!id) return;
     
     const isReactShape = reactShapes.some((s) => s.id === id);
     const isKonvaShape = konvaShapes.some((s) => s.id === id);
+    const isConnection = connections.some((c) => c.id === id); // ADD THIS
     
     if (isReactShape) {
       setReactShapes(prev => 
@@ -191,15 +205,19 @@ const BoardPage = () => {
       );
     } else if (isKonvaShape) {
       debouncedUpdateShape(id, attrs);
+    } else if (isConnection) {
+      // Handle connection updates
+      updateConnection(id, attrs);
     }
-  }, [debouncedUpdateShape, reactShapes, konvaShapes]);
+  }, [debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection]);
 
-  // Handler for FormattingToolbar
+  // Handler for FormattingToolbar - UPDATED WITH CONNECTION SUPPORT
   const handleFormattingToolbarUpdate = useCallback((updates: Record<string, any>) => {
     if (!selectedNodeId) return;
     
     const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
     const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
+    const isConnection = connections.some((c) => c.id === selectedNodeId); // ADD THIS
     
     if (isReactShape) {
       setReactShapes(prev => 
@@ -209,25 +227,32 @@ const BoardPage = () => {
       );
     } else if (isKonvaShape) {
       debouncedUpdateShape(selectedNodeId, updates);
+    } else if (isConnection) {
+      // Handle connection styling updates
+      updateConnection(selectedNodeId, updates);
     }
-  }, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes]);
+  }, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection]);
 
-  // Memoize selected shape
+  // Memoize selected shape - UPDATED WITH CONNECTIONS
   const selectedShape = useMemo(() => {
-  if (!selectedNodeId) return null;
-  
-  // Check react shapes
-  const reactShape = reactShapes.find((s) => s.id === selectedNodeId);
-  if (reactShape) return reactShape;
-  
-  // Check konva shapes
-  const konvaShape = konvaShapes.find((s) => s.id === selectedNodeId);
-  if (konvaShape) return konvaShape;
-  
-  // Check images - ADD THIS
-  const imageShape = images.find((img) => img.id === selectedNodeId);
-  return imageShape || null;
-}, [selectedNodeId, reactShapes, konvaShapes, images]);
+    if (!selectedNodeId) return null;
+    
+    // Check react shapes
+    const reactShape = reactShapes.find((s) => s.id === selectedNodeId);
+    if (reactShape) return reactShape;
+    
+    // Check konva shapes
+    const konvaShape = konvaShapes.find((s) => s.id === selectedNodeId);
+    if (konvaShape) return konvaShape;
+    
+    // Check images
+    const imageShape = images.find((img) => img.id === selectedNodeId);
+    if (imageShape) return imageShape;
+    
+    // Check connections - ADD THIS
+    const connectionShape = connections.find((conn) => conn.id === selectedNodeId);
+    return connectionShape || null;
+  }, [selectedNodeId, reactShapes, konvaShapes, images, connections]);
 
   // Shape creation
   const handleAddShape = useCallback((type: Tool) => {
@@ -266,14 +291,24 @@ const BoardPage = () => {
         const src = e.target?.result as string;
         if (src) {
           // Add image to board
-          addImage(src, undoRedoAddAction); // USE addImage FROM DESTRUCTURING
+          addImage(src, undoRedoAddAction);
         }
       };
       reader.readAsDataURL(file);
     } catch (error) {
       console.error('Error uploading image:', error);
     }
-  }, [addImage, undoRedoAddAction]); // UPDATE DEPENDENCY
+  }, [addImage, undoRedoAddAction]);
+
+  // NEW: Handle connection deletion (double-click)
+  const handleConnectionDelete = useCallback((connectionId: string) => {
+    console.log('🗑️ Deleting connection:', connectionId);
+    removeConnection(connectionId);
+    undoRedoAddAction({
+      type: "delete-connection",
+      connectionId: connectionId
+    });
+  }, [removeConnection, undoRedoAddAction]);
 
   // Close without save
   const handleCloseWithoutSave = useCallback(async () => {
@@ -361,7 +396,7 @@ const BoardPage = () => {
             
             <div className="flex items-center gap-2 min-w-[80px] justify-center">
               <span className="text-sm font-medium text-gray-700">
-                {Math.round(scale * 100)}% {/* THIS WILL NOW UPDATE! */}
+                {Math.round(scale * 100)}%
               </span>
             </div>
             
@@ -400,7 +435,7 @@ const BoardPage = () => {
           </div>
         </div>
 
-        {/* Stage - UPDATED WITH IMAGE PROPS */}
+        {/* Stage - UPDATED WITH CONNECTION PROPS */}
         <StageComponent
           key={`stage-${stageKey}`}
           stageRef={stageRef}
@@ -412,7 +447,8 @@ const BoardPage = () => {
           shapes={konvaShapes}
           reactShapes={reactShapes}
           stageFrames={stageFrames}
-          images={images} // ADD THIS
+          images={images}
+          connections={connections} // ADD THIS
           selectedNodeId={selectedNodeId}
           stageInstance={stageInstance}
           handleWheel={toolHandlers.handleWheel}
@@ -425,7 +461,8 @@ const BoardPage = () => {
           setSelectedNodeId={setSelectedNodeId}
           setReactShapes={setReactShapes}
           setShapes={setKonvaShapes}
-          setImages={setImages} // ADD THIS
+          setImages={setImages}
+          setConnections={setConnections} // ADD THIS
           updateShape={handleStageShapeUpdate}
           setStageInstance={setStageInstance}
         />

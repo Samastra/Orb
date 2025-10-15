@@ -15,6 +15,22 @@ const reorderArray = <T,>(arr: T[], from: number, to: number): T[] => {
   return newArr;
 };
 
+// NEW: Connection type definition
+export type Connection = {
+  id: string;
+  type: 'connection';
+  from: { x: number; y: number; nodeId?: string | null };
+  to: { x: number; y: number; nodeId?: string | null };
+  // cubic bezier control points
+  cp1x: number;
+  cp1y: number;
+  cp2x: number;
+  cp2y: number;
+  stroke?: string;
+  strokeWidth?: number;
+  draggable: boolean;
+};
+
 export const useBoardState = () => {
   const params = useParams();
 
@@ -43,75 +59,114 @@ export const useBoardState = () => {
   const [boardInfo, setBoardInfo] = useState(defaultBoardInfo);
   const [stageFrames, setStageFrames] = useState<KonvaShape[]>([]);
   const [images, setImages] = useState<ImageShape[]>([]);
+  
+  // UPDATED: Connections state with proper typing
+  const [connections, setConnections] = useState<Connection[]>([]);
+
+  // NEW: Add connection function
+  const addConnection = useCallback((connectionData: Omit<Connection, 'id' | 'type'>, addAction: (action: Action) => void) => {
+    const connectionId = `connection-${Date.now()}`;
+    
+    const newConnection: Connection = {
+      id: connectionId,
+      type: 'connection',
+      ...connectionData,
+      draggable: false, // Connections themselves aren't draggable, only endpoints
+    };
+    
+    console.log('➕ Adding Connection:', newConnection);
+    setConnections(prev => [...prev, newConnection]);
+    
+    // ADD ACTION RECORDING
+    addAction({
+      type: "add-connection",
+      data: newConnection
+    } as Action);
+    
+    return connectionId;
+  }, []);
+
+  // NEW: Update connection function
+  const updateConnection = useCallback((id: string, updates: Partial<Connection>) => {
+    setConnections(prev => prev.map(conn => 
+      conn.id === id ? { ...conn, ...updates } : conn
+    ));
+  }, []);
+
+  // NEW: Remove connection function
+  const removeConnection = useCallback((id: string) => {
+    setConnections(prev => prev.filter(conn => conn.id !== id));
+    if (selectedNodeId === id) setSelectedNodeId(null);
+  }, [selectedNodeId]);
 
   // Add image function
-const addImage = useCallback((src: string, addAction: (action: Action) => void) => {
-  const imageId = `image-${Date.now()}`;
-  
-  const img = new (window as any).Image();
-  img.src = src;
-  
-  img.onload = () => {
-    const maxWidth = 600;
-    const maxHeight = 400;
+  const addImage = useCallback((src: string, addAction: (action: Action) => void) => {
+    const imageId = `image-${Date.now()}`;
     
-    let width = img.naturalWidth;
-    let height = img.naturalHeight;
-    const aspectRatio = width / height;
+    const img = new (window as any).Image();
+    img.src = src;
     
-    // Scale down if image is too large
-    if (width > maxWidth || height > maxHeight) {
-      const ratio = Math.min(maxWidth / width, maxHeight / height);
-      width = width * ratio;
-      height = height * ratio;
-    }
-    
-    const newImage: ImageShape = {
-      id: imageId,
-      type: 'image',
-      x: 100,
-      y: 100,
-      width: width,
-      height: height,
-      src: src,
-      rotation: 0,
-      draggable: true,
-      originalWidth: img.naturalWidth,
-      originalHeight: img.naturalHeight,
-      aspectRatio: aspectRatio
-    };
-    setImages(prev => [...prev, newImage]);
-    
-    addAction({
-      type: "add-image",
-      data: newImage
-    });
-  };
-  
-  img.onerror = () => {
-    console.error('Failed to load image for dimensions:', src);
-    const fallbackImage: ImageShape = {
-      id: imageId,
-      type: 'image',
-      x: 100,
-      y: 100,
-      width: 200,
-      height: 150,
-      src: src,
-      rotation: 0,
-      draggable: true,
+    img.onload = () => {
+      const maxWidth = 600;
+      const maxHeight = 400;
+      
+      let width = img.naturalWidth;
+      let height = img.naturalHeight;
+      const aspectRatio = width / height;
+      
+      // Scale down if image is too large
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = width * ratio;
+        height = height * ratio;
+      }
+      
+      const newImage: ImageShape = {
+        id: imageId,
+        type: 'image',
+        x: 100,
+        y: 100,
+        width: width,
+        height: height,
+        src: src,
+        rotation: 0,
+        draggable: true,
+        originalWidth: img.naturalWidth,
+        originalHeight: img.naturalHeight,
+        aspectRatio: aspectRatio
+      };
+      setImages(prev => [...prev, newImage]);
+      
+      addAction({
+        type: "add-image",
+        data: newImage
+      });
     };
     
-    setImages(prev => [...prev, fallbackImage]);
+    img.onerror = () => {
+      console.error('Failed to load image for dimensions:', src);
+      const fallbackImage: ImageShape = {
+        id: imageId,
+        type: 'image',
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 150,
+        src: src,
+        rotation: 0,
+        draggable: true,
+      };
+      
+      setImages(prev => [...prev, fallbackImage]);
+      
+      addAction({
+        type: "add-image",
+        data: fallbackImage
+      });
+    };
     
-    addAction({
-      type: "add-image",
-      data: fallbackImage
-    });
-  };
-  
-  return imageId;
-}, []);
+    return imageId;
+  }, []);
 
   const addKonvaShape = useCallback((type: Tool, center: { x: number; y: number }, draggable: boolean) => {
     const shapeId = `shape-${Date.now()}`;
@@ -185,18 +240,21 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void) 
     setKonvaShapes(prev => prev.filter(shape => shape.id !== id));
   }, []);
 
-  // Apply reordered shapes - UPDATED TO INCLUDE IMAGES
-  const applyReorderedShapes = useCallback((updatedShapes: Array<KonvaShape | ReactShape | ImageShape>) => {
+  // Apply reordered shapes - UPDATED TO INCLUDE IMAGES AND CONNECTIONS
+  const applyReorderedShapes = useCallback((updatedShapes: Array<KonvaShape | ReactShape | ImageShape | Connection>) => {
     console.log('🔄 Applying reordered shapes:', updatedShapes.length);
     
     const newKonvaShapes: KonvaShape[] = [];
     const newReactShapes: ReactShape[] = [];
     const newImages: ImageShape[] = [];
+    const newConnections: Connection[] = [];
 
     updatedShapes.forEach(shape => {
       if ('type' in shape) {
         if (shape.type === 'image') {
           newImages.push(shape as ImageShape);
+        } else if (shape.type === 'connection') {
+          newConnections.push(shape as Connection);
         } else if (['rect', 'circle', 'ellipse', 'triangle', 'arrow', 'stage'].includes(shape.type)) {
           newKonvaShapes.push(shape as KonvaShape);
         } else {
@@ -208,25 +266,28 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void) 
     console.log('📊 Split into:', { 
       konva: newKonvaShapes.length, 
       react: newReactShapes.length, 
-      images: newImages.length 
+      images: newImages.length,
+      connections: newConnections.length
     });
     
     setKonvaShapes(newKonvaShapes);
     setReactShapes(newReactShapes);
     setImages(newImages);
+    setConnections(newConnections);
   }, []);
 
-  // SIMPLE LAYER FUNCTIONS - FIXED TO INCLUDE IMAGES
+  // SIMPLE LAYER FUNCTIONS - FIXED TO INCLUDE IMAGES AND CONNECTIONS
   const bringForward = () => {
     console.log('🎯 BRING FORWARD called, selected:', selectedNodeId);
     if (!selectedNodeId) return;
     
-    // FIX: Include images in the array
-    const allShapes = [...konvaShapes, ...reactShapes, ...images];
+    // FIX: Include images and connections in the array
+    const allShapes = [...konvaShapes, ...reactShapes, ...images, ...connections];
     console.log('📋 All shapes:', { 
       konva: konvaShapes.length, 
       react: reactShapes.length, 
       images: images.length,
+      connections: connections.length,
       total: allShapes.length 
     });
     
@@ -243,12 +304,13 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void) 
     console.log('🎯 SEND BACKWARD called, selected:', selectedNodeId);
     if (!selectedNodeId) return;
     
-    // FIX: Include images in the array
-    const allShapes = [...konvaShapes, ...reactShapes, ...images];
+    // FIX: Include images and connections in the array
+    const allShapes = [...konvaShapes, ...reactShapes, ...images, ...connections];
     console.log('📋 All shapes:', { 
       konva: konvaShapes.length, 
       react: reactShapes.length, 
       images: images.length,
+      connections: connections.length,
       total: allShapes.length 
     });
     
@@ -265,12 +327,13 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void) 
     console.log('🎯 BRING TO FRONT called, selected:', selectedNodeId);
     if (!selectedNodeId) return;
     
-    // FIX: Include images in the array
-    const allShapes = [...konvaShapes, ...reactShapes, ...images];
+    // FIX: Include images and connections in the array
+    const allShapes = [...konvaShapes, ...reactShapes, ...images, ...connections];
     console.log('📋 All shapes:', { 
       konva: konvaShapes.length, 
       react: reactShapes.length, 
       images: images.length,
+      connections: connections.length,
       total: allShapes.length 
     });
     
@@ -287,12 +350,13 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void) 
     console.log('🎯 SEND TO BACK called, selected:', selectedNodeId);
     if (!selectedNodeId) return;
     
-    // FIX: Include images in the array
-    const allShapes = [...konvaShapes, ...reactShapes, ...images];
+    // FIX: Include images and connections in the array
+    const allShapes = [...konvaShapes, ...reactShapes, ...images, ...connections];
     console.log('📋 All shapes:', { 
       konva: konvaShapes.length, 
       react: reactShapes.length, 
       images: images.length,
+      connections: connections.length,
       total: allShapes.length 
     });
     
@@ -305,138 +369,141 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void) 
     applyReorderedShapes(updatedShapes);
   };
 
-// Shape management
-const addShape = useCallback((type: Tool, addAction: (action: Action) => void) => {
-  console.log('🎯 addShape called with type:', type);
-  
-  if (!stageInstance) {
-    console.log('❌ No stage instance');
-    return;
-  }
-
-  const safePosition = position ?? { x: 0, y: 0 }; 
-  const center = {
-    x: (stageInstance.width() / 2 / scale) - safePosition.x / scale,
-    y: (stageInstance.height() / 2 / scale) - safePosition.y / scale,
-  };
-
-  console.log('📍 Creating shape at center:', center);
-
-  if (type === "text") {
-    const shapeId = `shape-${Date.now()}`;
+  // Shape management
+  const addShape = useCallback((type: Tool, addAction: (action: Action) => void) => {
+    console.log('🎯 addShape called with type:', type);
     
-    const newTextShape: ReactShape = {
-      id: shapeId,
-      type: 'text',
-      x: center.x,
-      y: center.y,
-      text: "Double click to edit",
-      fontSize: 20,
-      fill: "#000000",
-      fontFamily: "Arial",
-      fontWeight: "400",
-      fontStyle: "normal",
-      textDecoration: "none",
-      align: "left",
-      draggable: true,
-    };
-    
-    console.log('➕ Adding Text shape:', newTextShape);
-    setReactShapes(prev => [...prev, newTextShape]);
-    
-    // ADD ACTION RECORDING
-    addAction({
-      type: "add-react-shape",
-      shapeType: 'text',
-      data: newTextShape
-    });
-    
-    if (activeTool === "select") {
-      setSelectedNodeId(shapeId);
+    if (!stageInstance) {
+      console.log('❌ No stage instance');
+      return;
     }
-  } else if (type === "stickyNote") {
-    const shapeId = `sticky-${Date.now()}`;
-    
-    const newStickyNote: ReactShape = {
-      id: shapeId,
-      type: 'stickyNote',
-      x: center.x - 100,
-      y: center.y - 75,
-      text: "Double click to edit...",
-      fontSize: 16,
-      width: 200,
-      height: 150,
-      backgroundColor: "#ffeb3b",
-      textColor: "#000000",
-      fontFamily: "Arial",
-      draggable: true,
+
+    const safePosition = position ?? { x: 0, y: 0 }; 
+    const center = {
+      x: (stageInstance.width() / 2 / scale) - safePosition.x / scale,
+      y: (stageInstance.height() / 2 / scale) - safePosition.y / scale,
     };
-    
-    console.log('➕ Adding Sticky Note:', newStickyNote);
-    setReactShapes(prev => [...prev, newStickyNote]);
-    
-    // ADD ACTION RECORDING
-    addAction({
-      type: "add-react-shape",
-      shapeType: 'stickyNote',
-      data: newStickyNote
-    });
-    
-    if (activeTool === "select") {
-      setSelectedNodeId(shapeId);
-    }
-  } else {
-    // For Konva shapes (rect, circle, etc.)
-    console.log('➕ Adding Konva shape:', type);
-    const result = addKonvaShape(type, center, true);
-    
-    // ADD ACTION RECORDING
-    if (result) {
+
+    console.log('📍 Creating shape at center:', center);
+
+    if (type === "text") {
+      const shapeId = `shape-${Date.now()}`;
+      
+      const newTextShape: ReactShape = {
+        id: shapeId,
+        type: 'text',
+        x: center.x,
+        y: center.y,
+        text: "Double click to edit",
+        fontSize: 20,
+        fill: "#000000",
+        fontFamily: "Arial",
+        fontWeight: "400",
+        fontStyle: "normal",
+        textDecoration: "none",
+        align: "left",
+        draggable: true,
+      };
+      
+      console.log('➕ Adding Text shape:', newTextShape);
+      setReactShapes(prev => [...prev, newTextShape]);
+      
+      // ADD ACTION RECORDING
       addAction({
-        type: "add-konva-shape",
-        shapeType: type,
-        data: result.shapeData
+        type: "add-react-shape",
+        shapeType: 'text',
+        data: newTextShape
       });
       
       if (activeTool === "select") {
-        setSelectedNodeId(result.shapeId);
+        setSelectedNodeId(shapeId);
+      }
+    } else if (type === "stickyNote") {
+      const shapeId = `sticky-${Date.now()}`;
+      
+      const newStickyNote: ReactShape = {
+        id: shapeId,
+        type: 'stickyNote',
+        x: center.x - 100,
+        y: center.y - 75,
+        text: "Double click to edit...",
+        fontSize: 16,
+        width: 200,
+        height: 150,
+        backgroundColor: "#ffeb3b",
+        textColor: "#000000",
+        fontFamily: "Arial",
+        draggable: true,
+      };
+      
+      console.log('➕ Adding Sticky Note:', newStickyNote);
+      setReactShapes(prev => [...prev, newStickyNote]);
+      
+      // ADD ACTION RECORDING
+      addAction({
+        type: "add-react-shape",
+        shapeType: 'stickyNote',
+        data: newStickyNote
+      });
+      
+      if (activeTool === "select") {
+        setSelectedNodeId(shapeId);
+      }
+    } else {
+      // For Konva shapes (rect, circle, etc.)
+      console.log('➕ Adding Konva shape:', type);
+      const result = addKonvaShape(type, center, true);
+      
+      // ADD ACTION RECORDING
+      if (result) {
+        addAction({
+          type: "add-konva-shape",
+          shapeType: type,
+          data: result.shapeData
+        });
+        
+        if (activeTool === "select") {
+          setSelectedNodeId(result.shapeId);
+        }
       }
     }
-  }
-}, [stageInstance, scale, position, activeTool, addKonvaShape, setSelectedNodeId]);
+  }, [stageInstance, scale, position, activeTool, addKonvaShape, setSelectedNodeId]);
 
-const addStageFrame = useCallback((width: number, height: number, addAction: (action: Action) => void) => {
-  const shapeId = `stage-${Date.now()}`;
-  
-  const stageFrame: KonvaShape = {
-    id: shapeId,
-    type: 'stage',
-    x: 50,
-    y: 50,
-    width: width,
-    height: height,
-    fill: "#ffffff",
-    stroke: "#cccccc",
-    strokeWidth: 2,
-    draggable: true,
-  };
-  
-  console.log('➕ Adding Stage Frame:', stageFrame);
-  setStageFrames(prev => [...prev, stageFrame]);
-  
-  // ADD ACTION RECORDING
-  addAction({
-    type: "add-stage-frame",
-    data: stageFrame
-  });
-  
-  return shapeId;
-}, []);
+  const addStageFrame = useCallback((width: number, height: number, addAction: (action: Action) => void) => {
+    const shapeId = `stage-${Date.now()}`;
+    
+    const stageFrame: KonvaShape = {
+      id: shapeId,
+      type: 'stage',
+      x: 50,
+      y: 50,
+      width: width,
+      height: height,
+      fill: "#ffffff",
+      stroke: "#cccccc",
+      strokeWidth: 2,
+      draggable: true,
+    };
+    
+    console.log('➕ Adding Stage Frame:', stageFrame);
+    setStageFrames(prev => [...prev, stageFrame]);
+    
+    // ADD ACTION RECORDING
+    addAction({
+      type: "add-stage-frame",
+      data: stageFrame
+    });
+    
+    return shapeId;
+  }, []);
 
   const updateShape = useCallback(
     (id: string, attrs: Partial<any>) => {
       setReactShapes((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
       setKonvaShapes((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
+      setImages((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
+      // Also update connections if needed
+      setConnections((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
     },
     []
   );
@@ -445,6 +512,8 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
     (id: string) => {
       setReactShapes((prev) => prev.filter((s) => s.id !== id));
       setKonvaShapes((prev) => prev.filter((s) => s.id !== id));
+      setImages((prev) => prev.filter((s) => s.id !== id));
+      setConnections((prev) => prev.filter((s) => s.id !== id));
       if (selectedNodeId === id) setSelectedNodeId(null);
     },
     [selectedNodeId]
@@ -455,14 +524,37 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
   }, []);
 
   const getSelectedShape = useCallback(() => {
-    const all = [...konvaShapes, ...reactShapes, ...images];
+    const all = [...konvaShapes, ...reactShapes, ...images, ...connections];
     return all.find((s: any) => s.id === selectedNodeId) || null;
-  }, [konvaShapes, reactShapes, images, selectedNodeId]);
+  }, [konvaShapes, reactShapes, images, connections, selectedNodeId]);
+
+  // Ensure connectors follow connected nodes when those nodes move.
+  const updateConnectionsForNode = useCallback((nodeId: string, newX: number, newY: number) => {
+    setConnections(prev =>
+      prev.map(conn => {
+        const updated = { ...conn };
+
+        if (updated.from?.nodeId === nodeId) {
+          updated.from = { ...updated.from, x: newX, y: newY };
+        }
+        if (updated.to?.nodeId === nodeId) {
+          updated.to = { ...updated.to, x: newX, y: newY };
+        }
+
+        // NOTE: We intentionally do not auto-recompute control points here.
+        // The control points should be recomputed by the connector logic in useKonvaTools
+        // (or on render) so we keep the state sync simple and predictable.
+
+        return updated;
+      })
+    );
+  }, []);
 
   const resetBoard = useCallback(() => {
     setKonvaShapes([]);
     setReactShapes([]);
     setImages([]);
+    setConnections([]);
     setSelectedNodeId(null);
     setActiveTool(null);
   }, []);
@@ -512,7 +604,9 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
     boardInfo,
     stageFrames,
     images,
+    connections,
     // Setters
+    setConnections,
     setStageDimensions,
     setTempDimensions,
     setConnectionStart,
@@ -545,6 +639,11 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
     selectShape,
     resetBoard,
 
+    // Connection actions - NEW
+    addConnection,
+    updateConnection,
+    removeConnection,
+
     // Layering
     bringForward,
     sendBackward,
@@ -553,7 +652,7 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
 
     // Helpers
     getSelectedShape,
-
+    updateConnectionsForNode,
     // Konva helpers
     addKonvaShape,
     updateKonvaShape,

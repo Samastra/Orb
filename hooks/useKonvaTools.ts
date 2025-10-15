@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import Konva from "konva";
 import { Tool, Action } from "../types/board-types";
 
@@ -83,7 +83,14 @@ export const useKonvaTools = (
   const isDrawing = useRef(false);
   const lastErasedLines = useRef<number[]>([]); // Track recently erased lines to avoid duplicate detection
 
-  // NEW: Function to detect and erase lines that intersect with current eraser position
+  // NEW: Smart connection tool refs
+  const tempGroupRef = useRef<Konva.Group | null>(null);
+  const startAnchorRef = useRef<Konva.Circle | null>(null);
+  const endAnchorRef = useRef<Konva.Circle | null>(null);
+  const pathNodeRef = useRef<Konva.Path | null>(null);
+  const isPlacingConnection = useRef(false); // NEW: Track if we're in placement mode
+
+  // NEW: Detect and erase lines that intersect with current eraser position
   const detectAndEraseLines = useCallback((currentPoint: { x: number; y: number }) => {
     setLines(prevLines => {
       const linesToKeep: Array<{tool: 'brush' | 'eraser', points: number[]}> = [];
@@ -120,89 +127,287 @@ export const useKonvaTools = (
     });
   }, [setLines, addAction, scale]);
 
-  // ---------- Connection Tool Logic ----------
-  const handleConnectionStart = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool !== "connect") return;
+  // ---------- IMPROVED SMART CONNECTION TOOL LOGIC ----------
+  
+  // Enhanced computeControlPoints function with smart snapping
+  const computeSmartControlPoints = useCallback((from: {x: number, y: number}, to: {x: number, y: number}) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
     
-    e.evt.preventDefault();
+    // Snap to straight line when nearly horizontal (|dy| < 15px)
+    const shouldSnapStraight = Math.abs(dy) < 15;
     
-    const stage = stageRef.current;
-    if (!stage) return;
-    
-    const pos = getRelativePointerPosition(stage);
-    if (!pos) return;
-
-    setConnectionStart({ x: pos.x, y: pos.y });
-    setIsConnecting(true);
-    
-    const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
-    if (drawLayer) {
-      const line = new Konva.Line({
-        points: [pos.x, pos.y, pos.x, pos.y],
-        stroke: '#007bff',
-        strokeWidth: 3,
-        lineCap: 'round',
-        lineJoin: 'round',
-        dash: [5, 5],
-        listening: false,
-      });
-      drawLayer.add(line);
-      setTempConnection(line);
-      drawLayer.batchDraw();
+    if (shouldSnapStraight) {
+      return {
+        cp1x: from.x,
+        cp1y: from.y,
+        cp2x: to.x, 
+        cp2y: to.y,
+        shouldSnapStraight: true
+      };
     }
-  }, [activeTool, stageRef, setConnectionStart, setIsConnecting, setTempConnection]);
-
-  const handleConnectionMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool !== "connect" || !isConnecting || !tempConnection || !connectionStart) return;
     
+    // Smart bezier with midpoint control points (Figma-like)
+    const midX = from.x + dx / 2;
+    return {
+      cp1x: midX,
+      cp1y: from.y,
+      cp2x: midX,
+      cp2y: to.y,
+      shouldSnapStraight: false
+    };
+  }, []);
+
+  // Helper to build SVG path string for Konva.Path
+  const buildPathData = useCallback((from: {x: number, y: number}, to: {x: number, y: number}, cp1x: number, cp1y: number, cp2x: number, cp2y: number, snapStraight: boolean) => {
+    if (snapStraight) {
+      return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+    }
+    return `M ${from.x} ${from.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${to.x} ${to.y}`;
+  }, []);
+
+  // NEW: Instant connection creation when tool is activated
+  useEffect(() => {
+    if (activeTool === "connect" && !isConnecting && !tempGroupRef.current) {
+      console.log('🔗 Connection tool activated - creating instant connection');
+      createInstantConnection();
+    }
+  }, [activeTool, isConnecting]);
+
+  // NEW: Create connection immediately when tool is selected
+  const createInstantConnection = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
-    
-    const point = getRelativePointerPosition(stage);
-    if (!point) return;
 
-    tempConnection.points([connectionStart.x, connectionStart.y, point.x, point.y]);
-    tempConnection.getLayer()?.batchDraw();
-  }, [activeTool, isConnecting, tempConnection, connectionStart, stageRef]);
+    // Calculate center position considering current zoom and pan
+    const stageCenter = {
+      x: stage.width() / 2 / scale - position.x / scale,
+      y: stage.height() / 2 / scale - position.y / scale,
+    };
 
-  const handleConnectionEnd = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool !== "connect" || !isConnecting || !tempConnection || !connectionStart) return;
-    
-    const stage = stageRef.current;
-    if (!stage) return;
-    
-    const point = getRelativePointerPosition(stage);
-    if (!point) return;
+    // Create endpoints with 200px horizontal offset (centered)
+    const from = { x: stageCenter.x - 100, y: stageCenter.y };
+    const to = { x: stageCenter.x + 100, y: stageCenter.y };
+
+    setConnectionStart(from);
+    setIsConnecting(true);
+    isPlacingConnection.current = true; // NEW: Enter placement mode
 
     const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
-    
-    const connectionLine = new Konva.Arrow({
-      points: [connectionStart.x, connectionStart.y, point.x, point.y],
-      stroke: '#6c757d',
-      strokeWidth: 3,
-      fill: '#6c757d',
-      pointerLength: 12,
-      pointerWidth: 12,
-      draggable: true,
+    if (!drawLayer) return;
+
+    // Create connection group
+    const group = new Konva.Group({
+      x: 0,
+      y: 0,
+      draggable: false,
+      name: 'selectable-shape connection-group',
+    });
+
+    const { cp1x, cp1y, cp2x, cp2y, shouldSnapStraight } = computeSmartControlPoints(from, to);
+    const pathData = buildPathData(from, to, cp1x, cp1y, cp2x, cp2y, shouldSnapStraight);
+
+    // Connection Path (Bezier) - IMPROVED STYLING
+    const path = new Konva.Path({
+      data: pathData,
+      stroke: '#333', // Dark gray like Figma
+      strokeWidth: 2, // Thinner, cleaner look
       lineCap: 'round',
       lineJoin: 'round',
-      name: 'selectable-shape',
+      listening: true, // Allow clicking on the line itself
+      name: 'connection-path',
+    });
+    pathNodeRef.current = path;
+
+    // Anchor circles (draggable endpoints) - IMPROVED STYLING
+    const anchorRadius = 6;
+    
+    // Tail point (start) - BLUE
+    const startAnchor = new Konva.Circle({
+      x: from.x,
+      y: from.y,
+      radius: anchorRadius,
+      fill: '#007AFF', // Blue
+      stroke: '#ffffff',
+      strokeWidth: 2,
+      draggable: true,
+      name: 'connection-anchor tail-anchor',
     });
     
-    if (drawLayer) {
-      drawLayer.add(connectionLine);
-      addAction({ type: "add", node: connectionLine });
-    }
-    
-    if (drawLayer && tempConnection) {
-      tempConnection.destroy();
+    // Head point (end) - RED  
+    const endAnchor = new Konva.Circle({
+      x: to.x,
+      y: to.y,
+      radius: anchorRadius,
+      fill: '#FF3B30', // Red
+      stroke: '#ffffff',
+      strokeWidth: 2,
+      draggable: true,
+      name: 'connection-anchor head-anchor',
+    });
+
+    // Attach dragmove handlers for anchors to update the path dynamically
+    const updatePathFromAnchors = () => {
+      const fx = startAnchor.x();
+      const fy = startAnchor.y();
+      const tx = endAnchor.x();
+      const ty = endAnchor.y();
+
+      const { cp1x, cp1y, cp2x, cp2y, shouldSnapStraight } = computeSmartControlPoints({x:fx,y:fy}, {x:tx,y:ty});
+      const d = buildPathData({x:fx,y:fy}, {x:tx,y:ty}, cp1x, cp1y, cp2x, cp2y, shouldSnapStraight);
+      path.data(d);
+      path.getLayer()?.batchDraw();
+    };
+
+    startAnchor.on('dragmove', () => {
+      updatePathFromAnchors();
+    });
+
+    endAnchor.on('dragmove', () => {
+      updatePathFromAnchors();
+    });
+
+    // Click handler for the path itself (select connection)
+    path.on('click tap', (evt) => {
+      evt.cancelBubble = true;
+      setSelectedNodeId(group.id());
+    });
+
+    // If connection is double clicked, remove it
+    group.on('dblclick dbltap', (evt) => {
+      evt.cancelBubble = true;
+      // Remove group
+      group.destroy();
       drawLayer.batchDraw();
-    }
+      // Clear refs and state
+      cleanupConnection();
+    });
+
+    group.add(path);
+    group.add(startAnchor);
+    group.add(endAnchor);
+
+    // Add to layer and store refs
+    drawLayer.add(group);
+    drawLayer.batchDraw();
+
+    tempGroupRef.current = group;
+    startAnchorRef.current = startAnchor;
+    endAnchorRef.current = endAnchor;
     
+    // Store the group into tempConnection
+    setTempConnection(group as unknown as Konva.Line);
+    setSelectedNodeId(group.id());
+  }, [stageRef, scale, position, setConnectionStart, setIsConnecting, setTempConnection, setSelectedNodeId, computeSmartControlPoints, buildPathData]);
+
+  // NEW: Cleanup connection references
+  const cleanupConnection = useCallback(() => {
+    tempGroupRef.current = null;
+    startAnchorRef.current = null;
+    endAnchorRef.current = null;
+    pathNodeRef.current = null;
     setTempConnection(null);
     setConnectionStart(null);
     setIsConnecting(false);
-  }, [activeTool, isConnecting, tempConnection, connectionStart, stageRef, addAction]);
+    isPlacingConnection.current = false; // NEW: Reset placement mode
+  }, [setTempConnection, setConnectionStart, setIsConnecting]);
+
+  // NEW: Finalize connection placement
+  const finalizeConnectionPlacement = useCallback(() => {
+    if (!isPlacingConnection.current || !tempGroupRef.current) return;
+    
+    console.log('🎯 Finalizing connection placement');
+    
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
+    if (!drawLayer) return;
+
+    const group = tempGroupRef.current;
+    const startAnchor = startAnchorRef.current!;
+    const endAnchor = endAnchorRef.current!;
+    const path = pathNodeRef.current!;
+
+    // give anchors proper hit area and cursor
+    startAnchor.on('mouseover', () => {
+      const c = stage.container();
+      c.style.cursor = 'pointer';
+    });
+    startAnchor.on('mouseout', () => {
+      const c = stage.container();
+      c.style.cursor = activeTool === "connect" ? 'crosshair' : 'default';
+    });
+    endAnchor.on('mouseover', () => {
+      const c = stage.container();
+      c.style.cursor = 'pointer';
+    });
+    endAnchor.on('mouseout', () => {
+      const c = stage.container();
+      c.style.cursor = activeTool === "connect" ? 'crosshair' : 'default';
+    });
+
+    // Name anchors & path for selection/transform compatibility
+    group.name('selectable-shape connection-group');
+    path.name('connection-path');
+
+    // Record the addition in undo stack
+    addAction({ type: "add", node: group });
+    drawLayer.batchDraw();
+
+    // Exit placement mode but keep connection active
+    isPlacingConnection.current = false;
+    setIsConnecting(false);
+    
+    console.log('✅ Connection finalized and ready for adjustments');
+  }, [stageRef, activeTool, addAction, setIsConnecting]);
+
+  // NEW: Cleanup when switching away from connection tool
+  useEffect(() => {
+    if (activeTool !== "connect" && tempGroupRef.current) {
+      console.log('🔗 Connection tool deactivated - cleaning up');
+      cleanupConnection();
+    }
+  }, [activeTool, cleanupConnection]);
+
+  // UPDATED: Connection move handler - only follow cursor during placement
+  const handleConnectionMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Only move end anchor if we're in placement mode
+    if (activeTool !== "connect" || !isPlacingConnection.current || !tempGroupRef.current) return;
+
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const point = getRelativePointerPosition(stage);
+    if (!point) return;
+
+    const endAnchor = endAnchorRef.current;
+    const path = pathNodeRef.current;
+    const startAnchor = startAnchorRef.current;
+    if (!startAnchor || !endAnchor || !path) return;
+
+    // Move end anchor to pointer position during placement
+    endAnchor.position({ x: point.x, y: point.y });
+
+    // Recompute path with new end position
+    const fx = startAnchor.x();
+    const fy = startAnchor.y();
+    const tx = endAnchor.x();
+    const ty = endAnchor.y();
+
+    const { cp1x, cp1y, cp2x, cp2y, shouldSnapStraight } = computeSmartControlPoints({x:fx,y:fy}, {x:tx,y:ty});
+    const d = buildPathData({x:fx,y:fy}, {x:tx,y:ty}, cp1x, cp1y, cp2x, cp2y, shouldSnapStraight);
+    path.data(d);
+    path.getLayer()?.batchDraw();
+  }, [activeTool, stageRef, computeSmartControlPoints, buildPathData]);
+
+  // UPDATED: Connection end handler - now handles placement finalization
+  const handleConnectionEnd = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // If we're in placement mode, finalize on click
+    if (activeTool === "connect" && isPlacingConnection.current) {
+      finalizeConnectionPlacement();
+    }
+  }, [activeTool, finalizeConnectionPlacement]);
 
   const handleConnectionHover = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (activeTool !== "connect" || isConnecting) return;
@@ -214,7 +419,16 @@ export const useKonvaTools = (
     container.style.cursor = 'crosshair';
   }, [activeTool, isConnecting, stageRef]);
 
-  // ---------- Pen Tool Logic ----------
+  // UPDATED: Connection start handler (now only for manual creation if needed)
+  const handleConnectionStart = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Only allow manual connection start if no connection exists
+    if (activeTool !== "connect" || tempGroupRef.current) return;
+
+    e.evt.preventDefault();
+    createInstantConnection();
+  }, [activeTool, createInstantConnection]);
+
+  // ---------- PEN TOOL LOGIC (UNCHANGED) ----------
   const handleDrawingMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (activeTool !== 'pen') return;
 
@@ -363,7 +577,7 @@ export const useKonvaTools = (
     }
   }, [activeTool, drawingMode, lines, addAction]);
 
-  // ---------- Centralized Mouse Handlers ----------
+  // ---------- CENTRALIZED MOUSE HANDLERS ----------
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (activeTool === 'pen') {
       handleDrawingMouseDown(e);
@@ -381,6 +595,7 @@ export const useKonvaTools = (
     }
   }, [activeTool, handleDrawingMouseMove, handleConnectionMove, handleConnectionHover]);
 
+  // UPDATED: Mouse up handler - now handles connection finalization
   const handleMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (activeTool === 'pen') {
       handleDrawingMouseUp();
@@ -407,7 +622,7 @@ export const useKonvaTools = (
     }
   }, [activeTool, handleDrawingTouchMove]);
 
-  // ---------- Wheel Handler ----------
+  // ---------- WHEEL HANDLER ----------
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
     const scaleBy = 1.05;
@@ -436,7 +651,7 @@ export const useKonvaTools = (
     stage.batchDraw();
   }, [stageRef]);
 
-  // ---------- Tool Change Handler ----------
+  // ---------- TOOL CHANGE HANDLER ----------
   const handleToolChange = useCallback((tool: Tool | null) => {
     if (activeTool === 'pen' && tool !== 'pen') {
       isDrawing.current = false;
@@ -462,30 +677,30 @@ export const useKonvaTools = (
     
     drawLayer.batchDraw();
   }, [activeTool, drawingMode, setActiveTool, stageRef]);
+
   const handleZoomIn = useCallback(() => {
-  const stage = stageRef.current;
-  if (!stage) return;
+    const stage = stageRef.current;
+    if (!stage) return;
 
-  const scaleBy = 1.2;
-  const oldScale = stage.scaleX();
-  const newScale = Math.min(oldScale * scaleBy, 5); // Max zoom 500%
+    const scaleBy = 1.2;
+    const oldScale = stage.scaleX();
+    const newScale = Math.min(oldScale * scaleBy, 5); // Max zoom 500%
 
-  stage.scale({ x: newScale, y: newScale });
-  stage.batchDraw();
-}, [stageRef]);
+    stage.scale({ x: newScale, y: newScale });
+    stage.batchDraw();
+  }, [stageRef]);
 
-const handleZoomOut = useCallback(() => {
-  const stage = stageRef.current;
-  if (!stage) return;
+  const handleZoomOut = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
 
-  const scaleBy = 1.2;
-  const oldScale = stage.scaleX();
-  const newScale = Math.max(oldScale / scaleBy, 0.1); // Min zoom 10%
+    const scaleBy = 1.2;
+    const oldScale = stage.scaleX();
+    const newScale = Math.max(oldScale / scaleBy, 0.1); // Min zoom 10%
 
-  stage.scale({ x: newScale, y: newScale });
-  stage.batchDraw();
-}, [stageRef]);
-
+    stage.scale({ x: newScale, y: newScale });
+    stage.batchDraw();
+  }, [stageRef]);
 
   return {
     // Handlers
@@ -503,7 +718,7 @@ const handleZoomOut = useCallback(() => {
     handleDrawingMouseMove,
     handleDrawingMouseUp,
     handleWheel,
-    handleZoomIn,    // ← ADD THIS
+    handleZoomIn,
     handleZoomOut,
     // Refs
     isDrawing,
