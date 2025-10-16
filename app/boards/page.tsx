@@ -1,160 +1,320 @@
+"use client"
+
+import { motion } from "framer-motion"
 import Link from "next/link"
 import BoardCard from "@/components/BoardCard"
+import { GlassCard } from "@/components/ui/glass-card"
+import { Button } from "@/components/ui/button"
+import { 
+  Search, 
+  Filter, 
+  TrendingUp, 
+  Sparkles, 
+  Users,
+  Globe,
+  ArrowLeft,
+  Command
+} from "lucide-react"
 
 const PublicBoards = () => {
+  const featuredBoards = [
+    {
+      id: "1",
+      title: "Crash Course: History of the Roman Empire",
+      username: "@bennySam",
+      boardcategory: "Study · History",
+      upvotes: 120,
+      saves: 30,
+      isPublic: true,
+      createdAt: "2024-01-15"
+    },
+    {
+      id: "2", 
+      title: "Finding the Perfect Hook for My Novel",
+      username: "@wordsmith",
+      boardcategory: "Writing · Creativity",
+      upvotes: 89,
+      saves: 45,
+      isPublic: true,
+      createdAt: "2024-01-14"
+    },
+    {
+      id: "3",
+      title: "Mind Mapping My 2025 Goals",
+      username: "@focusdaily", 
+      boardcategory: "Personal · Productivity",
+      upvotes: 156,
+      saves: 67,
+      isPublic: true,
+      createdAt: "2024-01-13"
+    },
+    {
+      id: "4",
+      title: "What If Cities Ran on 100% Renewable Energy?",
+      username: "@bigthinker",
+      boardcategory: "Curiosity · Future",
+      upvotes: 203,
+      saves: 92,
+      isPublic: true,
+      createdAt: "2024-01-12"
+    }
+  ]
+
+  const popularBoards = [
+    {
+      id: "5",
+      title: "Breaking Down Quantum Physics in Plain English",
+      username: "@studentgenius",
+      boardcategory: "Study · Physics",
+      upvotes: 312,
+      saves: 145,
+      isPublic: true,
+      createdAt: "2024-01-11"
+    },
+    {
+      id: "6",
+      title: "Startup Idea Validation Framework",
+      username: "@entrepreneur",
+      boardcategory: "Business · Strategy",
+      upvotes: 278,
+      saves: 134,
+      isPublic: true,
+      createdAt: "2024-01-10"
+    },
+    {
+      id: "7",
+      title: "Learning Web Development Roadmap 2024",
+      username: "@coderlife",
+      boardcategory: "Study · Programming",
+      upvotes: 445,
+      saves: 201,
+      isPublic: true,
+      createdAt: "2024-01-09"
+    },
+    {
+      id: "8",
+      title: "Philosophy of Mind - Consciousness Explained",
+      username: "@deepthinker",
+      boardcategory: "Philosophy · Science",
+      upvotes: 167,
+      saves: 78,
+      isPublic: true,
+      createdAt: "2024-01-08"
+    }
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-200">
-
-      {/* header menu */}
-      <nav className="flex items-center justify-between p-4 bg-white ">
-        <div className="flex items-center justify-between ">
-          <img src="/image/ham-menu.svg" alt="menu" className="w-12 h-12" />
-
-          <Link href="/" className="text-2xl font-bold mr-10 ml-10">Orb</Link>
-        </div>
-        <div >
-          <Link href="/dashboard">
-            <img src="/image/account-circle.svg" alt="account" className="w-12 h-12" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      {/* Enhanced Navigation */}
+      <motion.nav 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between p-6 bg-white/80 backdrop-blur-md border-b border-white/30"
+      >
+        <div className="flex items-center gap-8">
+          <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back to Dashboard</span>
+          </Link>
+          
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <Command className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Orb
+            </h1>
           </Link>
         </div>
-      </nav>
-      {/* side bar */}
-          <div className="flex gap-4">
-            {/* ... */}
+
+        <Link href="/dashboard">
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-transform duration-300">
+            <Users className="w-6 h-6 text-white" />
           </div>
-      {/* main render public boards */}
+        </Link>
+      </motion.nav>
 
-      <div className="mx-4 sm:mx-10 lg:mx-20 my-10">
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-12"
+        >
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+            <div className="space-y-4">
+              <GlassCard className="inline-flex items-center gap-2 px-4 py-2">
+                <Globe className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-gray-700">
+                  Community Knowledge Hub
+                </span>
+              </GlassCard>
+              
+              <div className="space-y-2">
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900">
+                  Explore Public{" "}
+                  <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    Boards
+                  </span>
+                </h1>
+                <p className="text-xl text-gray-600 max-w-2xl">
+                  Discover inspiring ideas, learn from others, and find templates 
+                  from our community of creators and thinkers.
+                </p>
+              </div>
+            </div>
 
-        {/* boards and search input section */}
-        <section className="flex items-center justify-between">
-      <h1 className="text-3xl font-bold">Public Boards</h1>
+            {/* Stats */}
+            <div className="flex gap-6">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">500+</div>
+                <div className="text-sm text-gray-500">Public Boards</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">2.1K</div>
+                <div className="text-sm text-gray-500">Active Users</div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
 
-      <div className=" flex items-center justify-between gap-1" >
-        <img src="/image/sort.svg" alt="filter-icon" />
-        <h3>Filter</h3>
+        {/* Search and Filter Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="mb-8"
+        >
+          <GlassCard className="p-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="flex items-center gap-4 flex-1 max-w-2xl">
+                <div className="relative flex-1">
+                  <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                  <input 
+                    type="text"
+                    placeholder="Search public boards, topics, or users..."
+                    className="w-full pl-10 pr-4 py-3 bg-white/50 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <Button variant="outline" className="border-gray-300 hover:border-blue-300">
+                  <Filter className="w-4 h-4 mr-2" />
+                  Filters
+                </Button>
+              </div>
 
-        <input 
-        type="text"
+              <div className="flex items-center gap-3">
+                <Button variant="outline" className="border-gray-300 hover:border-blue-300">
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Popular
+                </Button>
+                <Button variant="outline" className="border-gray-300 hover:border-blue-300">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  New
+                </Button>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
 
-        placeholder="Search boards"
-        className="border border-gray-300 rounded-lg px-4 py-2 ml-5"        
-        />
+        {/* Featured Boards Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="mb-12"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <Sparkles className="w-6 h-6 text-amber-500" />
+            <h2 className="text-2xl font-bold text-gray-900">Featured Boards</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {featuredBoards.map((board, index) => (
+              <motion.div
+                key={board.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 + (index * 0.1) }}
+              >
+                <BoardCard
+                  title={board.title}
+                  username={board.username}
+                  boardcategory={board.boardcategory}
+                  upvotes={board.upvotes}
+                  saves={board.saves}
+                  boardId={board.id}
+                  createdAt={board.createdAt}
+                  isPublic={board.isPublic}
+                />
+              </motion.div>
+            ))}
+          </div>
+        </motion.section>
+
+        {/* Popular Boards Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <TrendingUp className="w-6 h-6 text-green-500" />
+            <h2 className="text-2xl font-bold text-gray-900">Most Popular</h2>
+          </div>
+
+          <GlassCard className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {popularBoards.map((board, index) => (
+                <motion.div
+                  key={board.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.6, delay: 0.6 + (index * 0.1) }}
+                >
+                  <BoardCard
+                    title={board.title}
+                    username={board.username}
+                    boardcategory={board.boardcategory}
+                    upvotes={board.upvotes}
+                    saves={board.saves}
+                    boardId={board.id}
+                    createdAt={board.createdAt}
+                    isPublic={board.isPublic}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          </GlassCard>
+        </motion.section>
+
+        {/* Bottom CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
+          className="mt-16 text-center"
+        >
+          <GlassCard className="p-8 max-w-2xl mx-auto">
+            <div className="space-y-4">
+              <h3 className="text-2xl font-bold text-gray-900">
+                Ready to Share Your Ideas?
+              </h3>
+              <p className="text-gray-600">
+                Create your own public board and inspire others in the community.
+              </p>
+              <Link href="/boards/new">
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4">
+                  Create Your Board
+                </Button>
+              </Link>
+            </div>
+          </GlassCard>
+        </motion.div>
       </div>
-
-        </section>
-
-            {/* public board results */}
-        <div className=" mt-10 overflow-scroll bg-white p-5 rounded-lg">
-              <BoardCard
-              title="Crash course :History of the Roman empire."
-              username="@bennySam"
-              boardcategory="Study"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Finding the Perfect Hook for My Novel"
-              username="@wordsmith"
-              boardcategory="Writing · Creativity"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Mind Mapping My 2025 Goals"
-              username="@focusdaily"
-              boardcategory="Personal · Productivity "
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="What If Cities Ran on 100% Renewable Energy?"
-              username="@bigthinker"
-              boardcategory="Curiosity · Future"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-              <BoardCard
-              title="Breaking Down Quantum Physics in Plain English"
-              username="@studentgenius"
-              boardcategory="Study · Physics"
-              upvotes={120}
-              saves={30}
-              
-              />
-        </div>
-      
-
-      </div>
-      </div>
+    </div>
   )
 }
 
