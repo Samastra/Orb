@@ -17,6 +17,7 @@ import { useBoardState } from "@/hooks/useBoardState";
 import { useKonvaTools } from "@/hooks/useKonvaTools";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import FormattingToolbar from "@/components/FormattingToolbar";
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 // Utils
 import { fetchBoard } from "@/lib/actions/board-actions";
 import { useWindowSize } from "@/hooks/useWindowSize";
@@ -57,10 +58,10 @@ const BoardPage = () => {
   
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
-    isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeId, stageInstance, tempDimensions, // ADD connections HERE
+    isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeId, stageInstance, tempDimensions,
     showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
     setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
-    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setSelectedNodeId, setStageInstance, // ADD setConnections HERE
+    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setSelectedNodeId, setStageInstance,
     setTempDimensions, setShowSaveModal, setShowSetupDialog, setBoardInfo,
     // Layer functions
     bringForward,
@@ -70,59 +71,57 @@ const BoardPage = () => {
     // Shape functions
     addShape,
     updateShape,
+    deleteShape,
     addKonvaShape,
     addStageFrame,
     addImage,
-    addConnection, // ADD THIS
-    updateConnection, // ADD THIS
-    removeConnection, // ADD THIS
+    addConnection,
+    updateConnection,
+    removeConnection,
   } = boardState;
 
   // Undo/Redo functionality - UPDATED WITH IMAGES AND CONNECTIONS
-const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
-  stageRef,
-  boardState.actions,
-  boardState.undoneActions,
-  reactShapes,
-  lines,
-  konvaShapes,
-  stageFrames,
-  images,
-  connections, // ADD THIS - connection state
-  boardState.setActions,
-  boardState.setUndoneActions,
-  setReactShapes,
-  setLines,
-  setKonvaShapes,
-  setStageFrames,
-  setImages,
-  setConnections // ADD THIS
-  // 18 arguments total - matches the updated function signature
-);
+  const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
+    stageRef,
+    boardState.actions,
+    boardState.undoneActions,
+    reactShapes,
+    lines,
+    konvaShapes,
+    stageFrames,
+    images,
+    connections,
+    boardState.setActions,
+    boardState.setUndoneActions,
+    setReactShapes,
+    setLines,
+    setKonvaShapes,
+    setStageFrames,
+    setImages,
+    setConnections
+  );
 
-  // Tool functionality - UPDATED WITH CONNECTION SUPPORT
-  // Tool functionality - UPDATED WITH CONNECTION SUPPORT
-const toolHandlers = useKonvaTools(
-  stageRef, 
-  activeTool, 
-  scale, 
-  position, 
-  drawingMode, 
-  lines, 
-  connectionStart, 
-  tempConnection, 
-  isConnecting, 
-  selectedNodeId, 
-  setActiveTool, 
-  setDrawingMode, 
-  setLines, 
-  setConnectionStart, 
-  setTempConnection, 
-  setIsConnecting, 
-  setSelectedNodeId, 
-  undoRedoAddAction
-  // 17 arguments total - matches the function signature
-);
+  // Tool functionality
+  const toolHandlers = useKonvaTools(
+    stageRef, 
+    activeTool, 
+    scale, 
+    position, 
+    drawingMode, 
+    lines, 
+    connectionStart, 
+    tempConnection, 
+    isConnecting, 
+    selectedNodeId, 
+    setActiveTool, 
+    setDrawingMode, 
+    setLines, 
+    setConnectionStart, 
+    setTempConnection, 
+    setIsConnecting, 
+    setSelectedNodeId, 
+    undoRedoAddAction
+  );
 
   // ADD ZOOM FUNCTIONS THAT ACTUALLY WORK
   const handleZoomIn = useCallback(() => {
@@ -131,12 +130,11 @@ const toolHandlers = useKonvaTools(
 
     const scaleBy = 1.2;
     const oldScale = stage.scaleX();
-    const newScale = Math.min(oldScale * scaleBy, 5); // Max zoom 500%
+    const newScale = Math.min(oldScale * scaleBy, 5);
 
     stage.scale({ x: newScale, y: newScale });
     stage.batchDraw();
     
-    // FORCE UPDATE THE SCALE IN STATE
     boardState.setScale(newScale);
   }, [stageRef, boardState.setScale]);
 
@@ -146,19 +144,18 @@ const toolHandlers = useKonvaTools(
 
     const scaleBy = 1.2;
     const oldScale = stage.scaleX();
-    const newScale = Math.max(oldScale / scaleBy, 0.1); // Min zoom 10%
+    const newScale = Math.max(oldScale / scaleBy, 0.1);
 
     stage.scale({ x: newScale, y: newScale });
     stage.batchDraw();
     
-    // FORCE UPDATE THE SCALE IN STATE
     boardState.setScale(newScale);
   }, [stageRef, boardState.setScale]);
 
   const debouncedUpdateShape = useDebounce((shapeId: string, updates: Partial<any>) => {
     const isReactShape = reactShapes.some((s) => s.id === shapeId);
     const isKonvaShape = konvaShapes.some((s) => s.id === shapeId);
-    const isConnection = connections.some((c) => c.id === shapeId); // ADD THIS
+    const isConnection = connections.some((c) => c.id === shapeId);
     
     if (isReactShape) {
       setReactShapes(prev => 
@@ -184,7 +181,6 @@ const toolHandlers = useKonvaTools(
         }
       }
     } else if (isConnection) {
-      // Handle connection updates
       updateConnection(shapeId, updates);
     }
   }, 50);
@@ -195,7 +191,7 @@ const toolHandlers = useKonvaTools(
     
     const isReactShape = reactShapes.some((s) => s.id === id);
     const isKonvaShape = konvaShapes.some((s) => s.id === id);
-    const isConnection = connections.some((c) => c.id === id); // ADD THIS
+    const isConnection = connections.some((c) => c.id === id);
     
     if (isReactShape) {
       setReactShapes(prev => 
@@ -206,7 +202,6 @@ const toolHandlers = useKonvaTools(
     } else if (isKonvaShape) {
       debouncedUpdateShape(id, attrs);
     } else if (isConnection) {
-      // Handle connection updates
       updateConnection(id, attrs);
     }
   }, [debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection]);
@@ -217,7 +212,7 @@ const toolHandlers = useKonvaTools(
     
     const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
     const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
-    const isConnection = connections.some((c) => c.id === selectedNodeId); // ADD THIS
+    const isConnection = connections.some((c) => c.id === selectedNodeId);
     
     if (isReactShape) {
       setReactShapes(prev => 
@@ -228,7 +223,6 @@ const toolHandlers = useKonvaTools(
     } else if (isKonvaShape) {
       debouncedUpdateShape(selectedNodeId, updates);
     } else if (isConnection) {
-      // Handle connection styling updates
       updateConnection(selectedNodeId, updates);
     }
   }, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection]);
@@ -237,19 +231,15 @@ const toolHandlers = useKonvaTools(
   const selectedShape = useMemo(() => {
     if (!selectedNodeId) return null;
     
-    // Check react shapes
     const reactShape = reactShapes.find((s) => s.id === selectedNodeId);
     if (reactShape) return reactShape;
     
-    // Check konva shapes
     const konvaShape = konvaShapes.find((s) => s.id === selectedNodeId);
     if (konvaShape) return konvaShape;
     
-    // Check images
     const imageShape = images.find((img) => img.id === selectedNodeId);
     if (imageShape) return imageShape;
     
-    // Check connections - ADD THIS
     const connectionShape = connections.find((conn) => conn.id === selectedNodeId);
     return connectionShape || null;
   }, [selectedNodeId, reactShapes, konvaShapes, images, connections]);
@@ -285,12 +275,10 @@ const toolHandlers = useKonvaTools(
 
   const handleImageUpload = useCallback(async (file: File) => {
     try {
-      // Convert file to base64
       const reader = new FileReader();
       reader.onload = (e) => {
         const src = e.target?.result as string;
         if (src) {
-          // Add image to board
           addImage(src, undoRedoAddAction);
         }
       };
@@ -320,6 +308,86 @@ const toolHandlers = useKonvaTools(
     }
   }, [currentBoardId]);
 
+  // FIX 1: Enhanced delete function that supports undo/redo
+  // FIX 1: Enhanced delete function that supports undo/redo for ALL shape types including stages
+const handleDeleteShape = useCallback((id: string) => {
+  console.log('🗑️ Keyboard delete triggered for:', id, {
+    reactShapes: reactShapes.find(s => s.id === id),
+    konvaShapes: konvaShapes.find(s => s.id === id),
+    images: images.find(s => s.id === id),
+    connections: connections.find(s => s.id === id),
+    stageFrames: stageFrames.find(s => s.id === id) // ADD THIS
+  });
+  
+  // Use the enhanced delete that records actions
+  const allShapes = [...reactShapes, ...konvaShapes, ...images, ...connections, ...stageFrames]; // ADD stageFrames
+  const shapeToDelete = allShapes.find(shape => shape.id === id);
+  
+  if (shapeToDelete) {
+    // Record deletion for undo/redo
+    let actionType: any;
+    
+    if (reactShapes.find(s => s.id === id)) {
+      actionType = 'delete-react-shape';
+    } else if (konvaShapes.find(s => s.id === id)) {
+      actionType = 'delete-konva-shape';
+    } else if (images.find(s => s.id === id)) {
+      actionType = 'delete-image';
+    } else if (connections.find(s => s.id === id)) {
+      actionType = 'delete-connection';
+    } else if (stageFrames.find(s => s.id === id)) { // ADD THIS
+      actionType = 'delete-stage-frame';
+    } else {
+      actionType = 'delete-shape';
+    }
+    
+    console.log('💾 Recording deletion action:', actionType, shapeToDelete);
+    undoRedoAddAction({
+      type: actionType,
+      data: shapeToDelete
+    });
+  }
+  
+  // Perform the actual deletion
+  console.log('🗑️ Actually deleting shape:', id);
+  deleteShape(id); // This should handle stage frames too
+}, [reactShapes, konvaShapes, images, connections, stageFrames, deleteShape, undoRedoAddAction]); // ADD stageFrames dependency
+
+  // FIX 2: Enhanced tool change handler
+  const handleToolChangeWithAutoCreate = useCallback((tool: Tool | null) => {
+    console.log('🔧 Tool change:', tool);
+    toolHandlers.handleToolChange(tool);
+    setActiveTool(tool);
+    
+    // Auto-create shapes for certain tools
+    if (tool === 'text' || tool === 'stickyNote') {
+      setTimeout(() => {
+        console.log('📝 Auto-creating shape from keyboard shortcut:', tool);
+        handleAddShape(tool);
+      }, 100);
+    }
+  }, [toolHandlers.handleToolChange, setActiveTool, handleAddShape]);
+
+  // FIX 3: Keyboard shortcuts integration with proper handlers
+  // Fix 3: Keyboard shortcuts integration with proper handlers
+const keyboardShortcuts = useKeyboardShortcuts({
+  selectedNodeId,
+  deleteShape: handleDeleteShape,
+  setSelectedNodeId,
+  activeTool,
+  setActiveTool: (tool: Tool | null) => {
+    console.log('🔧 Keyboard tool change:', tool);
+    handleToolChangeWithAutoCreate(tool);
+  },
+  handleToolChange: handleToolChangeWithAutoCreate,
+  addShape: handleAddShape,
+  undo,
+  redo,
+  handleZoomIn,
+  handleZoomOut,
+  isEditingText: false,
+});
+
   useEffect(() => {
     const checkIfNewBoard = async () => {
       const board = await fetchBoard(params.boardId as string);
@@ -343,7 +411,6 @@ const toolHandlers = useKonvaTools(
   return (
     <>
       <div className="relative w-screen h-screen bg-gray-50">
-        {/* Header */}
         <BoardHeader
           boardInfo={boardInfo}
           isTemporaryBoard={isTemporaryBoard}
@@ -353,12 +420,11 @@ const toolHandlers = useKonvaTools(
           handleCloseWithoutSave={handleCloseWithoutSave}
         />
 
-        {/* Toolbar */}
         <Toolbar
           activeTool={activeTool}
           drawingMode={drawingMode}
           tempDimensions={tempDimensions}
-          handleToolChange={toolHandlers.handleToolChange}
+          handleToolChange={handleToolChangeWithAutoCreate}
           setDrawingMode={setDrawingMode}
           addShape={handleAddShape}
           setTempDimensions={setTempDimensions}
@@ -368,7 +434,6 @@ const toolHandlers = useKonvaTools(
           redo={redo}
         />
 
-        {/* Formatting Toolbar */}
         <FormattingToolbar
           selectedShape={selectedShape}
           onChange={handleFormattingToolbarUpdate}
@@ -378,13 +443,11 @@ const toolHandlers = useKonvaTools(
           onSendToBack={sendToBack}
         />
 
-        {/* BOTTOM CONTROLS - THE ONE YOU LIKED! */}
         <div className={cn(
           "absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-4",
           "bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-lg border border-gray-200",
           "transition-all duration-300"
         )}>
-          {/* Zoom Controls */}
           <div className="flex items-center gap-3">
             <button 
               onClick={handleZoomOut}
@@ -409,7 +472,6 @@ const toolHandlers = useKonvaTools(
             </button>
           </div>
 
-          {/* Quick Actions - UNDO/REDO YOU LIKED */}
           <div className="w-px h-6 bg-gray-300"></div>
           <div className="flex items-center gap-2">
             <button
@@ -435,7 +497,6 @@ const toolHandlers = useKonvaTools(
           </div>
         </div>
 
-        {/* Stage - UPDATED WITH CONNECTION PROPS */}
         <StageComponent
           key={`stage-${stageKey}`}
           stageRef={stageRef}
@@ -448,7 +509,7 @@ const toolHandlers = useKonvaTools(
           reactShapes={reactShapes}
           stageFrames={stageFrames}
           images={images}
-          connections={connections} // ADD THIS
+          connections={connections}
           selectedNodeId={selectedNodeId}
           stageInstance={stageInstance}
           handleWheel={toolHandlers.handleWheel}
@@ -462,13 +523,12 @@ const toolHandlers = useKonvaTools(
           setReactShapes={setReactShapes}
           setShapes={setKonvaShapes}
           setImages={setImages}
-          setConnections={setConnections} // ADD THIS
+          setConnections={setConnections}
           updateShape={handleStageShapeUpdate}
           setStageInstance={setStageInstance}
         />
       </div>
 
-      {/* Create Board Dialog */}
       <CreateBoard 
         open={showSetupDialog}
         onOpenChange={(open) => setShowSetupDialog(open)} 

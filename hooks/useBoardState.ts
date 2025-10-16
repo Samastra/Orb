@@ -508,16 +508,30 @@ export const useBoardState = () => {
     []
   );
 
-  const deleteShape = useCallback(
-    (id: string) => {
-      setReactShapes((prev) => prev.filter((s) => s.id !== id));
-      setKonvaShapes((prev) => prev.filter((s) => s.id !== id));
-      setImages((prev) => prev.filter((s) => s.id !== id));
-      setConnections((prev) => prev.filter((s) => s.id !== id));
-      if (selectedNodeId === id) setSelectedNodeId(null);
-    },
-    [selectedNodeId]
-  );
+  // In useBoardState.ts - replace deleteShape with this:
+const deleteShape = useCallback(
+  (id: string) => {
+    console.log('🗑️ Deleting shape:', id, {
+      reactShapes: reactShapes.find(s => s.id === id),
+      konvaShapes: konvaShapes.find(s => s.id === id),
+      images: images.find(s => s.id === id),
+      connections: connections.find(s => s.id === id),
+      stageFrames: stageFrames.find(s => s.id === id) // ADD THIS LINE
+    });
+    
+    setReactShapes((prev) => prev.filter((s) => s.id !== id));
+    setKonvaShapes((prev) => prev.filter((s) => s.id !== id));
+    setImages((prev) => prev.filter((s) => s.id !== id));
+    setConnections((prev) => prev.filter((s) => s.id !== id));
+    setStageFrames((prev) => prev.filter((s) => s.id !== id)); // ADD THIS LINE - CRITICAL!
+    
+    if (selectedNodeId === id) {
+      console.log('🗑️ Clearing selection after delete');
+      setSelectedNodeId(null);
+    }
+  },
+  [selectedNodeId, reactShapes, konvaShapes, images, connections, stageFrames] // ADD stageFrames to dependencies
+);
 
   const selectShape = useCallback((id: string | null) => {
     setSelectedNodeId(id);
