@@ -30,7 +30,8 @@ interface SearchResults {
 interface ResourceListProps {
   boardTitle?: string;
   boardCategory?: string;
-  onAddToBoard?: (imageUrl: string, altText: string) => void; // ← ADD THIS
+  onAddToBoard?: (imageUrl: string, altText: string) => void;
+  onPlayVideo?: (videoId: string, title: string) => void; // ← ADD THIS
 }
 const ImageTypes = [
   { value: "all", label: "All Images" },
@@ -45,7 +46,7 @@ const emptyResults: SearchResults = {
   websites: []
 }
 
-const ResourceList = ({ boardTitle, boardCategory, onAddToBoard }: ResourceListProps) => {
+const ResourceList = ({ boardTitle, boardCategory, onAddToBoard, onPlayVideo }: ResourceListProps) => {
   const { recommendations } = useRecommendations()
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -273,16 +274,17 @@ if (activeTab === 'images') {
   return (
     <div className="grid grid-cols-3 gap-3"> {/* Changed from 2 to 3 columns */}
       {currentResources.map((resource: Resource) => (
-       <ResourceCard 
-        key={resource.id}
-        heading={resource.heading}
-        body={resource.body}
-        image={resource.image}
-        alt={resource.alt}
-        type={resource.type as any}
-        url={getResourceUrl(resource)}
-        onAddToBoard={onAddToBoard} // ← ADD THIS
-      />
+      <ResourceCard 
+  key={resource.id}
+  heading={resource.heading}
+  body={resource.body}
+  image={resource.image}
+  alt={resource.alt}
+  type={resource.type as any}
+  url={getResourceUrl(resource)}
+  onAddToBoard={onAddToBoard}
+  onPlayVideo={onPlayVideo} // ← ADD THIS
+/>
       ))}
     </div>
   )
@@ -290,16 +292,17 @@ if (activeTab === 'images') {
 
     return currentResources.map((resource: Resource) => (
       <div key={resource.id} className="mb-3">
-      <ResourceCard 
-        key={resource.id}
-        heading={resource.heading}
-        body={resource.body}
-        image={resource.image}
-        alt={resource.alt}
-        type={resource.type as any}
-        url={getResourceUrl(resource)}
-        onAddToBoard={onAddToBoard} // ← ADD THIS
-      />
+     <ResourceCard 
+  key={resource.id}
+  heading={resource.heading}
+  body={resource.body}
+  image={resource.image}
+  alt={resource.alt}
+  type={resource.type as any}
+  url={getResourceUrl(resource)}
+  onAddToBoard={onAddToBoard}
+  onPlayVideo={onPlayVideo} // ← ADD THIS
+/>
       </div>
     ))
   }

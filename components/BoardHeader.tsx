@@ -24,8 +24,10 @@ interface BoardHeaderProps {
   showSaveModal: boolean;
   setShowSaveModal: (show: boolean) => void;
   handleCloseWithoutSave: () => void;
-  onAddImageFromRecommendations?: (imageUrl: string, altText: string) => void; // ← ADD THIS
+  onAddImageFromRecommendations?: (imageUrl: string, altText: string) => void;
+  onPlayVideo?: (videoId: string, title: string) => void; // ← ADD THIS
 }
+
 
 const BoardHeader: React.FC<BoardHeaderProps> = ({
   boardInfo,
@@ -35,6 +37,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   setShowSaveModal,
   handleCloseWithoutSave,
   onAddImageFromRecommendations,
+  onPlayVideo, 
 }) => {
   const { user } = useUser();
 
@@ -100,7 +103,8 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                <ResourceList 
           boardTitle={boardInfo.title}
           boardCategory={boardInfo.category}
-          onAddToBoard={onAddImageFromRecommendations} // ← USE THE PROP
+          onAddToBoard={onAddImageFromRecommendations}
+          onPlayVideo={onPlayVideo} // ← USE THE PROP
         />
               </SheetContent>
             </Sheet>

@@ -12,7 +12,9 @@ import BoardHeader from "@/components/BoardHeader";
 import StageComponent from "@/components/StageComponent";
 import CreateBoard from "@/components/createBoard";
 import { deleteBoard } from "@/lib/actions/board-actions";
+import VideoPlayerModal from '@/components/VideoPlayerModal';
 // Hooks
+import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { useBoardState } from "@/hooks/useBoardState";
 import { useKonvaTools } from "@/hooks/useKonvaTools";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
@@ -53,9 +55,19 @@ const BoardPage = () => {
   
   const [stageKey, setStageKey] = useState(0);
 
+    const {
+  videoId,
+  videoTitle, 
+  isVideoOpen,
+  openVideo,
+  closeVideo
+} = useVideoPlayer();
+
   // State management
   const boardState = useBoardState();
   
+
+
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
     isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeId, stageInstance, tempDimensions,
@@ -435,16 +447,16 @@ const BoardPage = () => {
       <div className="relative w-screen h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
         
         {/* Premium Glass Headers & Toolbars */}
-        <BoardHeader
+       <BoardHeader
             boardInfo={boardInfo}
             isTemporaryBoard={isTemporaryBoard}
             currentBoardId={currentBoardId}
             showSaveModal={showSaveModal}
             setShowSaveModal={setShowSaveModal}
             handleCloseWithoutSave={handleCloseWithoutSave}
-            onAddImageFromRecommendations={handleAddImageFromRecommendations} // ← ADD THIS
+            onAddImageFromRecommendations={handleAddImageFromRecommendations}
+            onPlayVideo={openVideo} // ← ADD THIS - use the openVideo function from useVideoPlayer
           />
-
         <Toolbar
           activeTool={activeTool}
           drawingMode={drawingMode}
@@ -568,6 +580,13 @@ const BoardPage = () => {
             category: updates.category
           })
         }}
+      />
+
+      <VideoPlayerModal
+        videoId={videoId || ''}
+        title={videoTitle}
+        isOpen={isVideoOpen}
+        onClose={closeVideo}
       />
     </>
   );

@@ -11,27 +11,48 @@ type ResourceCardProps = {
   url?: string;
   type: 'book' | 'video' | 'photo' | 'vector' | 'website';
   onAddToBoard?: (imageUrl: string, altText: string) => void;
+  onPlayVideo?: (videoId: string, title: string) => void; // ← ADD THIS
 }
 
-const ResourceCard = ({ heading, body, image, alt, url, type, onAddToBoard }: ResourceCardProps) => {
+const ResourceCard = ({ heading, body, image, alt, url, type, onAddToBoard, onPlayVideo }: ResourceCardProps) => {
   const [imageError, setImageError] = useState(false);
 
   // Handle click - prioritize adding to board over navigation
-  const handleClick = (e: React.MouseEvent) => {
-    // If it's an image type and we have the add handler, use that instead of navigation
-    if ((type === 'photo' || type === 'vector') && image && onAddToBoard) {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('🎯 Adding image to board:', image);
-      onAddToBoard(image, alt);
-      return;
-    }
+ const handleClick = (e: React.MouseEvent) => {
+  // If it's an image type and we have the add handler, use that instead of navigation
+  if ((type === 'photo' || type === 'vector') && image && onAddToBoard) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🎯 Adding image to board:', image);
+    onAddToBoard(image, alt);
+    return;
+  }
+
+    const extractYouTubeId = (url: string): string | null => {
+      const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+      const match = url.match(regExp);
+      return (match && match[7].length === 11) ? match[7] : null;
+    };
+
+  // NEW: If it's a video and we have the video handler, use modal instead of navigation
+  if (type === 'video' && onPlayVideo && url) {
+    e.preventDefault();
+    e.stopPropagation();
     
-    // For other types or if no handler, allow normal navigation
-    if (!url) {
-      e.preventDefault();
+    // Extract YouTube video ID from URL
+    const videoId = extractYouTubeId(url);
+    if (videoId) {
+      console.log('🎬 Playing video in modal:', videoId);
+      onPlayVideo(videoId, heading);
     }
-  };
+    return;
+  }
+  
+  // For other types or if no handler, allow normal navigation
+  if (!url) {
+    e.preventDefault();
+  }
+};
 
   // Get icon based on resource type
   const getTypeIcon = () => {
@@ -250,13 +271,13 @@ const ResourceCard = ({ heading, body, image, alt, url, type, onAddToBoard }: Re
   );
 
   // For non-image types with URLs, use Link for proper navigation
-    if (url) {
-      return (
-        <Link href={url} target="_blank" rel="noopener noreferrer" className="block">
-          {cardContent}
-        </Link>
-      );
-    }
+        if (url && type !== 'video') {
+        return (
+          <Link href={url} target="_blank" rel="noopener noreferrer" className="block">
+            {cardContent}
+          </Link>
+        );
+      }
 
   return cardContent;
 };
