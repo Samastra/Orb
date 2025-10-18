@@ -309,49 +309,48 @@ const BoardPage = () => {
   }, [currentBoardId]);
 
   // FIX 1: Enhanced delete function that supports undo/redo
-  // FIX 1: Enhanced delete function that supports undo/redo for ALL shape types including stages
-const handleDeleteShape = useCallback((id: string) => {
-  console.log('🗑️ Keyboard delete triggered for:', id, {
-    reactShapes: reactShapes.find(s => s.id === id),
-    konvaShapes: konvaShapes.find(s => s.id === id),
-    images: images.find(s => s.id === id),
-    connections: connections.find(s => s.id === id),
-    stageFrames: stageFrames.find(s => s.id === id) // ADD THIS
-  });
-  
-  // Use the enhanced delete that records actions
-  const allShapes = [...reactShapes, ...konvaShapes, ...images, ...connections, ...stageFrames]; // ADD stageFrames
-  const shapeToDelete = allShapes.find(shape => shape.id === id);
-  
-  if (shapeToDelete) {
-    // Record deletion for undo/redo
-    let actionType: any;
+  const handleDeleteShape = useCallback((id: string) => {
+    console.log('🗑️ Keyboard delete triggered for:', id, {
+      reactShapes: reactShapes.find(s => s.id === id),
+      konvaShapes: konvaShapes.find(s => s.id === id),
+      images: images.find(s => s.id === id),
+      connections: connections.find(s => s.id === id),
+      stageFrames: stageFrames.find(s => s.id === id)
+    });
     
-    if (reactShapes.find(s => s.id === id)) {
-      actionType = 'delete-react-shape';
-    } else if (konvaShapes.find(s => s.id === id)) {
-      actionType = 'delete-konva-shape';
-    } else if (images.find(s => s.id === id)) {
-      actionType = 'delete-image';
-    } else if (connections.find(s => s.id === id)) {
-      actionType = 'delete-connection';
-    } else if (stageFrames.find(s => s.id === id)) { // ADD THIS
-      actionType = 'delete-stage-frame';
-    } else {
-      actionType = 'delete-shape';
+    // Use the enhanced delete that records actions
+    const allShapes = [...reactShapes, ...konvaShapes, ...images, ...connections, ...stageFrames];
+    const shapeToDelete = allShapes.find(shape => shape.id === id);
+    
+    if (shapeToDelete) {
+      // Record deletion for undo/redo
+      let actionType: any;
+      
+      if (reactShapes.find(s => s.id === id)) {
+        actionType = 'delete-react-shape';
+      } else if (konvaShapes.find(s => s.id === id)) {
+        actionType = 'delete-konva-shape';
+      } else if (images.find(s => s.id === id)) {
+        actionType = 'delete-image';
+      } else if (connections.find(s => s.id === id)) {
+        actionType = 'delete-connection';
+      } else if (stageFrames.find(s => s.id === id)) {
+        actionType = 'delete-stage-frame';
+      } else {
+        actionType = 'delete-shape';
+      }
+      
+      console.log('💾 Recording deletion action:', actionType, shapeToDelete);
+      undoRedoAddAction({
+        type: actionType,
+        data: shapeToDelete
+      });
     }
     
-    console.log('💾 Recording deletion action:', actionType, shapeToDelete);
-    undoRedoAddAction({
-      type: actionType,
-      data: shapeToDelete
-    });
-  }
-  
-  // Perform the actual deletion
-  console.log('🗑️ Actually deleting shape:', id);
-  deleteShape(id); // This should handle stage frames too
-}, [reactShapes, konvaShapes, images, connections, stageFrames, deleteShape, undoRedoAddAction]); // ADD stageFrames dependency
+    // Perform the actual deletion
+    console.log('🗑️ Actually deleting shape:', id);
+    deleteShape(id);
+  }, [reactShapes, konvaShapes, images, connections, stageFrames, deleteShape, undoRedoAddAction]);
 
   // FIX 2: Enhanced tool change handler
   const handleToolChangeWithAutoCreate = useCallback((tool: Tool | null) => {
@@ -369,24 +368,23 @@ const handleDeleteShape = useCallback((id: string) => {
   }, [toolHandlers.handleToolChange, setActiveTool, handleAddShape]);
 
   // FIX 3: Keyboard shortcuts integration with proper handlers
-  // Fix 3: Keyboard shortcuts integration with proper handlers
-const keyboardShortcuts = useKeyboardShortcuts({
-  selectedNodeId,
-  deleteShape: handleDeleteShape,
-  setSelectedNodeId,
-  activeTool,
-  setActiveTool: (tool: Tool | null) => {
-    console.log('🔧 Keyboard tool change:', tool);
-    handleToolChangeWithAutoCreate(tool);
-  },
-  handleToolChange: handleToolChangeWithAutoCreate,
-  addShape: handleAddShape,
-  undo,
-  redo,
-  handleZoomIn,
-  handleZoomOut,
-  isEditingText: false,
-});
+  const keyboardShortcuts = useKeyboardShortcuts({
+    selectedNodeId,
+    deleteShape: handleDeleteShape,
+    setSelectedNodeId,
+    activeTool,
+    setActiveTool: (tool: Tool | null) => {
+      console.log('🔧 Keyboard tool change:', tool);
+      handleToolChangeWithAutoCreate(tool);
+    },
+    handleToolChange: handleToolChangeWithAutoCreate,
+    addShape: handleAddShape,
+    undo,
+    redo,
+    handleZoomIn,
+    handleZoomOut,
+    isEditingText: false,
+  });
 
   useEffect(() => {
     const checkIfNewBoard = async () => {
@@ -410,7 +408,10 @@ const keyboardShortcuts = useKeyboardShortcuts({
 
   return (
     <>
-      <div className="relative w-screen h-screen bg-gray-50">
+      {/* Premium Gradient Background */}
+      <div className="relative w-screen h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
+        
+        {/* Premium Glass Headers & Toolbars */}
         <BoardHeader
           boardInfo={boardInfo}
           isTemporaryBoard={isTemporaryBoard}
@@ -443,60 +444,63 @@ const keyboardShortcuts = useKeyboardShortcuts({
           onSendToBack={sendToBack}
         />
 
+        {/* Premium Zoom & Controls Panel */}
         <div className={cn(
-          "absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-4",
-          "bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-lg border border-gray-200",
-          "transition-all duration-300"
+          "absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-4",
+          "bg-white/95 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-xl border border-gray-200/80",
+          "transition-all duration-300 hover:shadow-2xl"
         )}>
           <div className="flex items-center gap-3">
             <button 
               onClick={handleZoomOut}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110"
               title="Zoom Out"
             >
-              <img src="/image/connect-nodes2.svg" alt="zoom-out" className="w-5 h-5" />
+              <img src="/image/connect-nodes2.svg" alt="zoom-out" className="w-5 h-5 transition-transform duration-300" />
             </button>
             
             <div className="flex items-center gap-2 min-w-[80px] justify-center">
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-gray-700 bg-gray-100/80 px-2 py-1 rounded-lg">
                 {Math.round(scale * 100)}%
               </span>
             </div>
             
             <button 
               onClick={handleZoomIn}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110"
               title="Zoom In"
             >
-              <img src="/image/add-icon.svg" alt="zoom-in" className="w-5 h-5" />
+              <img src="/image/add-icon.svg" alt="zoom-in" className="w-5 h-5 transition-transform duration-300" />
             </button>
           </div>
 
-          <div className="w-px h-6 bg-gray-300"></div>
+          <div className="w-px h-6 bg-gray-300/80"></div>
+          
           <div className="flex items-center gap-2">
             <button
               onClick={undo}
               disabled={boardState.actions.length === 0}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
               title="Undo"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
             <button
               onClick={redo}
               disabled={boardState.undoneActions.length === 0}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
               title="Redo"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>
             </button>
           </div>
         </div>
 
+        {/* Stage Component - UNCHANGED FUNCTIONALITY */}
         <StageComponent
           key={`stage-${stageKey}`}
           stageRef={stageRef}
@@ -529,6 +533,7 @@ const keyboardShortcuts = useKeyboardShortcuts({
         />
       </div>
 
+      {/* Create Board Modal - NOW WITH PREMIUM STYLING */}
       <CreateBoard 
         open={showSetupDialog}
         onOpenChange={(open) => setShowSetupDialog(open)} 
