@@ -10,10 +10,28 @@ type ResourceCardProps = {
   alt: string;
   url?: string;
   type: 'book' | 'video' | 'photo' | 'vector' | 'website';
+  onAddToBoard?: (imageUrl: string, altText: string) => void;
 }
 
-const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProps) => {
+const ResourceCard = ({ heading, body, image, alt, url, type, onAddToBoard }: ResourceCardProps) => {
   const [imageError, setImageError] = useState(false);
+
+  // Handle click - prioritize adding to board over navigation
+  const handleClick = (e: React.MouseEvent) => {
+    // If it's an image type and we have the add handler, use that instead of navigation
+    if ((type === 'photo' || type === 'vector') && image && onAddToBoard) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('🎯 Adding image to board:', image);
+      onAddToBoard(image, alt);
+      return;
+    }
+    
+    // For other types or if no handler, allow normal navigation
+    if (!url) {
+      e.preventDefault();
+    }
+  };
 
   // Get icon based on resource type
   const getTypeIcon = () => {
@@ -95,12 +113,15 @@ const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProp
   // IMAGE-ONLY LAYOUT for photos and vectors - PREMIUM STYLING
   if (type === 'photo' || type === 'vector') {
     const cardContent = (
-      <div className={`
-        group relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg
-        hover:shadow-2xl transition-all duration-300 border border-gray-200/80
-        hover:border-blue-300 overflow-hidden
-        ${url ? 'cursor-pointer hover:scale-[1.02]' : ''}
-      `}>
+      <div 
+        className={`
+          group relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg
+          hover:shadow-2xl transition-all duration-300 border border-gray-200/80
+          hover:border-blue-300 overflow-hidden
+          ${(url || onAddToBoard) ? 'cursor-pointer hover:scale-[1.02]' : ''}
+        `}
+        onClick={handleClick}
+      >
         {/* Premium Image Container */}
         <div className="w-full h-48 relative overflow-hidden">
           {displayImage ? (
@@ -129,8 +150,17 @@ const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProp
             </span>
           </div>
           
-          {/* External link indicator */}
-          {url && (
+          {/* Add to board indicator for images */}
+          {onAddToBoard && (
+            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="bg-blue-600 text-white p-1.5 rounded-full backdrop-blur-sm">
+                <span className="text-xs font-medium">+ Add</span>
+              </div>
+            </div>
+          )}
+          
+          {/* External link indicator for non-images */}
+          {url && type !== 'photo' && type !== 'vector' && (
             <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <div className="bg-black/70 text-white p-1.5 rounded-full backdrop-blur-sm">
                 <ExternalLink className="w-3 h-3" />
@@ -148,25 +178,21 @@ const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProp
       </div>
     );
 
-    if (url) {
-      return (
-        <Link href={url} target="_blank" rel="noopener noreferrer" className="block">
-          {cardContent}
-        </Link>
-      );
-    }
-
+    // For images, we don't use Link since we handle clicks manually
     return cardContent;
   }
 
   // PREMIUM LAYOUT for other types (books, videos, websites)
   const cardContent = (
-    <div className={`
-      group bg-white/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg
-      hover:shadow-2xl transition-all duration-300 border border-gray-200/80
-      hover:border-blue-300 flex gap-4
-      ${url ? 'cursor-pointer hover:scale-[1.02]' : ''}
-    `}>
+    <div 
+      className={`
+        group bg-white/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg
+        hover:shadow-2xl transition-all duration-300 border border-gray-200/80
+        hover:border-blue-300 flex gap-4
+        ${url ? 'cursor-pointer hover:scale-[1.02]' : ''}
+      `}
+      onClick={handleClick}
+    >
       {/* Premium Thumbnail */}
       <div className="flex-shrink-0 w-16 h-16 relative">
         {displayImage ? (
@@ -223,13 +249,14 @@ const ResourceCard = ({ heading, body, image, alt, url, type }: ResourceCardProp
     </div>
   );
 
-  if (url) {
-    return (
-      <Link href={url} target="_blank" rel="noopener noreferrer" className="block">
-        {cardContent}
-      </Link>
-    );
-  }
+  // For non-image types with URLs, use Link for proper navigation
+    if (url) {
+      return (
+        <Link href={url} target="_blank" rel="noopener noreferrer" className="block">
+          {cardContent}
+        </Link>
+      );
+    }
 
   return cardContent;
 };

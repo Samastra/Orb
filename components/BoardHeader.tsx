@@ -24,6 +24,7 @@ interface BoardHeaderProps {
   showSaveModal: boolean;
   setShowSaveModal: (show: boolean) => void;
   handleCloseWithoutSave: () => void;
+  onAddImageFromRecommendations?: (imageUrl: string, altText: string) => void; // ← ADD THIS
 }
 
 const BoardHeader: React.FC<BoardHeaderProps> = ({
@@ -33,6 +34,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   showSaveModal,
   setShowSaveModal,
   handleCloseWithoutSave,
+  onAddImageFromRecommendations,
 }) => {
   const { user } = useUser();
 
@@ -95,10 +97,11 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                 <SheetHeader className="sr-only">
                   <SheetTitle>AI Recommendations</SheetTitle>
                 </SheetHeader>
-                <ResourceList 
-                  boardTitle={boardInfo.title}
-                  boardCategory={boardInfo.category}
-                />
+               <ResourceList 
+          boardTitle={boardInfo.title}
+          boardCategory={boardInfo.category}
+          onAddToBoard={onAddImageFromRecommendations} // ← USE THE PROP
+        />
               </SheetContent>
             </Sheet>
 

@@ -367,6 +367,29 @@ const BoardPage = () => {
     }
   }, [toolHandlers.handleToolChange, setActiveTool, handleAddShape]);
 
+    // Calculate current viewport center considering zoom and pan
+    const calculateViewportCenter = useCallback(() => {
+      if (!stageRef.current) return { x: 100, y: 100 };
+      
+      const stage = stageRef.current;
+      const stageWidth = stage.width();
+      const stageHeight = stage.height();
+      
+      // Calculate center considering current pan and zoom
+      return {
+        x: (stageWidth / 2 - position.x) / scale,
+        y: (stageHeight / 2 - position.y) / scale
+      };
+    }, [scale, position, stageRef]);
+
+
+      const handleAddImageFromRecommendations = useCallback((imageUrl: string, altText: string) => {
+      const viewportCenter = calculateViewportCenter();
+      console.log('🎯 Adding image from recommendations at:', viewportCenter);
+      
+      addImage(imageUrl, undoRedoAddAction, viewportCenter);
+    }, [calculateViewportCenter, addImage, undoRedoAddAction]);
+
   // FIX 3: Keyboard shortcuts integration with proper handlers
   const keyboardShortcuts = useKeyboardShortcuts({
     selectedNodeId,
@@ -413,13 +436,14 @@ const BoardPage = () => {
         
         {/* Premium Glass Headers & Toolbars */}
         <BoardHeader
-          boardInfo={boardInfo}
-          isTemporaryBoard={isTemporaryBoard}
-          currentBoardId={currentBoardId}
-          showSaveModal={showSaveModal}
-          setShowSaveModal={setShowSaveModal}
-          handleCloseWithoutSave={handleCloseWithoutSave}
-        />
+            boardInfo={boardInfo}
+            isTemporaryBoard={isTemporaryBoard}
+            currentBoardId={currentBoardId}
+            showSaveModal={showSaveModal}
+            setShowSaveModal={setShowSaveModal}
+            handleCloseWithoutSave={handleCloseWithoutSave}
+            onAddImageFromRecommendations={handleAddImageFromRecommendations} // ← ADD THIS
+          />
 
         <Toolbar
           activeTool={activeTool}

@@ -100,7 +100,7 @@ export const useBoardState = () => {
   }, [selectedNodeId]);
 
   // Add image function
-  const addImage = useCallback((src: string, addAction: (action: Action) => void) => {
+const addImage = useCallback((src: string, addAction: (action: Action) => void, position = { x: 100, y: 100 }) => {
     const imageId = `image-${Date.now()}`;
     
     const img = new (window as any).Image();
@@ -121,11 +121,11 @@ export const useBoardState = () => {
         height = height * ratio;
       }
       
-      const newImage: ImageShape = {
+    const newImage: ImageShape = {
         id: imageId,
         type: 'image',
-        x: 100,
-        y: 100,
+        x: position.x,  // ← USE PARAMETER
+        y: position.y,  // ← USE PARAMETER
         width: width,
         height: height,
         src: src,
@@ -145,11 +145,11 @@ export const useBoardState = () => {
     
     img.onerror = () => {
       console.error('Failed to load image for dimensions:', src);
-      const fallbackImage: ImageShape = {
+     const fallbackImage: ImageShape = {
         id: imageId,
         type: 'image',
-        x: 100,
-        y: 100,
+        x: position.x,  // ← USE PARAMETER
+        y: position.y,  // ← USE PARAMETER
         width: 200,
         height: 150,
         src: src,
