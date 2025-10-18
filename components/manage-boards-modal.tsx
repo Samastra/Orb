@@ -110,145 +110,145 @@ export function ManageBoardsModal({ open, onOpenChange, userId }: ManageBoardsMo
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1400px] w-[90vw] h-[90vh] flex flex-col p-0 bg-gradient-to-br from-gray-50 to-white rounded-xl overflow-hidden border-0 shadow-2xl">
-        {/* Enhanced Header */}
-        <div className="flex items-center justify-between p-6 border-b bg-white/80 backdrop-blur-sm">
-          <div className="space-y-1">
-            <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-              Manage Boards
-            </DialogTitle>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
-              <div className="flex items-center gap-1">
-                <Folder className="w-4 h-4" />
-                <span>{boards.length} board{boards.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Globe className="w-4 h-4 text-green-600" />
-                <span>{boards.filter(b => b.is_public).length} public</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Lock className="w-4 h-4 text-gray-500" />
-                <span>{boards.filter(b => !b.is_public).length} private</span>
-              </div>
-            </div>
+   <Dialog open={open} onOpenChange={onOpenChange}>
+  <DialogContent className="min-w-[800px] w-[198vw] h-[95vh] flex flex-col p-0 bg-gradient-to-br from-gray-50 to-white rounded-xl overflow-hidden border-0 shadow-2xl">
+    {/* Header - unchanged */}
+    <div className="flex items-center justify-between p-6 border-b bg-white/80 backdrop-blur-sm">
+      <div className="space-y-1">
+        <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+          Manage Boards
+        </DialogTitle>
+        <div className="flex items-center gap-4 text-sm text-gray-600">
+          <div className="flex items-center gap-1">
+            <Folder className="w-4 h-4" />
+            <span>{boards.length} board{boards.length !== 1 ? 's' : ''}</span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenChange(false)}
-            className="h-9 w-9 rounded-full hover:bg-gray-100 transition-all duration-200"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Enhanced Toolbar */}
-        <div className="flex items-center gap-4 p-6 border-b bg-white/60 backdrop-blur-sm">
-          <div className="flex-1 flex gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search boards by name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              />
-            </div>
-            
-            <Button variant="outline" className="gap-2 rounded-lg border-gray-300 hover:bg-gray-50 transition-all">
-              <Filter className="w-4 h-4" />
-              Filter
-              <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700">3</Badge>
-            </Button>
+          <div className="flex items-center gap-1">
+            <Globe className="w-4 h-4 text-green-600" />
+            <span>{boards.filter(b => b.is_public).length} public</span>
           </div>
-
-          <Button 
-            variant="outline" 
-            onClick={selectAllBoards}
-            className="rounded-lg border-gray-300 hover:bg-gray-50 transition-all"
-          >
-            {selectedBoards.length === filteredBoards.length ? "Deselect All" : "Select All"}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Lock className="w-4 h-4 text-gray-500" />
+            <span>{boards.filter(b => !b.is_public).length} private</span>
+          </div>
         </div>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onOpenChange(false)}
+        className="h-9 w-9 rounded-full hover:bg-gray-100 transition-all duration-200"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
 
-        {/* Enhanced Board Grid */}
-        <div className="flex-1 overflow-auto p-6 bg-gradient-to-b from-white to-gray-50/30">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-48 space-y-3">
-              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-              <p className="text-gray-500">Loading your boards...</p>
-            </div>
-          ) : filteredBoards.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-gray-500 space-y-3">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                <Folder className="w-8 h-8 text-gray-400" />
-              </div>
-              <p className="text-lg font-medium">No boards found</p>
-              {searchQuery && (
-                <p className="text-sm">Try adjusting your search terms</p>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredBoards.map((board) => (
-                <BoardManagementCard
-                  key={board.id}
-                  board={board}
-                  isSelected={selectedBoards.includes(board.id)}
-                  onSelect={() => toggleBoardSelection(board.id)}
-                />
-              ))}
-            </div>
+    {/* Toolbar - unchanged */}
+    <div className="flex items-center gap-4 p-6 border-b bg-white/60 backdrop-blur-sm">
+      <div className="flex-1 flex gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search boards by name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-4 py-2 rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+          />
+        </div>
+        
+        <Button variant="outline" className="gap-2 rounded-lg border-gray-300 hover:bg-gray-50 transition-all">
+          <Filter className="w-4 h-4" />
+          Filter
+          <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-700">3</Badge>
+        </Button>
+      </div>
+
+      <Button 
+        variant="outline" 
+        onClick={selectAllBoards}
+        className="rounded-lg border-gray-300 hover:bg-gray-50 transition-all"
+      >
+        {selectedBoards.length === filteredBoards.length ? "Deselect All" : "Select All"}
+      </Button>
+    </div>
+
+    {/* Board Grid - Wider cards, better spacing */}
+    <div className="flex-1 overflow-auto p-8 bg-gradient-to-b from-white to-gray-50/30">
+      {loading ? (
+        <div className="flex flex-col items-center justify-center h-48 space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+          <p className="text-gray-500">Loading your boards...</p>
+        </div>
+      ) : filteredBoards.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-48 text-gray-500 space-y-3">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+            <Folder className="w-8 h-8 text-gray-400" />
+          </div>
+          <p className="text-lg font-medium">No boards found</p>
+          {searchQuery && (
+            <p className="text-sm">Try adjusting your search terms</p>
           )}
         </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
+          {filteredBoards.map((board) => (
+            <BoardManagementCard
+              key={board.id}
+              board={board}
+              isSelected={selectedBoards.includes(board.id)}
+              onSelect={() => toggleBoardSelection(board.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
 
-        {/* Enhanced Bulk Actions Footer */}
-        {selectedBoards.length > 0 && (
-          <div className="border-t p-6 bg-gradient-to-r from-blue-50 to-indigo-50 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-medium">{selectedBoards.length}</span>
-                </div>
-                <p className="text-sm font-medium text-gray-700">
-                  {selectedBoards.length} board{selectedBoards.length !== 1 ? 's' : ''} selected
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => handleToggleVisibility(true)}
-                  disabled={deleteLoading || updateLoading}
-                  className="gap-2 rounded-lg border-green-200 bg-white hover:bg-green-50 hover:border-green-300 transition-all"
-                >
-                  {updateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-                  Make Public
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleToggleVisibility(false)}
-                  disabled={deleteLoading || updateLoading}
-                  className="gap-2 rounded-lg border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all"
-                >
-                  {updateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                  Make Private
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={handleDeleteSelected}
-                  disabled={deleteLoading || updateLoading}
-                  className="gap-2 rounded-lg bg-red-600 hover:bg-red-700 transition-all shadow-sm"
-                >
-                  {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  {deleteLoading ? "Deleting..." : "Delete Selected"}
-                </Button>
-              </div>
+    {/* Bulk Actions - Clean, professional, no stacking */}
+    {selectedBoards.length > 0 && (
+      <div className="border-t p-6 bg-gradient-to-r from-blue-50 to-indigo-50 backdrop-blur-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">{selectedBoards.length}</span>
             </div>
+            <p className="text-sm font-medium text-gray-700">
+              {selectedBoards.length} board{selectedBoards.length !== 1 ? 's' : ''} selected
+            </p>
           </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => handleToggleVisibility(true)}
+              disabled={deleteLoading || updateLoading}
+              className="gap-2 rounded-lg border-green-200 bg-white hover:bg-green-50 hover:border-green-300 transition-all px-6"
+            >
+              {updateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+              Make Public
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleToggleVisibility(false)}
+              disabled={deleteLoading || updateLoading}
+              className="gap-2 rounded-lg border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all px-6"
+            >
+              {updateLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+              Make Private
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteSelected}
+              disabled={deleteLoading || updateLoading}
+              className="gap-2 rounded-lg bg-red-600 hover:bg-red-700 transition-all shadow-sm px-6"
+            >
+              {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Delete Selected
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
   )
 }
 
@@ -264,28 +264,27 @@ function BoardManagementCard({
 }) {
   return (
     <div 
-      className={`group relative border-2 rounded-xl p-4 cursor-pointer transition-all duration-300 w-full backdrop-blur-sm ${
+      className={`group relative border-2 rounded-xl p-6 cursor-pointer transition-all duration-300 w-full backdrop-blur-sm ${
         isSelected 
           ? "border-blue-500 bg-blue-50/80 shadow-lg shadow-blue-100 scale-[1.02]" 
           : "border-gray-200/80 bg-white/70 hover:border-gray-300 hover:shadow-lg hover:scale-[1.01]"
       }`}
       onClick={onSelect}
     >
-      {/* Selection Glow Effect */}
       {isSelected && (
         <div className="absolute inset-0 rounded-xl bg-blue-500/5 border-2 border-blue-500/20" />
       )}
       
-      <div className="flex items-start gap-3 w-full relative">
+      <div className="flex items-start gap-4 w-full relative">
         <Checkbox
           checked={isSelected}
           onCheckedChange={onSelect}
           className="mt-1 flex-shrink-0 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
         />
-        <div className="flex-1 min-w-0 space-y-3 w-full">
-          {/* Header with title and visibility badge */}
-          <div className="flex items-start justify-between w-full gap-2">
-            <h3 className="font-semibold text-gray-900 truncate flex-1 text-lg leading-tight group-hover:text-gray-700 transition-colors">
+        <div className="flex-1 min-w-0 space-y-4 w-full">
+          {/* Header with proper width handling */}
+          <div className="flex items-start justify-between w-full gap-4">
+            <h3 className="font-semibold text-gray-900 text-lg leading-tight group-hover:text-gray-700 transition-colors break-words pr-2">
               {board.title}
             </h3>
             <Badge 
@@ -310,31 +309,30 @@ function BoardManagementCard({
             </Badge>
           </div>
           
-          {/* Category with icon */}
+          {/* Category */}
           {board.category && (
             <div className="flex items-center gap-2">
               <Folder className="w-4 h-4 text-gray-400" />
-              <p className="text-sm text-gray-600 truncate">
+              <p className="text-sm text-gray-600">
                 {board.category}
               </p>
             </div>
           )}
           
-          {/* Date and additional info */}
-          <div className="flex items-center gap-4 text-xs text-gray-500 pt-2 border-t border-gray-100">
-            <div className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
+          {/* Metadata */}
+          <div className="flex items-center gap-6 text-sm text-gray-500 pt-3 border-t border-gray-100">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
               <span>Created {new Date(board.created_at).toLocaleDateString()}</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Eye className="w-3 h-3" />
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4" />
               <span>{board.is_public ? "Visible to all" : "Only you"}</span>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Hover effect overlay */}
       <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
     </div>
   )
