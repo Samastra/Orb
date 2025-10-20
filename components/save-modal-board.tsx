@@ -3,20 +3,40 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { SignIn, SignUp } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { saveAnonymousBoard } from "@/lib/actions/board-actions";
+import { saveBoardElements } from "@/lib/actions/board-elements-actions"; // ADD THIS
 
+// IN components/save-modal-board.tsx - UPDATE THE INTERFACE
+// IN components/save-modal-board.tsx - UPDATE THE INTERFACE
 interface SaveBoardModalProps {
   isOpen: boolean;
   onClose: () => void;
   tempBoardId: string;
+  boardElements?: {
+    reactShapes: any[];
+    konvaShapes: any[];
+    stageFrames: any[];
+    images: any[];
+    connections: any[];
+    stageState?: { // MAKE THIS OPTIONAL with ?
+      scale: number;
+      position: { x: number; y: number };
+    };
+  };
 }
 
-export default function SaveBoardModal({ isOpen, onClose, tempBoardId }: SaveBoardModalProps) {
+export default function SaveBoardModal({ 
+  isOpen, 
+  onClose, 
+  tempBoardId,
+  boardElements // ADD THIS PROP
+}: SaveBoardModalProps) {
   const { isSignedIn, user } = useUser();
   const { openSignIn, openSignUp } = useClerk();
   const [isSignUp, setIsSignUp] = useState(false);
-
+  const [isSaving, setIsSaving] = useState(false); // ADD LOADING STATE
 
   console.log("🔍 Modal received tempBoardId:", tempBoardId);
+
   // Handle save after user authenticates
   useEffect(() => {
     if (isSignedIn && user && isOpen) {
@@ -24,16 +44,43 @@ export default function SaveBoardModal({ isOpen, onClose, tempBoardId }: SaveBoa
     }
   }, [isSignedIn, user, isOpen]);
 
-  const handleSaveAfterAuth = async () => {
+  // IN components/save-modal-board.tsx - UPDATE handleSaveAfterAuth
+// IN components/save-modal-board.tsx - UPDATE handleSaveAfterAuth
+// IN components/save-modal-board.tsx - UPDATE handleSaveAfterAuth
+const handleSaveAfterAuth = async () => {
   if (!user) return;
   
+  setIsSaving(true);
   try {
+    // 1. Save board metadata
     await saveAnonymousBoard(tempBoardId, user.id);
+    
+    // 2. Save board elements if they exist
+    if (boardElements) {
+      // Provide default stage state if missing
+      const stageState = boardElements.stageState || { scale: 1, position: { x: 0, y: 0 } };
+      
+      await saveBoardElements(
+        tempBoardId, 
+        {
+          reactShapes: boardElements.reactShapes,
+          konvaShapes: boardElements.konvaShapes,
+          stageFrames: boardElements.stageFrames,
+          images: boardElements.images,
+          connections: boardElements.connections
+        },
+        stageState, // USE THE STAGE STATE (WITH FALLBACK)
+        user.id
+      );
+    }
+    
     onClose();
     alert("Board saved successfully!");
   } catch (error: any) {
     console.error("Failed to save board:", error);
     alert(`Failed to save board: ${error.message || 'Unknown error'}`);
+  } finally {
+    setIsSaving(false);
   }
 };
 
@@ -75,9 +122,10 @@ export default function SaveBoardModal({ isOpen, onClose, tempBoardId }: SaveBoa
             <p>Ready to save your board?</p>
             <button 
               onClick={handleSaveAfterAuth}
-              className="bg-blue-500 text-white px-4 py-2 rounded mt-4"
+              disabled={isSaving}
+              className="bg-blue-500 text-white px-4 py-2 rounded mt-4 disabled:opacity-50"
             >
-              Save Board
+              {isSaving ? "Saving..." : "Save Board"}
             </button>
           </div>
         )}

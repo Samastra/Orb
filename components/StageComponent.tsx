@@ -26,7 +26,7 @@ interface StageComponentProps {
   shapes: KonvaShape[];
   stageFrames: KonvaShape[]; 
   images: ImageShape[];
-  connections: Connection[]; // NEW: Add connections prop
+  connections: Connection[];
   selectedNodeId: string | null;
   stageInstance: Konva.Stage | null;
   width?: number;
@@ -42,7 +42,9 @@ interface StageComponentProps {
   setReactShapes: React.Dispatch<React.SetStateAction<ReactShape[]>>;
   setShapes: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
   setImages: React.Dispatch<React.SetStateAction<ImageShape[]>>;
-  setConnections: React.Dispatch<React.SetStateAction<Connection[]>>; // NEW: Add setConnections
+  setConnections: React.Dispatch<React.SetStateAction<Connection[]>>;
+  // ADD THIS LINE:
+  setStageFrames: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
   updateShape: (id: string, attrs: Partial<KonvaShape>) => void;
   setStageInstance: (stage: Konva.Stage | null) => void;
 }
@@ -184,7 +186,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   shapes,
   stageFrames,
   images,
-  connections, // NEW: Destructure connections
+  connections,
   selectedNodeId,
   stageInstance,
   width,
@@ -200,7 +202,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setReactShapes,
   setShapes,
   setImages,
-  setConnections, // NEW: Destructure setConnections
+  setConnections,
+  // ADD THIS LINE:
+  setStageFrames,
   updateShape,
   setStageInstance,
 }) => {
@@ -314,26 +318,31 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
   };
 
- const handleShapeDragEnd = (item: CombinedShape, e: any) => {
+const handleShapeDragEnd = (item: CombinedShape, e: any) => {
   try {
     // Only handle drag for shapes that have x,y coordinates (not connections)
     if (item.__kind === 'connection') {
       return; // Connections are not draggable themselves
     }
-    
+
     const nx = e.target.x();
     const ny = e.target.y();
-    
+
     if (item.__kind === 'konva') {
       updateShape(item.id, { x: nx, y: ny });
     } else if (item.__kind === 'react') {
-      setReactShapes(prev => prev.map(s => 
+      setReactShapes(prev => prev.map(s =>
         s.id === item.id ? { ...s, x: nx, y: ny } : s
       ));
     } else if (item.__kind === 'image') {
       // Handle image drag
-      setImages(prev => prev.map(img => 
+      setImages(prev => prev.map(img =>
         img.id === item.id ? { ...img, x: nx, y: ny } : img
+      ));
+    } else if (item.__kind === 'stage') {
+      // FIXED: Add proper TypeScript types
+      setStageFrames((prev: KonvaShape[]) => prev.map((f: KonvaShape) =>
+        f.id === item.id ? { ...f, x: nx, y: ny } : f
       ));
     }
   } catch (error) {

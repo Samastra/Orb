@@ -469,33 +469,51 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
     }
   }, [stageInstance, scale, position, activeTool, addKonvaShape, setSelectedNodeId]);
 
-  const addStageFrame = useCallback((width: number, height: number, addAction: (action: Action) => void) => {
-    const shapeId = `stage-${Date.now()}`;
-    
-    const stageFrame: KonvaShape = {
-      id: shapeId,
-      type: 'stage',
-      x: 50,
-      y: 50,
-      width: width,
-      height: height,
-      fill: "#ffffff",
-      stroke: "#cccccc",
-      strokeWidth: 2,
-      draggable: true,
+const addStageFrame = useCallback((width: number, height: number, addAction: (action: Action) => void, centerPosition?: { x: number; y: number }) => {
+  const shapeId = `stage-${Date.now()}`;
+  
+  // Use provided center or calculate based on stage
+  let x = 50;
+  let y = 50;
+  
+  if (centerPosition) {
+    // Center the stage frame at the provided position
+    x = centerPosition.x - width / 2;
+    y = centerPosition.y - height / 2;
+  } else if (stageInstance) {
+    // Calculate center of visible area
+    const safePosition = position ?? { x: 0, y: 0 };
+    const center = {
+      x: (stageInstance.width() / 2 / scale) - safePosition.x / scale,
+      y: (stageInstance.height() / 2 / scale) - safePosition.y / scale,
     };
-    
-    console.log('➕ Adding Stage Frame:', stageFrame);
-    setStageFrames(prev => [...prev, stageFrame]);
-    
-    // ADD ACTION RECORDING
-    addAction({
-      type: "add-stage-frame",
-      data: stageFrame
-    });
-    
-    return shapeId;
-  }, []);
+    x = center.x - width / 2;
+    y = center.y - height / 2;
+  }
+  
+  const stageFrame: KonvaShape = {
+    id: shapeId,
+    type: 'stage',
+    x: x,  // ← DYNAMIC POSITION
+    y: y,  // ← DYNAMIC POSITION
+    width: width,
+    height: height,
+    fill: "#ffffff",
+    stroke: "#cccccc",
+    strokeWidth: 2,
+    draggable: true,
+  };
+  
+  console.log('➕ Adding Stage Frame at position:', { x, y }, stageFrame);
+  setStageFrames(prev => [...prev, stageFrame]);
+  
+  addAction({
+    type: "add-stage-frame",
+    data: stageFrame
+  });
+  
+  return shapeId;
+}, [stageInstance, scale, position]);
 
   const updateShape = useCallback(
     (id: string, attrs: Partial<any>) => {

@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
+import { useAutoSave } from '@/hooks/useAutoSave';
 import { useParams } from "next/navigation";
 import { Tool, ReactShape } from "@/types/board-types";
 import { defaultStageDimensions } from "@/constants/tool-constants";
@@ -24,7 +25,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { fetchBoard } from "@/lib/actions/board-actions";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { cn } from "@/lib/utils";
-
+import { loadBoardElements } from "@/lib/actions/board-elements-actions";
 // Fix text rendering
 if (typeof window !== 'undefined') {
   (Konva as any)._fixTextRendering = true;
@@ -44,6 +45,8 @@ const useDebounce = (callback: Function, delay: number) => {
     }, delay);
   }, [callback, delay]);
 };
+
+
 
 const BoardPage = () => {
   const params = useParams();
@@ -66,7 +69,7 @@ const BoardPage = () => {
   // State management
   const boardState = useBoardState();
   
-
+    
 
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
@@ -135,6 +138,33 @@ const BoardPage = () => {
     undoRedoAddAction
   );
 
+  
+    // / INSIDE YOUR BoardPage COMPONENT, ADD:
+      const { user } = useUser();
+      const { triggerSave } = useAutoSave(currentBoardId, isTemporaryBoard, user?.id);
+
+      // ADD AUTO-SAVE EFFECT
+      useEffect(() => {
+        if (currentBoardId && !isTemporaryBoard && user) {
+          triggerSave({
+            reactShapes,
+            konvaShapes,
+            stageFrames,
+            images,
+            connections
+          });
+        }
+      }, [
+        reactShapes, 
+        konvaShapes, 
+        stageFrames, 
+        images, 
+        connections, 
+        currentBoardId, 
+        isTemporaryBoard, 
+        user, 
+        triggerSave
+      ]);
   // ADD ZOOM FUNCTIONS THAT ACTUALLY WORK
   const handleZoomIn = useCallback(() => {
     const stage = stageRef.current;
@@ -198,46 +228,75 @@ const BoardPage = () => {
   }, 50);
 
   // Handler for StageComponent - UPDATED WITH CONNECTION SUPPORT
-  const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<any>) => {
-    if (!id) return;
-    
-    const isReactShape = reactShapes.some((s) => s.id === id);
-    const isKonvaShape = konvaShapes.some((s) => s.id === id);
-    const isConnection = connections.some((c) => c.id === id);
-    
-    if (isReactShape) {
-      setReactShapes(prev => 
-        prev.map(shape => 
-          shape.id === id ? { ...shape, ...attrs } : shape
-        )
-      );
-    } else if (isKonvaShape) {
-      debouncedUpdateShape(id, attrs);
-    } else if (isConnection) {
-      updateConnection(id, attrs);
-    }
-  }, [debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection]);
+// UPDATE handleStageShapeUpdate to trigger auto-save
+const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<any>) => {
+  if (!id) return;
+  
+  const isReactShape = reactShapes.some((s) => s.id === id);
+  const isKonvaShape = konvaShapes.some((s) => s.id === id);
+  const isConnection = connections.some((c) => c.id === id);
+  
+  if (isReactShape) {
+    setReactShapes(prev => 
+      prev.map(shape => 
+        shape.id === id ? { ...shape, ...attrs } : shape
+      )
+    );
+  } else if (isKonvaShape) {
+    debouncedUpdateShape(id, attrs);
+  } else if (isConnection) {
+    updateConnection(id, attrs);
+  }
+  
+  // TRIGGER AUTO-SAVE AFTER SHAPE UPDATE
+  if (currentBoardId && !isTemporaryBoard && user) {
+    triggerSave({
+      reactShapes: isReactShape ? 
+        reactShapes.map(s => s.id === id ? { ...s, ...attrs } : s) : reactShapes,
+      konvaShapes: isKonvaShape ? 
+        konvaShapes.map(s => s.id === id ? { ...s, ...attrs } : s) : konvaShapes,
+      stageFrames,
+      images,
+      connections: isConnection ? 
+        connections.map(c => c.id === id ? { ...c, ...attrs } : c) : connections
+    });
+  }
+}, [debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, currentBoardId, isTemporaryBoard, user, triggerSave]);
 
-  // Handler for FormattingToolbar - UPDATED WITH CONNECTION SUPPORT
-  const handleFormattingToolbarUpdate = useCallback((updates: Record<string, any>) => {
-    if (!selectedNodeId) return;
-    
-    const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-    const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
-    const isConnection = connections.some((c) => c.id === selectedNodeId);
-    
-    if (isReactShape) {
-      setReactShapes(prev => 
-        prev.map(shape => 
-          shape.id === selectedNodeId ? { ...shape, ...updates } : shape
-        )
-      );
-    } else if (isKonvaShape) {
-      debouncedUpdateShape(selectedNodeId, updates);
-    } else if (isConnection) {
-      updateConnection(selectedNodeId, updates);
-    }
-  }, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection]);
+// UPDATE handleFormattingToolbarUpdate to trigger auto-save
+const handleFormattingToolbarUpdate = useCallback((updates: Record<string, any>) => {
+  if (!selectedNodeId) return;
+  
+  const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
+  const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
+  const isConnection = connections.some((c) => c.id === selectedNodeId);
+  
+  if (isReactShape) {
+    setReactShapes(prev => 
+      prev.map(shape => 
+        shape.id === selectedNodeId ? { ...shape, ...updates } : shape
+      )
+    );
+  } else if (isKonvaShape) {
+    debouncedUpdateShape(selectedNodeId, updates);
+  } else if (isConnection) {
+    updateConnection(selectedNodeId, updates);
+  }
+  
+  // TRIGGER AUTO-SAVE AFTER TOOLBAR UPDATE
+  if (currentBoardId && !isTemporaryBoard && user) {
+    triggerSave({
+      reactShapes: isReactShape ? 
+        reactShapes.map(s => s.id === selectedNodeId ? { ...s, ...updates } : s) : reactShapes,
+      konvaShapes: isKonvaShape ? 
+        konvaShapes.map(s => s.id === selectedNodeId ? { ...s, ...updates } : s) : konvaShapes,
+      stageFrames,
+      images,
+      connections: isConnection ? 
+        connections.map(c => c.id === selectedNodeId ? { ...c, ...updates } : c) : connections
+    });
+  }
+}, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, currentBoardId, isTemporaryBoard, user, triggerSave]);
 
   // Memoize selected shape - UPDATED WITH CONNECTIONS
   const selectedShape = useMemo(() => {
@@ -271,19 +330,7 @@ const BoardPage = () => {
     addShape(type, undoRedoAddAction);
   }, [stageRef, scale, position, addShape, undoRedoAddAction]);
 
-  // Stage dimensions
-  const handleApplyStage = useCallback(() => {
-    console.log('🎯 Creating stage frame:', tempDimensions);
-    
-    if (tempDimensions.width > 0 && tempDimensions.height > 0) {
-      const stageFrameId = addStageFrame(tempDimensions.width, tempDimensions.height, undoRedoAddAction);
-      console.log('✅ Stage frame created:', stageFrameId);
-      
-      setTempDimensions(defaultStageDimensions);
-    } else {
-      console.log('❌ Invalid stage dimensions');
-    }
-  }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction]);
+ 
 
   const handleImageUpload = useCallback(async (file: File) => {
     try {
@@ -394,6 +441,7 @@ const BoardPage = () => {
       };
     }, [scale, position, stageRef]);
 
+      
 
       const handleAddImageFromRecommendations = useCallback((imageUrl: string, altText: string) => {
       const viewportCenter = calculateViewportCenter();
@@ -401,6 +449,28 @@ const BoardPage = () => {
       
       addImage(imageUrl, undoRedoAddAction, viewportCenter);
     }, [calculateViewportCenter, addImage, undoRedoAddAction]);
+
+     // Stage dimensions
+      const handleApplyStage = useCallback(() => {
+        console.log('🎯 Creating stage frame:', tempDimensions);
+        
+        if (tempDimensions.width > 0 && tempDimensions.height > 0) {
+          // Calculate viewport center for stage frame placement
+          const viewportCenter = calculateViewportCenter();
+          
+          const stageFrameId = addStageFrame(
+            tempDimensions.width, 
+            tempDimensions.height, 
+            undoRedoAddAction,
+            viewportCenter // PASS THE CENTER POSITION
+          );
+          console.log('✅ Stage frame created:', stageFrameId);
+          
+          setTempDimensions(defaultStageDimensions);
+        } else {
+          console.log('❌ Invalid stage dimensions');
+        }
+      }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction, calculateViewportCenter]);
 
   // FIX 3: Keyboard shortcuts integration with proper handlers
   const keyboardShortcuts = useKeyboardShortcuts({
@@ -441,6 +511,36 @@ const BoardPage = () => {
     };
   }, []);
 
+  useEffect(() => {
+  const loadSavedElements = async () => {
+    if (currentBoardId && !isTemporaryBoard) {
+      try {
+        console.log("📥 Loading saved board elements...");
+        const elements = await loadBoardElements(currentBoardId);
+        
+        // Set all the loaded elements to state
+        setReactShapes(elements.reactShapes);
+        setKonvaShapes(elements.konvaShapes);
+        setStageFrames(elements.stageFrames);
+        setImages(elements.images);
+        setConnections(elements.connections);
+        
+        console.log("✅ Board elements loaded:", {
+          reactShapes: elements.reactShapes.length,
+          konvaShapes: elements.konvaShapes.length,
+          stageFrames: elements.stageFrames.length,
+          images: elements.images.length,
+          connections: elements.connections.length
+        });
+      } catch (error) {
+        console.error("❌ Error loading board elements:", error);
+      }
+    }
+  };
+  
+  loadSavedElements();
+}, [currentBoardId, isTemporaryBoard]);
+
   return (
     <>
       {/* Premium Gradient Background */}
@@ -455,7 +555,15 @@ const BoardPage = () => {
             setShowSaveModal={setShowSaveModal}
             handleCloseWithoutSave={handleCloseWithoutSave}
             onAddImageFromRecommendations={handleAddImageFromRecommendations}
-            onPlayVideo={openVideo} // ← ADD THIS - use the openVideo function from useVideoPlayer
+            onPlayVideo={openVideo}
+            // ADD THIS TO PASS ALL ELEMENTS
+            boardElements={{
+              reactShapes,
+              konvaShapes,
+              stageFrames,
+              images,
+              connections
+            }}
           />
         <Toolbar
           activeTool={activeTool}
@@ -552,6 +660,7 @@ const BoardPage = () => {
           connections={connections}
           selectedNodeId={selectedNodeId}
           stageInstance={stageInstance}
+          setStageFrames={setStageFrames}
           handleWheel={toolHandlers.handleWheel}
           handleMouseDown={toolHandlers.handleMouseDown}
           handleMouseUp={toolHandlers.handleMouseUp}

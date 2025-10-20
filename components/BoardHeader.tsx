@@ -25,8 +25,17 @@ interface BoardHeaderProps {
   setShowSaveModal: (show: boolean) => void;
   handleCloseWithoutSave: () => void;
   onAddImageFromRecommendations?: (imageUrl: string, altText: string) => void;
-  onPlayVideo?: (videoId: string, title: string) => void; // ← ADD THIS
+  onPlayVideo?: (videoId: string, title: string) => void;
+  // ADD THIS PROP
+  boardElements?: {
+    reactShapes: any[];
+    konvaShapes: any[];
+    stageFrames: any[];
+    images: any[];
+    connections: any[];
+  };
 }
+
 
 
 const BoardHeader: React.FC<BoardHeaderProps> = ({
@@ -38,6 +47,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   handleCloseWithoutSave,
   onAddImageFromRecommendations,
   onPlayVideo, 
+  boardElements
 }) => {
   const { user } = useUser();
 
@@ -158,10 +168,11 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
       </section>
 
       {/* Save Board Modal - UNCHANGED */}
-      <SaveBoardModal 
+     <SaveBoardModal 
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         tempBoardId={currentBoardId}
+        boardElements={boardElements} // PASS THE ELEMENTS HERE
       />
     </>
   );

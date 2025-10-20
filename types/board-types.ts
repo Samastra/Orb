@@ -1,7 +1,8 @@
 import Konva from "konva";
 import { KonvaShape } from '@/hooks/useShapes';
 import { Connection } from '@/hooks/useBoardState'; // ADD THIS IMPORT
-
+// IN types/board-types.ts - ADD THIS EXPORT
+export type { Connection } from '@/hooks/useBoardState';
 // ---------- Action Types ----------
 export type Action =
   | { type: "add"; node: Konva.Shape | Konva.Group }
