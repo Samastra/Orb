@@ -117,26 +117,28 @@ const BoardPage = () => {
   );
 
   // Tool functionality
-  const toolHandlers = useKonvaTools(
-    stageRef, 
-    activeTool, 
-    scale, 
-    position, 
-    drawingMode, 
-    lines, 
-    connectionStart, 
-    tempConnection, 
-    isConnecting, 
-    selectedNodeId, 
-    setActiveTool, 
-    setDrawingMode, 
-    setLines, 
-    setConnectionStart, 
-    setTempConnection, 
-    setIsConnecting, 
-    setSelectedNodeId, 
-    undoRedoAddAction
-  );
+const toolHandlers = useKonvaTools(
+  stageRef, 
+  activeTool, 
+  scale, 
+  position, 
+  drawingMode, 
+  lines, 
+  connectionStart, 
+  tempConnection, 
+  isConnecting, 
+  selectedNodeId, 
+  setActiveTool, 
+  setDrawingMode, 
+  setLines, 
+  setConnectionStart, 
+  setTempConnection, 
+  setIsConnecting, 
+  setSelectedNodeId, 
+  undoRedoAddAction,
+  setConnections, // 🆕 ADD THIS
+  updateConnection
+);
 
   
     // / INSIDE YOUR BoardPage COMPONENT, ADD:
@@ -195,6 +197,8 @@ const BoardPage = () => {
   }, [stageRef, boardState.setScale]);
 
   const debouncedUpdateShape = useDebounce((shapeId: string, updates: Partial<any>) => {
+    console.log('🔄 Debounced update for:', { shapeId, updates });
+    
     const isReactShape = reactShapes.some((s) => s.id === shapeId);
     const isKonvaShape = konvaShapes.some((s) => s.id === shapeId);
     const isConnection = connections.some((c) => c.id === shapeId);
@@ -214,6 +218,13 @@ const BoardPage = () => {
           node.setAttrs(updates);
           drawLayer.batchDraw();
           
+          // CRITICAL FIX: Update the konvaShapes state
+          setKonvaShapes(prev =>
+            prev.map(shape =>
+              shape.id === shapeId ? { ...shape, ...updates } : shape
+            )
+          );
+          
           undoRedoAddAction({
             type: "update",
             id: shapeId,
@@ -230,6 +241,8 @@ const BoardPage = () => {
   // Handler for StageComponent - UPDATED WITH CONNECTION SUPPORT
 // UPDATE handleStageShapeUpdate to trigger auto-save
 const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<any>) => {
+  console.log('🔄 Stage shape update triggered:', { id, attrs });
+  
   if (!id) return;
   
   const isReactShape = reactShapes.some((s) => s.id === id);
@@ -265,6 +278,8 @@ const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<any>) => 
 
 // UPDATE handleFormattingToolbarUpdate to trigger auto-save
 const handleFormattingToolbarUpdate = useCallback((updates: Record<string, any>) => {
+  console.log('🔄 Formatting toolbar update:', { selectedNodeId, updates });
+  
   if (!selectedNodeId) return;
   
   const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
@@ -524,13 +539,28 @@ const handleFormattingToolbarUpdate = useCallback((updates: Record<string, any>)
         setStageFrames(elements.stageFrames);
         setImages(elements.images);
         setConnections(elements.connections);
+        // Apply saved stage state if present
+        if (elements.stageState) {
+          const s = elements.stageState;
+          boardState.setScale(s.scale ?? 1);
+          boardState.setPosition(s.position ?? { x: 0, y: 0 });
+        }
         
         console.log("✅ Board elements loaded:", {
           reactShapes: elements.reactShapes.length,
           konvaShapes: elements.konvaShapes.length,
           stageFrames: elements.stageFrames.length,
           images: elements.images.length,
-          connections: elements.connections.length
+          connections: elements.connections.length,
+          konvaShapesDetails: elements.konvaShapes.map(s => ({
+            id: s.id,
+            type: s.type,
+            x: s.x,
+            y: s.y,
+            fill: s.fill,
+            width: s.width,
+            height: s.height
+          }))
         });
       } catch (error) {
         console.error("❌ Error loading board elements:", error);

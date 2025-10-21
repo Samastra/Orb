@@ -2,7 +2,7 @@
 import React, { useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Konva from "konva";
-import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, RegularPolygon, Image, Path } from "react-konva";
+import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, RegularPolygon, Image, Path, Group } from "react-konva";
 import GridLayer from "@/components/gridLayer";
 import EditableTextComponent from "@/components/editableTextCompoent";
 import { ReactShape, Tool, ImageShape } from "../types/board-types";
@@ -47,6 +47,8 @@ interface StageComponentProps {
   setStageFrames: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
   updateShape: (id: string, attrs: Partial<KonvaShape>) => void;
   setStageInstance: (stage: Konva.Stage | null) => void;
+  // NEW: Add updateConnection prop
+  updateConnection: (id: string, updates: Partial<Connection>) => void;
 }
 
 // Simple combined shape type - UPDATED TO INCLUDE CONNECTIONS
@@ -60,10 +62,12 @@ type CombinedShape =
 // Image Component - Using native Konva Image (NO react-konva-image)
 const ImageElement = React.forwardRef(({ 
   imageShape, 
-  onDragEnd 
+  onDragEnd,
+  onTransformEnd
 }: { 
   imageShape: ImageShape;
   onDragEnd: (e: any) => void;
+  onTransformEnd?: (e: any) => void;
 }, ref: any) => {
   const [image, setImage] = React.useState<HTMLImageElement | null>(null);
   const [imageDimensions, setImageDimensions] = React.useState<{width: number, height: number} | null>(null);
@@ -101,6 +105,7 @@ const ImageElement = React.forwardRef(({
         strokeWidth={1}
         draggable={imageShape.draggable}
         onDragEnd={onDragEnd}
+        onTransformEnd={onTransformEnd}
         name="selectable-shape"
       />
     );
@@ -117,6 +122,7 @@ const ImageElement = React.forwardRef(({
       rotation={imageShape.rotation}
       draggable={imageShape.draggable}
       onDragEnd={onDragEnd}
+      onTransformEnd={onTransformEnd}
       name="selectable-shape"
       // Add explicit ID for selection
       id={imageShape.id}
@@ -126,50 +132,158 @@ const ImageElement = React.forwardRef(({
 
 ImageElement.displayName = 'ImageElement';
 
-// NEW: Connection Component
+// NEW: Enhanced Connection Component with editable anchors
 const ConnectionElement = React.forwardRef(({ 
   connection, 
   onDragEnd,
-  onClick 
+  onClick,
+  updateConnection  // NEW: Prop to update state
 }: { 
   connection: Connection;
   onDragEnd: (e: any) => void;
   onClick: (e: any) => void;
+  updateConnection: (id: string, updates: Partial<Connection>) => void;
 }, ref: any) => {
-  const internalRef = React.useRef<Konva.Path>(null);
+  const groupRef = React.useRef<Konva.Group>(null);
+  const pathRef = React.useRef<Konva.Path>(null);
+  const startAnchorRef = React.useRef<Konva.Circle>(null);
+  const endAnchorRef = React.useRef<Konva.Circle>(null);
 
   // Combine internal ref with forwarded ref
-  React.useImperativeHandle(ref, () => internalRef.current);
+  React.useImperativeHandle(ref, () => pathRef.current);  // Use path as main ref for transformer/selection
 
-  // Build path data from connection points
-  const buildConnectionPath = (conn: Connection) => {
-    const from = conn.from;
-    const to = conn.to;
+  // Function to compute control points (same as in useKonvaTools)
+  const computeSmartControlPoints = (from: {x: number, y: number}, to: {x: number, y: number}) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
     
-    // Use stored control points or calculate straight line
-    if (conn.cp1x !== undefined && conn.cp1y !== undefined && 
-        conn.cp2x !== undefined && conn.cp2y !== undefined) {
-      return `M ${from.x} ${from.y} C ${conn.cp1x} ${conn.cp1y}, ${conn.cp2x} ${conn.cp2y}, ${to.x} ${to.y}`;
-    } else {
-      // Fallback to straight line
-      return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+    const shouldSnapStraight = Math.abs(dy) < 15;
+    
+    if (shouldSnapStraight) {
+      return {
+        cp1x: from.x,
+        cp1y: from.y,
+        cp2x: to.x, 
+        cp2y: to.y,
+        shouldSnapStraight: true
+      };
     }
+    
+    const midX = from.x + dx / 2;
+    return {
+      cp1x: midX,
+      cp1y: from.y,
+      cp2x: midX,
+      cp2y: to.y,
+      shouldSnapStraight: false
+    };
   };
 
+  // Function to build path data (same as in useKonvaTools)
+  const buildPathData = (from: {x: number, y: number}, to: {x: number, y: number}, cp1x: number, cp1y: number, cp2x: number, cp2y: number, snapStraight: boolean) => {
+    if (snapStraight) {
+      return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
+    }
+    return `M ${from.x} ${from.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${to.x} ${to.y}`;
+  };
+
+  // Update path and state on anchor drag
+  const updatePathFromAnchors = () => {
+    if (!startAnchorRef.current || !endAnchorRef.current || !pathRef.current) return;
+
+    const fx = startAnchorRef.current.x();
+    const fy = startAnchorRef.current.y();
+    const tx = endAnchorRef.current.x();
+    const ty = endAnchorRef.current.y();
+
+    const { cp1x, cp1y, cp2x, cp2y, shouldSnapStraight } = computeSmartControlPoints({x: fx, y: fy}, {x: tx, y: ty});
+    const d = buildPathData({x: fx, y: fy}, {x: tx, y: ty}, cp1x, cp1y, cp2x, cp2y, shouldSnapStraight);
+    pathRef.current.data(d);
+    pathRef.current.getLayer()?.batchDraw();
+
+    // Update connection state
+    updateConnection(connection.id, {
+      from: { ...connection.from, x: fx, y: fy },
+      to: { ...connection.to, x: tx, y: ty },
+      cp1x, cp1y, cp2x, cp2y
+    });
+  };
+
+  // Setup anchors and handlers on mount
+  React.useEffect(() => {
+    if (!groupRef.current || !pathRef.current || !startAnchorRef.current || !endAnchorRef.current) return;
+
+    // Attach drag handlers
+    startAnchorRef.current.on('dragmove', updatePathFromAnchors);
+    endAnchorRef.current.on('dragmove', updatePathFromAnchors);
+
+    // Cleanup on unmount
+    return () => {
+      startAnchorRef.current?.off('dragmove', updatePathFromAnchors);
+      endAnchorRef.current?.off('dragmove', updatePathFromAnchors);
+    };
+  }, []);
+
+  // Build initial path data
+  const pathData = buildPathData(
+    connection.from,
+    connection.to,
+    connection.cp1x,
+    connection.cp1y,
+    connection.cp2x,
+    connection.cp2y,
+    Math.abs(connection.to.y - connection.from.y) < 15  // Simple snap check
+  );
+
+  const anchorRadius = 6;
+
   return (
-    <Path
-      ref={internalRef}
-      data={buildConnectionPath(connection)}
-      stroke={connection.stroke || '#333'}
-      strokeWidth={connection.strokeWidth || 2}
-      lineCap="round"
-      lineJoin="round"
-      listening={true} // Allow clicking on the connection
-      onClick={onClick}
-      onTap={onClick}
-      name="selectable-shape connection-path"
+    <Group
+      ref={groupRef}
       id={connection.id}
-    />
+      name="selectable-shape connection-group"
+      draggable={connection.draggable}
+      onDragEnd={onDragEnd}
+      onDblClick={(e) => {
+        e.cancelBubble = true;
+        // Handle double-click delete if needed
+      }}
+    >
+      <Path
+        ref={pathRef}
+        data={pathData}
+        stroke={connection.stroke || '#333'}
+        strokeWidth={connection.strokeWidth || 2}
+        lineCap="round"
+        lineJoin="round"
+        listening={true}
+        onClick={onClick}
+        onTap={onClick}
+        name="connection-path"
+      />
+      <Circle
+        ref={startAnchorRef}
+        x={connection.from.x}
+        y={connection.from.y}
+        radius={anchorRadius}
+        fill="#007AFF"  // Blue for start
+        stroke="#ffffff"
+        strokeWidth={2}
+        draggable={true}
+        name="connection-anchor tail-anchor"
+      />
+      <Circle
+        ref={endAnchorRef}
+        x={connection.to.x}
+        y={connection.to.y}
+        radius={anchorRadius}
+        fill="#FF3B30"  // Red for end
+        stroke="#ffffff"
+        strokeWidth={2}
+        draggable={true}
+        name="connection-anchor head-anchor"
+      />
+    </Group>
   );
 });
 
@@ -207,8 +321,96 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setStageFrames,
   updateShape,
   setStageInstance,
+  // NEW: Add updateConnection
+  updateConnection,
 }) => {
   const shapeRefs = useRef<{ [key: string]: any }>({});
+
+  // Handle transform end to persist size/rotation/position changes
+  const handleShapeTransformEnd = (item: CombinedShape, e: any) => {
+    try {
+      const node = e.target;
+
+      if (item.__kind === 'connection') return; // no transform for connections
+
+      // Normalize scale: compute final size then reset scale to 1
+                if (item.__kind === 'image') {
+            const newWidth = Math.max(1, node.width() * node.scaleX());
+            const newHeight = Math.max(1, node.height() * node.scaleY());
+            node.scaleX(1);
+            node.scaleY(1);
+            // USE updateShape INSTEAD OF setImages:
+            updateShape(item.id, { x: node.x(), y: node.y(), width: newWidth, height: newHeight, rotation: node.rotation() });
+            return;
+          }
+
+          if (item.__kind === 'stage') {
+            const newWidth = Math.max(1, node.width() * node.scaleX());
+            const newHeight = Math.max(1, node.height() * node.scaleY());
+            node.scaleX(1);
+            node.scaleY(1);
+            // USE updateShape INSTEAD OF setStageFrames:
+            updateShape(item.id, { x: node.x(), y: node.y(), width: newWidth, height: newHeight, rotation: node.rotation() });
+            return;
+          }
+
+
+      if (item.__kind === 'konva') {
+        const k = item as any;
+        switch (k.type) {
+          case 'rect': {
+            const newW = Math.max(1, node.width() * node.scaleX());
+            const newH = Math.max(1, node.height() * node.scaleY());
+            node.scaleX(1);
+            node.scaleY(1);
+            updateShape(item.id, { x: node.x(), y: node.y(), width: newW, height: newH, rotation: node.rotation() });
+            break;
+          }
+          case 'circle': {
+            const newR = Math.max(1, node.radius() * node.scaleX());
+            node.scaleX(1);
+            node.scaleY(1);
+            updateShape(item.id, { x: node.x(), y: node.y(), radius: newR, rotation: node.rotation() });
+            break;
+          }
+          case 'ellipse': {
+            const newRx = Math.max(1, node.radiusX() * node.scaleX());
+            const newRy = Math.max(1, node.radiusY() * node.scaleY());
+            node.scaleX(1);
+            node.scaleY(1);
+            updateShape(item.id, { x: node.x(), y: node.y(), radiusX: newRx, radiusY: newRy, rotation: node.rotation() });
+            break;
+          }
+          case 'triangle':
+          case 'arrow':
+          default: {
+            // For shapes where width/height aren't primary, just persist position & rotation
+            const newAttrs: any = { x: node.x(), y: node.y(), rotation: node.rotation() };
+            // If the node has width/height, persist them too
+            if (typeof node.width === 'function') {
+              const newW = Math.max(1, node.width() * node.scaleX());
+              const newH = Math.max(1, node.height() * node.scaleY());
+              node.scaleX(1);
+              node.scaleY(1);
+              newAttrs.width = newW;
+              newAttrs.height = newH;
+            }
+            updateShape(item.id, newAttrs);
+            break;
+          }
+        }
+        return;
+      }
+
+      if (item.__kind === 'react') {
+        // React shapes are controlled via their own components, but persist basics
+        setReactShapes(prev => prev.map(s => s.id === item.id ? ({ ...s, x: node.x(), y: node.y() }) : s));
+        return;
+      }
+    } catch (error) {
+      console.error('Error in handleShapeTransformEnd:', error);
+    }
+  };
 
   // Sync shape refs while preserving existing refs to avoid remounts - UPDATED WITH CONNECTIONS
   useEffect(() => {
@@ -455,7 +657,8 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                   fill={stageItem.fill || "#ffffff"}
                   stroke={stageItem.stroke || "#cccccc"}
                   strokeWidth={stageItem.strokeWidth || 2}
-                  cornerRadius={0}
+                      cornerRadius={0}
+                      onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                   name="stage-frame"
                 />
               );
@@ -467,10 +670,11 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                     ref={shapeRefs.current[item.id]}
                     imageShape={imageItem}
                     onDragEnd={(e) => handleImageDragEnd(imageItem, e)}
+                    onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                   />
                 );
               } else if (item.__kind === 'connection') {
-              // NEW: Render connection
+              // NEW: Render connection with editable anchors
               const connectionItem = item as Connection;
               return (
                 <ConnectionElement
@@ -479,9 +683,10 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                   connection={connectionItem}
                   onDragEnd={(e) => handleShapeDragEnd(item, e)}
                   onClick={(e) => handleConnectionClick(connectionItem, e)}
+                  updateConnection={updateConnection}  // NEW: Pass updateConnection
                 />
               );
-            } else if (item.__kind === 'konva') {
+                } else if (item.__kind === 'konva') {
               // Use type assertions for Konva properties
               const konvaItem = item as any;
               
@@ -498,6 +703,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       cornerRadius={konvaItem.cornerRadius ?? 0}
                       stroke={konvaItem.stroke}
                       strokeWidth={konvaItem.strokeWidth ?? 0}
+                      onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 case 'circle':
@@ -510,6 +716,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       fill={konvaItem.fill}
                       stroke={konvaItem.stroke}
                       strokeWidth={konvaItem.strokeWidth ?? 0}
+                        onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 case 'ellipse':
@@ -523,6 +730,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       fill={konvaItem.fill}
                       stroke={konvaItem.stroke}
                       strokeWidth={konvaItem.strokeWidth ?? 0}
+                        onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 case 'triangle':
@@ -536,6 +744,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       fill={konvaItem.fill}
                       stroke={konvaItem.stroke}
                       strokeWidth={konvaItem.strokeWidth ?? 0}
+                        onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 case 'arrow':
@@ -550,6 +759,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       strokeWidth={konvaItem.strokeWidth ?? 2}
                       pointerLength={konvaItem.pointerLength ?? 10}
                       pointerWidth={konvaItem.pointerWidth ?? 10}
+                        onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 default:

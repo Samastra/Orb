@@ -172,13 +172,17 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
     const shapeId = `shape-${Date.now()}`;
 
     const baseShape = {
-      id: shapeId,
-      type,
-      x: center.x,
-      y: center.y,
-      fill: "#aae3ff",
-      draggable: draggable,
-    };
+        id: shapeId,
+        type,
+        x: center.x,
+        y: center.y,
+        fill: "#aae3ff",
+        stroke: "#000000",     // 🆕 ADD: Border color
+        strokeWidth: 0,        // 🆕 ADD: Border thickness  
+        draggable: draggable,
+        rotation: 0,           // 🆕 ADD: Rotation
+        cornerRadius: 0,       // 🆕 ADD: For rectangles
+      };
 
     let newShape: KonvaShape;
 
@@ -190,6 +194,7 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
           y: center.y - 50,
           width: 100,
           height: 100,
+          cornerRadius: 0, // 🆕 ADD THIS
         };
         break;
       case "triangle":
@@ -203,6 +208,8 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
         newShape = {
           ...baseShape,
           radius: 50,
+          stroke: "#000000", // 🆕 ENSURE stroke exists
+          strokeWidth: 0,    // 🆕 ENSURE strokeWidth exists
         };
         break;
       case "ellipse":
@@ -516,15 +523,18 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
 }, [stageInstance, scale, position]);
 
   const updateShape = useCallback(
-    (id: string, attrs: Partial<any>) => {
-      setReactShapes((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
-      setKonvaShapes((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
-      setImages((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
-      // Also update connections if needed
-      setConnections((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
-    },
-    []
-  );
+  (id: string, attrs: Partial<any>) => {
+    console.log('🔄 updateShape called:', { id, attrs });
+    
+    // Update ALL shape types
+    setReactShapes((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
+    setKonvaShapes((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
+    setImages((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
+    setConnections((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
+    setStageFrames((prev) => prev.map((s) => (s.id === id ? { ...s, ...attrs } : s)));
+  },
+  []
+);
 
   // In useBoardState.ts - replace deleteShape with this:
 const deleteShape = useCallback(

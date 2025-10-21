@@ -18,4 +18,5 @@ export interface KonvaShape {
   stroke?: string;
   strokeWidth?: number;
   cornerRadius?: number;
+  rotation?: number;
 }
