@@ -1,39 +1,70 @@
-import { useCallback, useRef } from 'react';
-import { saveBoardElements } from '@/lib/actions/board-elements-actions';
+"use client";
 
-export const useAutoSave = (boardId: string, isTemporaryBoard: boolean, userId?: string) => {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+import { useCallback } from "react";
+import { saveBoardElements } from "@/lib/actions/board-elements-actions";
+import { ReactShape, ImageShape } from "@/types/board-types";
+import { KonvaShape } from "@/hooks/useShapes";
+import { Connection } from "@/hooks/useBoardState";
 
-  const triggerSave = useCallback((elements: {
-    reactShapes: any[];
-    konvaShapes: any[];
-    stageFrames: any[];
-    images: any[];
-    connections: any[];
-  }) => {
-    if (!boardId || isTemporaryBoard || !userId) return;
+type Line = { tool: "brush" | "eraser"; points: number[] };
 
-    // Clear existing timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+export const useAutoSave = (boardId: string, isTemporary: boolean, userId?: string) => {
+  const triggerSave = useCallback(
+    async (data: {
+      reactShapes: ReactShape[];
+      konvaShapes: KonvaShape[];
+      stageFrames: KonvaShape[];
+      images: ImageShape[];
+      connections: Connection[];
+      lines: Line[];
+      scale?: number; // Add scale
+      position?: { x: number; y: number }; // Add position
+    }) => {
+      if (!boardId || isTemporary || !userId) {
+        console.log("🚫 Auto-save skipped: missing boardId, temporary board, or userId", {
+          boardId,
+          isTemporary,
+          userId,
+        });
+        return;
+      }
 
-    // Debounce save to avoid spamming
-    timeoutRef.current = setTimeout(async () => {
       try {
-        console.log('💾 Auto-saving board...');
+        console.log("💾 Triggering auto-save for board:", boardId, {
+          reactShapes: data.reactShapes.length,
+          konvaShapes: data.konvaShapes.length,
+          stageFrames: data.stageFrames.length,
+          images: data.images.length,
+          connections: data.connections.length,
+          lines: data.lines.length,
+          scale: data.scale,
+          position: data.position,
+        });
+
         await saveBoardElements(
           boardId,
-          elements,
-          undefined, // No stage state for auto-save
+          {
+            reactShapes: data.reactShapes,
+            konvaShapes: data.konvaShapes,
+            stageFrames: data.stageFrames,
+            images: data.images,
+            connections: data.connections,
+            lines: data.lines,
+          },
+          {
+            scale: data.scale || 1,
+            position: data.position || { x: 0, y: 0 },
+          },
           userId
         );
-        console.log('✅ Auto-save completed');
+
+        console.log("✅ Auto-save completed for board:", boardId);
       } catch (error) {
-        console.error('❌ Auto-save failed:', error);
+        console.error("❌ Error during auto-save:", error);
       }
-    }, 2000); // Save 2 seconds after last change
-  }, [boardId, isTemporaryBoard, userId]);
+    },
+    [boardId, isTemporary, userId]
+  );
 
   return { triggerSave };
 };

@@ -6,7 +6,8 @@ import { KonvaShape } from "@/hooks/useShapes";
 import { Connection } from "@/hooks/useBoardState";
 import { createUserIfNotExists } from "./user-actions";
 
-// Normalize KonvaShape to ensure all required properties are present
+type Line = { tool: "brush" | "eraser"; points: number[] };
+
 const normalizeKonvaShape = (shape: KonvaShape): KonvaShape => {
   const baseShape: KonvaShape = {
     id: shape.id,
@@ -62,6 +63,7 @@ export const saveBoardElements = async (
     stageFrames: KonvaShape[];
     images: ImageShape[];
     connections: Connection[];
+    lines?: Line[];
   },
   stageState?: {
     scale: number;
@@ -70,6 +72,7 @@ export const saveBoardElements = async (
   clerkUserId?: string
 ) => {
   const safeStageState = stageState || { scale: 1, position: { x: 0, y: 0 } };
+  const safeLines = elements.lines || [];
 
   console.log("💾 Saving board elements + stage state:", {
     scale: safeStageState.scale,
@@ -79,21 +82,7 @@ export const saveBoardElements = async (
     stageFrames: elements.stageFrames.length,
     images: elements.images.length,
     connections: elements.connections.length,
-    konvaShapesDetails: elements.konvaShapes.map(s => ({
-      id: s.id,
-      type: s.type,
-      x: s.x,
-      y: s.y,
-      fill: s.fill,
-      stroke: s.stroke,
-      strokeWidth: s.strokeWidth,
-      width: s.width,
-      height: s.height,
-      radius: s.radius,
-      radiusX: s.radiusX,
-      radiusY: s.radiusY,
-      points: s.points,
-    })),
+    lines: safeLines.length,
   });
 
   const supabase = createSupabaseClient();
@@ -168,6 +157,15 @@ export const saveBoardElements = async (
       });
     });
 
+    safeLines.forEach((line, index) => {
+      allElements.push({
+        board_id: boardId,
+        type: "line",
+        properties: { ...line, id: `line-${index}-${Date.now()}` },
+        created_by: supabaseUserId,
+      });
+    });
+
     console.log(`📦 Inserting ${allElements.length} elements`);
 
     const { data, error } = await supabase
@@ -206,6 +204,7 @@ export const loadBoardElements = async (boardId: string) => {
     const stageFrames: KonvaShape[] = [];
     const images: ImageShape[] = [];
     const connections: Connection[] = [];
+    const lines: Line[] = [];
     let stageState = { scale: 1, position: { x: 0, y: 0 } };
 
     data?.forEach(element => {
@@ -236,6 +235,12 @@ export const loadBoardElements = async (boardId: string) => {
           case "connection":
             connections.push(shapeData as Connection);
             break;
+          case "line":
+            lines.push({
+              tool: shapeData.tool,
+              points: shapeData.points,
+            } as Line);
+            break;
         }
       }
     });
@@ -246,21 +251,7 @@ export const loadBoardElements = async (boardId: string) => {
       stageFrames: stageFrames.length,
       images: images.length,
       connections: connections.length,
-      konvaShapesDetails: konvaShapes.map(s => ({
-        id: s.id,
-        type: s.type,
-        x: s.x,
-        y: s.y,
-        fill: s.fill,
-        stroke: s.stroke,
-        strokeWidth: s.strokeWidth,
-        width: s.width,
-        height: s.height,
-        radius: s.radius,
-        radiusX: s.radiusX,
-        radiusY: s.radiusY,
-        points: s.points,
-      })),
+      lines: lines.length,
     });
 
     return {
@@ -269,6 +260,7 @@ export const loadBoardElements = async (boardId: string) => {
       stageFrames,
       images,
       connections,
+      lines,
       stageState,
     };
   } catch (error) {
