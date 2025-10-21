@@ -43,23 +43,23 @@ interface StageComponentProps {
   setShapes: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
   setImages: React.Dispatch<React.SetStateAction<ImageShape[]>>;
   setConnections: React.Dispatch<React.SetStateAction<Connection[]>>;
-  // ADD THIS LINE:
   setStageFrames: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
   updateShape: (id: string, attrs: Partial<KonvaShape>) => void;
   setStageInstance: (stage: Konva.Stage | null) => void;
-  // NEW: Add updateConnection prop
   updateConnection: (id: string, updates: Partial<Connection>) => void;
+  // NEW: Add onDelete prop
+  onDelete: (id: string) => void;
 }
 
-// Simple combined shape type - UPDATED TO INCLUDE CONNECTIONS
+// Simple combined shape type
 type CombinedShape = 
   | (KonvaShape & { __kind: 'konva' })
   | (ReactShape & { __kind: 'react' })
   | (KonvaShape & { __kind: 'stage' })
   | (ImageShape & { __kind: 'image' })
-  | (Connection & { __kind: 'connection' }); // NEW: Connection type
+  | (Connection & { __kind: 'connection' });
 
-// Image Component - Using native Konva Image (NO react-konva-image)
+// Image Component
 const ImageElement = React.forwardRef(({ 
   imageShape, 
   onDragEnd,
@@ -73,10 +73,8 @@ const ImageElement = React.forwardRef(({
   const [imageDimensions, setImageDimensions] = React.useState<{width: number, height: number} | null>(null);
   const internalRef = React.useRef<Konva.Image>(null);
 
-  // Combine internal ref with forwarded ref
   React.useImperativeHandle(ref, () => internalRef.current);
 
-  // Load image using native JavaScript and get natural dimensions
   React.useEffect(() => {
     const img = new (window as any).Image();
     img.src = imageShape.src;
@@ -124,41 +122,37 @@ const ImageElement = React.forwardRef(({
       onDragEnd={onDragEnd}
       onTransformEnd={onTransformEnd}
       name="selectable-shape"
-      // Add explicit ID for selection
       id={imageShape.id}
     />
   );
 });
-
 ImageElement.displayName = 'ImageElement';
 
-// NEW: Enhanced Connection Component with editable anchors
+// Enhanced Connection Component with editable anchors
 const ConnectionElement = React.forwardRef(({ 
   connection, 
   onDragEnd,
   onClick,
-  updateConnection  // NEW: Prop to update state
+  updateConnection,
+  onDelete  // NEW: Add onDelete prop
 }: { 
   connection: Connection;
   onDragEnd: (e: any) => void;
   onClick: (e: any) => void;
   updateConnection: (id: string, updates: Partial<Connection>) => void;
+  onDelete: (id: string) => void;
 }, ref: any) => {
   const groupRef = React.useRef<Konva.Group>(null);
   const pathRef = React.useRef<Konva.Path>(null);
   const startAnchorRef = React.useRef<Konva.Circle>(null);
   const endAnchorRef = React.useRef<Konva.Circle>(null);
 
-  // Combine internal ref with forwarded ref
-  React.useImperativeHandle(ref, () => pathRef.current);  // Use path as main ref for transformer/selection
+  React.useImperativeHandle(ref, () => pathRef.current);
 
-  // Function to compute control points (same as in useKonvaTools)
   const computeSmartControlPoints = (from: {x: number, y: number}, to: {x: number, y: number}) => {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
-    
     const shouldSnapStraight = Math.abs(dy) < 15;
-    
     if (shouldSnapStraight) {
       return {
         cp1x: from.x,
@@ -168,7 +162,6 @@ const ConnectionElement = React.forwardRef(({
         shouldSnapStraight: true
       };
     }
-    
     const midX = from.x + dx / 2;
     return {
       cp1x: midX,
@@ -179,7 +172,6 @@ const ConnectionElement = React.forwardRef(({
     };
   };
 
-  // Function to build path data (same as in useKonvaTools)
   const buildPathData = (from: {x: number, y: number}, to: {x: number, y: number}, cp1x: number, cp1y: number, cp2x: number, cp2y: number, snapStraight: boolean) => {
     if (snapStraight) {
       return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
@@ -187,7 +179,6 @@ const ConnectionElement = React.forwardRef(({
     return `M ${from.x} ${from.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${to.x} ${to.y}`;
   };
 
-  // Update path and state on anchor drag
   const updatePathFromAnchors = () => {
     if (!startAnchorRef.current || !endAnchorRef.current || !pathRef.current) return;
 
@@ -201,7 +192,6 @@ const ConnectionElement = React.forwardRef(({
     pathRef.current.data(d);
     pathRef.current.getLayer()?.batchDraw();
 
-    // Update connection state
     updateConnection(connection.id, {
       from: { ...connection.from, x: fx, y: fy },
       to: { ...connection.to, x: tx, y: ty },
@@ -209,22 +199,18 @@ const ConnectionElement = React.forwardRef(({
     });
   };
 
-  // Setup anchors and handlers on mount
   React.useEffect(() => {
     if (!groupRef.current || !pathRef.current || !startAnchorRef.current || !endAnchorRef.current) return;
 
-    // Attach drag handlers
     startAnchorRef.current.on('dragmove', updatePathFromAnchors);
     endAnchorRef.current.on('dragmove', updatePathFromAnchors);
 
-    // Cleanup on unmount
     return () => {
       startAnchorRef.current?.off('dragmove', updatePathFromAnchors);
       endAnchorRef.current?.off('dragmove', updatePathFromAnchors);
     };
   }, []);
 
-  // Build initial path data
   const pathData = buildPathData(
     connection.from,
     connection.to,
@@ -232,7 +218,7 @@ const ConnectionElement = React.forwardRef(({
     connection.cp1y,
     connection.cp2x,
     connection.cp2y,
-    Math.abs(connection.to.y - connection.from.y) < 15  // Simple snap check
+    Math.abs(connection.to.y - connection.from.y) < 15
   );
 
   const anchorRadius = 6;
@@ -246,7 +232,13 @@ const ConnectionElement = React.forwardRef(({
       onDragEnd={onDragEnd}
       onDblClick={(e) => {
         e.cancelBubble = true;
-        // Handle double-click delete if needed
+        console.log('🗑️ Double-click on connection:', connection.id);
+        onDelete(connection.id); // Trigger deletion
+      }}
+      onDblTap={(e) => {
+        e.cancelBubble = true;
+        console.log('🗑️ Double-tap on connection:', connection.id);
+        onDelete(connection.id); // Trigger deletion
       }}
     >
       <Path
@@ -266,7 +258,7 @@ const ConnectionElement = React.forwardRef(({
         x={connection.from.x}
         y={connection.from.y}
         radius={anchorRadius}
-        fill="#007AFF"  // Blue for start
+        fill="#007AFF"
         stroke="#ffffff"
         strokeWidth={2}
         draggable={true}
@@ -277,7 +269,7 @@ const ConnectionElement = React.forwardRef(({
         x={connection.to.x}
         y={connection.to.y}
         radius={anchorRadius}
-        fill="#FF3B30"  // Red for end
+        fill="#FF3B30"
         stroke="#ffffff"
         strokeWidth={2}
         draggable={true}
@@ -286,7 +278,6 @@ const ConnectionElement = React.forwardRef(({
     </Group>
   );
 });
-
 ConnectionElement.displayName = 'ConnectionElement';
 
 const StageComponent: React.FC<StageComponentProps> = ({
@@ -317,43 +308,37 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setShapes,
   setImages,
   setConnections,
-  // ADD THIS LINE:
   setStageFrames,
   updateShape,
   setStageInstance,
-  // NEW: Add updateConnection
   updateConnection,
+  onDelete, // NEW: Add onDelete prop
 }) => {
   const shapeRefs = useRef<{ [key: string]: any }>({});
 
-  // Handle transform end to persist size/rotation/position changes
   const handleShapeTransformEnd = (item: CombinedShape, e: any) => {
     try {
       const node = e.target;
 
-      if (item.__kind === 'connection') return; // no transform for connections
+      if (item.__kind === 'connection') return;
 
-      // Normalize scale: compute final size then reset scale to 1
-                if (item.__kind === 'image') {
-            const newWidth = Math.max(1, node.width() * node.scaleX());
-            const newHeight = Math.max(1, node.height() * node.scaleY());
-            node.scaleX(1);
-            node.scaleY(1);
-            // USE updateShape INSTEAD OF setImages:
-            updateShape(item.id, { x: node.x(), y: node.y(), width: newWidth, height: newHeight, rotation: node.rotation() });
-            return;
-          }
+      if (item.__kind === 'image') {
+        const newWidth = Math.max(1, node.width() * node.scaleX());
+        const newHeight = Math.max(1, node.height() * node.scaleY());
+        node.scaleX(1);
+        node.scaleY(1);
+        updateShape(item.id, { x: node.x(), y: node.y(), width: newWidth, height: newHeight, rotation: node.rotation() });
+        return;
+      }
 
-          if (item.__kind === 'stage') {
-            const newWidth = Math.max(1, node.width() * node.scaleX());
-            const newHeight = Math.max(1, node.height() * node.scaleY());
-            node.scaleX(1);
-            node.scaleY(1);
-            // USE updateShape INSTEAD OF setStageFrames:
-            updateShape(item.id, { x: node.x(), y: node.y(), width: newWidth, height: newHeight, rotation: node.rotation() });
-            return;
-          }
-
+      if (item.__kind === 'stage') {
+        const newWidth = Math.max(1, node.width() * node.scaleX());
+        const newHeight = Math.max(1, node.height() * node.scaleY());
+        node.scaleX(1);
+        node.scaleY(1);
+        updateShape(item.id, { x: node.x(), y: node.y(), width: newWidth, height: newHeight, rotation: node.rotation() });
+        return;
+      }
 
       if (item.__kind === 'konva') {
         const k = item as any;
@@ -384,9 +369,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
           case 'triangle':
           case 'arrow':
           default: {
-            // For shapes where width/height aren't primary, just persist position & rotation
             const newAttrs: any = { x: node.x(), y: node.y(), rotation: node.rotation() };
-            // If the node has width/height, persist them too
             if (typeof node.width === 'function') {
               const newW = Math.max(1, node.width() * node.scaleX());
               const newH = Math.max(1, node.height() * node.scaleY());
@@ -403,7 +386,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
       }
 
       if (item.__kind === 'react') {
-        // React shapes are controlled via their own components, but persist basics
         setReactShapes(prev => prev.map(s => s.id === item.id ? ({ ...s, x: node.x(), y: node.y() }) : s));
         return;
       }
@@ -412,51 +394,45 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
   };
 
-  // Sync shape refs while preserving existing refs to avoid remounts - UPDATED WITH CONNECTIONS
   useEffect(() => {
     const allIds = [
       ...stageFrames.map(s => s.id),
       ...shapes.map(s => s.id),
       ...reactShapes.map(r => r.id),
       ...images.map(i => i.id),
-      ...connections.map(c => c.id) // NEW: Include connections
+      ...connections.map(c => c.id)
     ];
     const map: { [key: string]: any } = { ...shapeRefs.current };
     
-    // ensure refs exist for all current ids, preserve existing refs
     allIds.forEach(id => {
       if (!map[id]) map[id] = React.createRef();
     });
     
-    // remove refs that no longer exist to keep ref map tidy
     Object.keys(map).forEach(k => {
       if (!allIds.includes(k)) delete map[k];
     });
     shapeRefs.current = map;
-  }, [stageFrames, shapes, reactShapes, images, connections]); // NEW: Add connections dependency
+  }, [stageFrames, shapes, reactShapes, images, connections]);
 
-  // UPDATED: Combine shapes and render in array order - INCLUDES CONNECTIONS
   const allShapesToRender = React.useMemo(() => {
     console.log('🔄 StageComponent re-rendering with shapes:', {
       stageFrames: stageFrames.length,
       konvaShapes: shapes.length,
       reactShapes: reactShapes.length,
       images: images.length,
-      connections: connections.length, // NEW: Log connections
+      connections: connections.length,
       total: stageFrames.length + shapes.length + reactShapes.length + images.length + connections.length
     });
     
-    // Fixed rendering order: stageFrames → konvaShapes → images → connections → reactShapes
     return [
       ...stageFrames.map(s => ({ ...s, __kind: 'stage' as const })),
       ...shapes.map(s => ({ ...s, __kind: 'konva' as const })),
       ...images.map(s => ({ ...s, __kind: 'image' as const })),
-      ...connections.map(s => ({ ...s, __kind: 'connection' as const })), // NEW: Add connections
+      ...connections.map(s => ({ ...s, __kind: 'connection' as const })),
       ...reactShapes.map(s => ({ ...s, __kind: 'react' as const })),
     ];
-  }, [stageFrames, shapes, reactShapes, images, connections]); // NEW: Add connections dependency
+  }, [stageFrames, shapes, reactShapes, images, connections]);
 
-  // Transformer management - UPDATED FOR CONNECTIONS
   useEffect(() => {
     if (!trRef.current) {
       return;
@@ -471,10 +447,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const ref = shapeRefs.current[selectedNodeId];
     const selectedShape = allShapesToRender.find(item => item.id === selectedNodeId);
     
-    // FIXED: Only exclude sticky notes and connections from transformer
     if (selectedShape && (
       (selectedShape.__kind === 'react' && selectedShape.type === 'stickyNote') ||
-      selectedShape.__kind === 'connection' // Connections don't use transformer
+      selectedShape.__kind === 'connection'
     )) {
       trRef.current.nodes([]);
       trRef.current.getLayer()?.batchDraw();
@@ -486,7 +461,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
         trRef.current.nodes([ref.current]);
         trRef.current.getLayer()?.batchDraw();
       } catch (err) {
-        // defensive: if transformer can't attach because node not yet mounted, clear nodes
         trRef.current.nodes([]);
         trRef.current.getLayer()?.batchDraw();
       }
@@ -520,37 +494,34 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
   };
 
-const handleShapeDragEnd = (item: CombinedShape, e: any) => {
-  try {
-    // Only handle drag for shapes that have x,y coordinates (not connections)
-    if (item.__kind === 'connection') {
-      return; // Connections are not draggable themselves
-    }
+  const handleShapeDragEnd = (item: CombinedShape, e: any) => {
+    try {
+      if (item.__kind === 'connection') {
+        return;
+      }
 
-    const nx = e.target.x();
-    const ny = e.target.y();
+      const nx = e.target.x();
+      const ny = e.target.y();
 
-    if (item.__kind === 'konva') {
-      updateShape(item.id, { x: nx, y: ny });
-    } else if (item.__kind === 'react') {
-      setReactShapes(prev => prev.map(s =>
-        s.id === item.id ? { ...s, x: nx, y: ny } : s
-      ));
-    } else if (item.__kind === 'image') {
-      // Handle image drag
-      setImages(prev => prev.map(img =>
-        img.id === item.id ? { ...img, x: nx, y: ny } : img
-      ));
-    } else if (item.__kind === 'stage') {
-      // FIXED: Add proper TypeScript types
-      setStageFrames((prev: KonvaShape[]) => prev.map((f: KonvaShape) =>
-        f.id === item.id ? { ...f, x: nx, y: ny } : f
-      ));
+      if (item.__kind === 'konva') {
+        updateShape(item.id, { x: nx, y: ny });
+      } else if (item.__kind === 'react') {
+        setReactShapes(prev => prev.map(s =>
+          s.id === item.id ? { ...s, x: nx, y: ny } : s
+        ));
+      } else if (item.__kind === 'image') {
+        setImages(prev => prev.map(img =>
+          img.id === item.id ? { ...img, x: nx, y: ny } : img
+        ));
+      } else if (item.__kind === 'stage') {
+        setStageFrames(prev => prev.map(f =>
+          f.id === item.id ? { ...f, x: nx, y: ny } : f
+        ));
+      }
+    } catch (error) {
+      console.error('Error handling shape drag end:', error);
     }
-  } catch (error) {
-    console.error('Error handling shape drag end:', error);
-  }
-};
+  };
 
   const handleShapeClick = (item: CombinedShape, e: any) => {
     e.cancelBubble = true;
@@ -559,7 +530,6 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
     }
   };
 
-  // NEW: Handle connection click
   const handleConnectionClick = (connection: Connection, e: any) => {
     e.cancelBubble = true;
     if (activeTool === "select") {
@@ -568,15 +538,11 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
     }
   };
 
-  // Handle image drag end
   const handleImageDragEnd = (imageShape: ImageShape, e: any) => {
     const node = e.target;
-    
-    // Check if this was a resize (transform) or just a move
     const wasResized = node.width() !== imageShape.width || node.height() !== imageShape.height;
     
     if (wasResized) {
-      // Image was resized - update both position and size
       setImages(prev => prev.map(img => 
         img.id === imageShape.id 
           ? { 
@@ -589,7 +555,6 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
           : img
       ));
     } else {
-      // Image was just moved - update position only
       setImages(prev => prev.map(img => 
         img.id === imageShape.id 
           ? { ...img, x: node.x(), y: node.y() }
@@ -627,23 +592,21 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
       >
         <GridLayer stage={stageInstance} baseSize={30} color="#d6d4d4ff" />
         <Layer name="draw-layer">
-          {/* SIMPLE RENDERING: Render all shapes in array order */}
           {allShapesToRender.map((item) => {
             console.log(`🎯 Rendering shape: ${item.id} (${item.__kind}:${item.type})`);
 
             const commonProps = {
-                  id: item.id,
-                  // Only add x and y for shapes that have them (not connections)
-                  ...(item.__kind !== 'connection' && {
-                    x: item.x,
-                    y: item.y,
-                  }),
-                  draggable: (item.draggable ?? true) && activeTool === "select",
-                  name: 'selectable-shape',
-                  onDragEnd: (e: any) => handleShapeDragEnd(item, e),
-                  onClick: (e: any) => handleShapeClick(item, e),
-                  onTap: (e: any) => handleShapeClick(item, e),
-                };
+              id: item.id,
+              ...(item.__kind !== 'connection' && {
+                x: item.x,
+                y: item.y,
+              }),
+              draggable: (item.draggable ?? true) && activeTool === "select",
+              name: 'selectable-shape',
+              onDragEnd: (e: any) => handleShapeDragEnd(item, e),
+              onClick: (e: any) => handleShapeClick(item, e),
+              onTap: (e: any) => handleShapeClick(item, e),
+            };
 
             if (item.__kind === 'stage') {
               const stageItem = item as KonvaShape;
@@ -657,24 +620,23 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                   fill={stageItem.fill || "#ffffff"}
                   stroke={stageItem.stroke || "#cccccc"}
                   strokeWidth={stageItem.strokeWidth || 2}
-                      cornerRadius={0}
-                      onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
+                  cornerRadius={0}
+                  onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                   name="stage-frame"
                 />
               );
             } else if (item.__kind === 'image') {
-                const imageItem = item as ImageShape;
-                return (
-                  <ImageElement
-                    key={item.id}
-                    ref={shapeRefs.current[item.id]}
-                    imageShape={imageItem}
-                    onDragEnd={(e) => handleImageDragEnd(imageItem, e)}
-                    onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
-                  />
-                );
-              } else if (item.__kind === 'connection') {
-              // NEW: Render connection with editable anchors
+              const imageItem = item as ImageShape;
+              return (
+                <ImageElement
+                  key={item.id}
+                  ref={shapeRefs.current[item.id]}
+                  imageShape={imageItem}
+                  onDragEnd={(e) => handleImageDragEnd(imageItem, e)}
+                  onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
+                />
+              );
+            } else if (item.__kind === 'connection') {
               const connectionItem = item as Connection;
               return (
                 <ConnectionElement
@@ -683,13 +645,12 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                   connection={connectionItem}
                   onDragEnd={(e) => handleShapeDragEnd(item, e)}
                   onClick={(e) => handleConnectionClick(connectionItem, e)}
-                  updateConnection={updateConnection}  // NEW: Pass updateConnection
+                  updateConnection={updateConnection}
+                  onDelete={onDelete} // NEW: Pass onDelete
                 />
               );
-                } else if (item.__kind === 'konva') {
-              // Use type assertions for Konva properties
+            } else if (item.__kind === 'konva') {
               const konvaItem = item as any;
-              
               switch (item.type) {
                 case 'rect':
                   return (
@@ -716,7 +677,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       fill={konvaItem.fill}
                       stroke={konvaItem.stroke}
                       strokeWidth={konvaItem.strokeWidth ?? 0}
-                        onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
+                      onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 case 'ellipse':
@@ -730,7 +691,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       fill={konvaItem.fill}
                       stroke={konvaItem.stroke}
                       strokeWidth={konvaItem.strokeWidth ?? 0}
-                        onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
+                      onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 case 'triangle':
@@ -744,7 +705,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       fill={konvaItem.fill}
                       stroke={konvaItem.stroke}
                       strokeWidth={konvaItem.strokeWidth ?? 0}
-                        onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
+                      onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 case 'arrow':
@@ -759,7 +720,7 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                       strokeWidth={konvaItem.strokeWidth ?? 2}
                       pointerLength={konvaItem.pointerLength ?? 10}
                       pointerWidth={konvaItem.pointerWidth ?? 10}
-                        onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
+                      onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
                     />
                   );
                 default:
@@ -827,7 +788,6 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
             }
           })}
           
-          {/* Lines */}
           {lines.map((line, i) => (
             <Line
               key={`line-${i}`}
@@ -844,20 +804,17 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
             />
           ))}
 
-          {/* Transformer */}
           <Transformer
             ref={trRef}
             enabledAnchors={[
               "top-left", "top-right",
               "bottom-left", "bottom-right",
-              "middle-left", "middle-right",   // ← ADD THESE
+              "middle-left", "middle-right",
               "middle-top", "middle-bottom"
-              // Remove center anchors to prevent skewing
             ]}
             boundBoxFunc={(oldBox, newBox) => {
               const selectedShape = allShapesToRender.find(item => item.id === selectedNodeId);
               
-              // If it's an image, maintain aspect ratio
               if (selectedShape && selectedShape.__kind === 'image') {
                 const imageShape = selectedShape as ImageShape;
                 const aspectRatio = imageShape.width / imageShape.height;
@@ -865,30 +822,26 @@ const handleShapeDragEnd = (item: CombinedShape, e: any) => {
                 let width = newBox.width;
                 let height = newBox.height;
                 
-                // Maintain aspect ratio
                 if (Math.abs(width - oldBox.width) > Math.abs(height - oldBox.height)) {
-                  // Width changed more, adjust height to match aspect ratio
                   height = width / aspectRatio;
                 } else {
-                  // Height changed more, adjust width to match aspect ratio
                   width = height * aspectRatio;
                 }
                 
                 return {
                   ...newBox,
-                  width: Math.max(20, width), // Minimum size
+                  width: Math.max(20, width),
                   height: Math.max(20, height),
                 };
               }
               
-              // For other shapes, use normal behavior
               return {
                 ...newBox,
                 width: Math.max(20, newBox.width),
                 height: Math.max(20, newBox.height),
               };
             }}
-            keepRatio={false} // We handle ratio manually for images
+            keepRatio={false}
             rotateEnabled={true}
             resizeEnabled={true}
             anchorSize={10}

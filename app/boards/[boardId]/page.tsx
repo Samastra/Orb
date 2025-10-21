@@ -705,6 +705,8 @@ const handleFormattingToolbarUpdate = useCallback((updates: Record<string, any>)
           setConnections={setConnections}
           updateShape={handleStageShapeUpdate}
           setStageInstance={setStageInstance}
+          updateConnection={updateConnection}
+          onDelete={handleDeleteShape}
         />
       </div>
 
