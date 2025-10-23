@@ -26,6 +26,7 @@ interface TextAttributes {
   letterSpacing?: number;
   lineHeight?: number;
   textTransform?: string;
+  rotation?: number; // Added rotation to fix TS error
   textShadow?: {
     color: string;
     blur: number;
@@ -94,6 +95,8 @@ const EditableTextComponentInner: React.FC<
   const [textWidth, setTextWidth] = useState(width || 200);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
+  const [sideAnchorActive, setSideAnchorActive] = useState(false); // Track side anchor usage
+
   // Transform text for display
   const getTransformedText = useCallback((txt: string, transform: string) => {
     switch (transform) {
@@ -108,44 +111,43 @@ const EditableTextComponentInner: React.FC<
     }
   }, []);
 
-  // Add this function to reset transforms
-      const resetTransform = useCallback(() => {
-        const node = textRef.current;
-        if (!node) return;
+  // Reset transform
+  const resetTransform = useCallback(() => {
+    const node = textRef.current;
+    if (!node) return;
 
-        node.width(200); // Default width
-        node.fontSize(20); // Default font size
-        node.rotation(0);
-        node.skewX(0);
-        node.skewY(0);
-        
-        setTextWidth(200);
-        onUpdate({ width: 200, fontSize: 20 });
-      }, [onUpdate, textRef]);
+    node.width(200); // Default width
+    node.fontSize(20); // Default font size
+    node.rotation(0);
+    node.skewX(0);
+    node.skewY(0);
 
+    setTextWidth(200);
+    onUpdate({ width: 200, fontSize: 20, rotation: 0 });
+  }, [onUpdate, textRef]);
 
   // Detect Shift key for proportional scaling
-    useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Shift') {
-          setIsShiftPressed(true);
-        }
-      };
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Shift") {
+        setIsShiftPressed(true);
+      }
+    };
 
-      const handleKeyUp = (e: KeyboardEvent) => {
-        if (e.key === 'Shift') {
-          setIsShiftPressed(false);
-        }
-      };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") {
+        setIsShiftPressed(false);
+      }
+    };
 
-      window.addEventListener('keydown', handleKeyDown);
-      window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
 
-      return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-        window.removeEventListener('keyup', handleKeyUp);
-      };
-    }, []);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
 
   useEffect(() => {
     setEditValue(text);
@@ -171,8 +173,8 @@ const EditableTextComponentInner: React.FC<
 
   // Auto-resize textarea as user types
   const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
   }, []);
 
   // Double-click text to edit
@@ -198,11 +200,11 @@ const EditableTextComponentInner: React.FC<
 
     textarea.value = textNode.text() || "";
     textarea.style.position = "absolute";
-    textarea.style.top = areaPosition.y + "px";
-    textarea.style.left = areaPosition.x + "px";
-    textarea.style.width = textNode.width() - textNode.padding() * 2 + "px";
-    textarea.style.minHeight = textNode.height() - textNode.padding() * 2 + "px";
-    textarea.style.fontSize = textNode.fontSize() + "px";
+    textarea.style.top = `${areaPosition.y}px`;
+    textarea.style.left = `${areaPosition.x}px`;
+    textarea.style.width = `${textNode.width() - textNode.padding() * 2}px`;
+    textarea.style.minHeight = `${textNode.height() - textNode.padding() * 2}px`;
+    textarea.style.fontSize = `${textNode.fontSize()}px`;
     textarea.style.fontFamily = textNode.fontFamily();
     textarea.style.fontStyle = textNode.fontStyle();
     textarea.style.fontWeight = fontWeight;
@@ -210,7 +212,7 @@ const EditableTextComponentInner: React.FC<
     textarea.style.border = "2px solid #0099e5";
     textarea.style.padding = "4px 8px";
     textarea.style.margin = "0";
-    textarea.style.background = "transparent"; // Slightly transparent white
+    textarea.style.background = "transparent";
     textarea.style.outline = "none";
     textarea.style.resize = "none";
     textarea.style.overflow = "hidden";
@@ -219,7 +221,7 @@ const EditableTextComponentInner: React.FC<
     textarea.style.zIndex = "1000";
     textarea.style.borderRadius = "4px";
     textarea.style.boxSizing = "border-box";
-    textarea.style.backdropFilter = "blur(0.5px)"; // Very subtle blur
+    textarea.style.backdropFilter = "blur(0.5px)";
 
     // Auto-resize initially
     autoResizeTextarea(textarea);
@@ -266,83 +268,73 @@ const EditableTextComponentInner: React.FC<
 
     textarea.addEventListener("keydown", handleKey);
     textarea.addEventListener("input", handleInput);
-    
+
     setTimeout(() => {
       window.addEventListener("click", handleOutsideClick, true);
     }, 0);
   }, [onUpdate, textRef, fontWeight, autoResizeTextarea]);
 
-  // Fixed transformation logic
- const handleTransform = useCallback(() => {
-  const node = textRef.current;
-  const transformer = trRef.current;
-  if (!node || !transformer) return;
+  // Figma-like transformation logic
+  const handleTransform = useCallback(() => {
+    const node = textRef.current;
+    const transformer = trRef.current;
+    if (!node || !transformer) return;
 
-  const activeAnchor = transformer.getActiveAnchor() || "";
-  const scaleX = node.scaleX();
-  const scaleY = node.scaleY();
+    const activeAnchor = transformer.getActiveAnchor() || "";
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
+    const originalWidth = textWidth;
+    const originalFontSize = fontSize;
 
-  const originalWidth = textWidth;
-  const originalFontSize = fontSize;
+    let newWidth = originalWidth;
+    let newFontSize = originalFontSize;
 
-  let newWidth = originalWidth;
-  let newFontSize = originalFontSize;
+    const isSideAnchor = activeAnchor.includes("middle-left") || activeAnchor.includes("middle-right");
+    setSideAnchorActive(isSideAnchor); // Update side anchor state
 
-  // Adobe-style scaling with modifiers
-  if (isShiftPressed) {
-    // Shift pressed: Always scale proportionally (like Illustrator)
-    const uniformScale = (scaleX + scaleY) / 2;
-    newFontSize = Math.max(8, Math.round(originalFontSize * uniformScale));
-    newWidth = Math.max(30, Math.round(originalWidth * uniformScale));
-  } else {
-    // No modifier: Context-aware scaling
-    if (activeAnchor.includes("middle-left") || activeAnchor.includes("middle-right")) {
-      // Horizontal only
+    if (isSideAnchor) {
+      // Side anchors: Adjust width only (affects line breaks)
       newWidth = Math.max(30, Math.round(originalWidth * scaleX));
-      newFontSize = originalFontSize;
-    } 
-    else if (activeAnchor.includes("middle-top") || activeAnchor.includes("middle-bottom")) {
-      // Vertical only
-      newFontSize = Math.max(8, Math.round(originalFontSize * scaleY));
-      newWidth = originalWidth;
-    }
-    else {
-      // Corner: Proportional by default
-      const uniformScale = (scaleX + scaleY) / 2;
-      newFontSize = Math.max(8, Math.round(originalFontSize * uniformScale));
+      newFontSize = originalFontSize; // Font size unchanged
+    } else {
+      // Corner anchors or Shift: Proportional scaling
+      const uniformScale = isShiftPressed ? Math.min(scaleX, scaleY) : scaleX; // Use scaleX for consistency
       newWidth = Math.max(30, Math.round(originalWidth * uniformScale));
+      newFontSize = Math.max(8, Math.round(originalFontSize * uniformScale));
     }
-  }
 
-  // Apply changes
-  node.width(newWidth);
-  node.fontSize(newFontSize);
-  node.scaleX(1);
-  node.scaleY(1);
+    // Apply changes without resetting scale during transform
+    node.width(newWidth);
+    node.fontSize(newFontSize);
 
-  setTextWidth(newWidth);
-}, [textRef, textWidth, fontSize, isShiftPressed]);
+    setTextWidth(newWidth);
+    node.getLayer()?.batchDraw();
+  }, [textRef, textWidth, fontSize, isShiftPressed]);
 
   const handleTransformEnd = useCallback(() => {
-  const node = textRef.current;
-  if (!node) return;
+    const node = textRef.current;
+    if (!node) return;
 
-  // Final update with all transformed properties
-  onUpdate({
-    x: node.x(),
-    y: node.y(),
-    width: textWidth,
-    fontSize: node.fontSize(),
-    // Preserve other attributes
-    text: text,
-    fill: fill,
-    fontFamily: fontFamily,
-    fontWeight: fontWeight,
-    fontStyle: fontStyle,
-    textDecoration: textDecoration,
-    align: align,
-  });
-}, [onUpdate, textRef, textWidth, text, fill, fontFamily, fontWeight, fontStyle, textDecoration, align]);
+    // Reset scale to 1 to avoid compounding
+    node.scaleX(1);
+    node.scaleY(1);
+
+    // Final update with all transformed properties
+    onUpdate({
+      x: node.x(),
+      y: node.y(),
+      width: textWidth,
+      fontSize: node.fontSize(),
+      text,
+      fill,
+      fontFamily,
+      fontWeight,
+      fontStyle,
+      textDecoration,
+      align,
+      rotation: node.rotation(),
+    });
+  }, [onUpdate, textRef, textWidth, text, fill, fontFamily, fontWeight, fontStyle, textDecoration, align]);
 
   const handleDragEnd = useCallback(
     (e: any) => {
@@ -390,32 +382,33 @@ const EditableTextComponentInner: React.FC<
 
       {isSelected && !isEditing && (
         <Transformer
-            ref={trRef}
-            enabledAnchors={[
-              "middle-left", "middle-right",
-              "top-left", "top-right", 
-              "bottom-left", "bottom-right",
-              "middle-top", "middle-bottom",
-            ]}
-            boundBoxFunc={(oldBox, newBox) => ({
-              ...newBox,
-              width: Math.max(30, newBox.width),
-              height: Math.max(20, newBox.height),
-            })}
-            keepRatio={false} // Let our custom logic handle proportions
-            rotateEnabled={true}
-            resizeEnabled={true}
-            anchorSize={12}
-            anchorCornerRadius={6}
-            borderStroke="#0099e5"
-            borderStrokeWidth={2}
-            anchorStroke="#0099e5"
-            anchorFill="#ffffff"
-            anchorStrokeWidth={1.5}
-          />
+          ref={trRef}
+          enabledAnchors={[
+            "middle-left",
+            "middle-right",
+            "top-left",
+            "top-right",
+            "bottom-left",
+            "bottom-right",
+          ]}
+          boundBoxFunc={(oldBox, newBox) => ({
+            ...newBox,
+            width: Math.max(30, newBox.width),
+            height: Math.max(20, newBox.height),
+          })}
+          keepRatio={!sideAnchorActive} // Use state to control proportionality
+          rotateEnabled={true}
+          resizeEnabled={true}
+          anchorSize={12}
+          anchorCornerRadius={6}
+          borderStroke="#0099e5"
+          borderStrokeWidth={2}
+          anchorStroke="#0099e5"
+          anchorFill="#ffffff"
+          anchorStrokeWidth={1.5}
+        />
       )}
 
-      {/* // Add this component inside your return statement, after the Transformer */}
       {isSelected && isShiftPressed && (
         <Text
           x={x}
