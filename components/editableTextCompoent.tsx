@@ -26,7 +26,7 @@ interface TextAttributes {
   letterSpacing?: number;
   lineHeight?: number;
   textTransform?: string;
-  rotation?: number; // Added rotation to fix TS error
+  rotation?: number;
   textShadow?: {
     color: string;
     blur: number;
@@ -63,6 +63,39 @@ export interface EditableTextComponentProps {
   };
 }
 
+// Custom text width measurement function
+const measureTextWidth = (
+  text: string,
+  options: {
+    fontSize: number;
+    fontFamily: string;
+    fontStyle: string;
+    fontWeight: string;
+    letterSpacing: number;
+  }
+): number => {
+  // Create a temporary canvas context to measure text
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
+  
+  if (!context) return text.length * options.fontSize * 0.6; // Fallback calculation
+  
+  // Set font properties
+  const fontString = [
+    options.fontStyle,
+    options.fontWeight,
+    `${options.fontSize}px`,
+    options.fontFamily
+  ].join(' ');
+  
+  context.font = fontString;
+  context.letterSpacing = `${options.letterSpacing}px`;
+  
+  // Measure the text
+  const metrics = context.measureText(text);
+  return metrics.width;
+};
+
 // Inner component
 const EditableTextComponentInner: React.FC<
   EditableTextComponentProps & { textRef: React.RefObject<Konva.Text | null> }
@@ -87,15 +120,15 @@ const EditableTextComponentInner: React.FC<
   textTransform = "none",
   textShadow,
   textRef,
-  width,
+  width = 200,
 }) => {
   const trRef = useRef<Konva.Transformer>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(text);
-  const [textWidth, setTextWidth] = useState(width || 200);
+  const [textWidth, setTextWidth] = useState(width);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
-  const [sideAnchorActive, setSideAnchorActive] = useState(false); // Track side anchor usage
+  const [sideAnchorActive, setSideAnchorActive] = useState(false);
 
   // Transform text for display
   const getTransformedText = useCallback((txt: string, transform: string) => {
@@ -116,8 +149,8 @@ const EditableTextComponentInner: React.FC<
     const node = textRef.current;
     if (!node) return;
 
-    node.width(200); // Default width
-    node.fontSize(20); // Default font size
+    node.width(200);
+    node.fontSize(20);
     node.rotation(0);
     node.skewX(0);
     node.skewY(0);
@@ -171,6 +204,44 @@ const EditableTextComponentInner: React.FC<
     }
   }, [activeTool, textRef]);
 
+  // Auto-fit text width on load to prevent forced wrapping
+  useEffect(() => {
+    const node = textRef.current;
+    if (!node) return;
+
+    const calculateAndSetWidth = () => {
+      const lines = text.split("\n");
+      
+      // Use our custom measurement function
+      const maxLineWidth = Math.max(...lines.map(line =>
+        measureTextWidth(line, {
+          fontSize,
+          fontFamily,
+          fontStyle,
+          fontWeight,
+          letterSpacing,
+        })
+      ));
+      
+      const newWidth = Math.max(50, Math.min(maxLineWidth + 20, 500)); // Min 50, max 500
+      
+      if (newWidth !== textWidth) {
+        node.width(newWidth);
+        setTextWidth(newWidth);
+        onUpdate({ width: newWidth });
+      }
+      node.getLayer()?.batchDraw();
+    };
+
+    // Wait for fonts to load for accurate measurement
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(calculateAndSetWidth);
+    } else {
+      // Fallback: wait a bit for fonts to load
+      setTimeout(calculateAndSetWidth, 100);
+    }
+  }, [textRef, text, fontSize, fontFamily, fontStyle, fontWeight, letterSpacing, lineHeight, textWidth, onUpdate]);
+
   // Auto-resize textarea as user types
   const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement) => {
     textarea.style.height = "auto";
@@ -221,7 +292,7 @@ const EditableTextComponentInner: React.FC<
     textarea.style.zIndex = "1000";
     textarea.style.borderRadius = "4px";
     textarea.style.boxSizing = "border-box";
-    textarea.style.backdropFilter = "blur(0.5px)";
+    textarea.style.backdropFilter = "blur(0.5px";
 
     // Auto-resize initially
     autoResizeTextarea(textarea);
@@ -274,7 +345,7 @@ const EditableTextComponentInner: React.FC<
     }, 0);
   }, [onUpdate, textRef, fontWeight, autoResizeTextarea]);
 
-  // Figma-like transformation logic
+  // Preview transform without applying (no wobble)
   const handleTransform = useCallback(() => {
     const node = textRef.current;
     const transformer = trRef.current;
@@ -283,48 +354,51 @@ const EditableTextComponentInner: React.FC<
     const activeAnchor = transformer.getActiveAnchor() || "";
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
+
+    const isSideAnchor = activeAnchor.includes("middle-left") || activeAnchor.includes("middle-right");
+    setSideAnchorActive(isSideAnchor);
+
+    // Preview scale without updating properties
+    Konva.Util.requestAnimFrame(() => {
+      node.getLayer()?.batchDraw();
+    });
+  }, [textRef]);
+
+  // Apply final transform (commit changes)
+  const handleTransformEnd = useCallback(() => {
+    const node = textRef.current;
+    const transformer = trRef.current;
+    if (!node || !transformer) return;
+
+    const scaleX = node.scaleX();
+    const scaleY = node.scaleY();
     const originalWidth = textWidth;
     const originalFontSize = fontSize;
 
     let newWidth = originalWidth;
     let newFontSize = originalFontSize;
 
-    const isSideAnchor = activeAnchor.includes("middle-left") || activeAnchor.includes("middle-right");
-    setSideAnchorActive(isSideAnchor); // Update side anchor state
-
+    const isSideAnchor = sideAnchorActive;
     if (isSideAnchor) {
-      // Side anchors: Adjust width only (affects line breaks)
-      newWidth = Math.max(30, Math.round(originalWidth * scaleX));
-      newFontSize = originalFontSize; // Font size unchanged
+      newWidth = Math.max(50, Math.round(originalWidth * scaleX));
+      newFontSize = originalFontSize;
     } else {
-      // Corner anchors or Shift: Proportional scaling
-      const uniformScale = isShiftPressed ? Math.min(scaleX, scaleY) : scaleX; // Use scaleX for consistency
-      newWidth = Math.max(30, Math.round(originalWidth * uniformScale));
+      const uniformScale = isShiftPressed ? Math.min(scaleX, scaleY) : scaleX;
+      newWidth = Math.max(50, Math.round(originalWidth * uniformScale));
       newFontSize = Math.max(8, Math.round(originalFontSize * uniformScale));
     }
 
-    // Apply changes without resetting scale during transform
     node.width(newWidth);
     node.fontSize(newFontSize);
-
-    setTextWidth(newWidth);
-    node.getLayer()?.batchDraw();
-  }, [textRef, textWidth, fontSize, isShiftPressed]);
-
-  const handleTransformEnd = useCallback(() => {
-    const node = textRef.current;
-    if (!node) return;
-
-    // Reset scale to 1 to avoid compounding
     node.scaleX(1);
     node.scaleY(1);
 
-    // Final update with all transformed properties
+    setTextWidth(newWidth);
     onUpdate({
       x: node.x(),
       y: node.y(),
-      width: textWidth,
-      fontSize: node.fontSize(),
+      width: newWidth,
+      fontSize: newFontSize,
       text,
       fill,
       fontFamily,
@@ -334,7 +408,30 @@ const EditableTextComponentInner: React.FC<
       align,
       rotation: node.rotation(),
     });
-  }, [onUpdate, textRef, textWidth, text, fill, fontFamily, fontWeight, fontStyle, textDecoration, align]);
+
+    // Force refit after transform
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        node.getLayer()?.batchDraw();
+      });
+    } else {
+      node.getLayer()?.batchDraw();
+    }
+  }, [
+    textRef,
+    textWidth,
+    fontSize,
+    isShiftPressed,
+    sideAnchorActive,
+    onUpdate,
+    text,
+    fill,
+    fontFamily,
+    fontWeight,
+    fontStyle,
+    textDecoration,
+    align,
+  ]);
 
   const handleDragEnd = useCallback(
     (e: any) => {
@@ -371,13 +468,14 @@ const EditableTextComponentInner: React.FC<
         draggable={!isEditing}
         width={textWidth}
         wrap="word"
+        ellipsis={true}
         onDblClick={handleTextDblClick}
         onDblTap={handleTextDblClick}
         onClick={() => !isEditing && onSelect()}
         onTap={() => !isEditing && onSelect()}
         onDragEnd={handleDragEnd}
-        onTransform={handleTransform}
-        onTransformEnd={handleTransformEnd}
+        onTransform={handleTransform} // Preview only
+        onTransformEnd={handleTransformEnd} // Commit changes
       />
 
       {isSelected && !isEditing && (
@@ -393,10 +491,10 @@ const EditableTextComponentInner: React.FC<
           ]}
           boundBoxFunc={(oldBox, newBox) => ({
             ...newBox,
-            width: Math.max(30, newBox.width),
+            width: Math.max(50, newBox.width),
             height: Math.max(20, newBox.height),
           })}
-          keepRatio={!sideAnchorActive} // Use state to control proportionality
+          keepRatio={!sideAnchorActive}
           rotateEnabled={true}
           resizeEnabled={true}
           anchorSize={12}
