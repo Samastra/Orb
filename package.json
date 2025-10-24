@@ -41,6 +41,7 @@
     "react-konva": "^19.0.7",
     "react-konva-image": "^0.0.1",
     "react-konva-utils": "^2.0.0",
+    "react-markdown": "^10.1.0",
     "svix": "^1.76.1",
     "tailwind-merge": "^3.3.1",
     "uuid": "^13.0.0"
