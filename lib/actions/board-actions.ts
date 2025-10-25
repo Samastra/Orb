@@ -152,7 +152,7 @@ export const updateBoard = async (boardId: string, updates: {
     })
     .eq("id", boardId)
     .select()
-    .single();
+    .single();  
 
   if (error) {
     console.error("❌ Supabase error:", error);
@@ -210,4 +210,146 @@ export const getPublicBoards = async () => {
 
   console.log("✅ Public boards fetched:", data.length);
   return data;
+};
+
+
+export const getUserBoardsWithDetails = async (clerkUserId: string, clerkUserData?: any) => {
+  const supabase = createSupabaseClient();
+  
+  const user = await createUserIfNotExists(clerkUserId, clerkUserData);
+  
+  const { data, error } = await supabase
+    .from("boards")
+    .select(`
+      *,
+      users:owner_id (
+        username,
+        full_name,
+        avatar_url
+      )
+    `)
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("❌ Error fetching user boards with details:", error);
+    throw error;
+  }
+
+  console.log("✅ User boards with details fetched:", data?.length || 0);
+  return data || [];
+};
+
+export const searchBoards = async (clerkUserId: string, query: string) => {
+  const supabase = createSupabaseClient();
+  
+  const user = await createUserIfNotExists(clerkUserId);
+  
+  if (!query.trim()) {
+    return getUserBoardsWithDetails(clerkUserId);
+  }
+
+  const { data, error } = await supabase
+    .from("boards")
+    .select(`
+      *,
+      users:owner_id (
+        username,
+        full_name,
+        avatar_url
+      )
+    `)
+    .eq("owner_id", user.id)
+    .or(`title.ilike.%${query}%,category.ilike.%${query}%,description.ilike.%${query}%`)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("❌ Error searching boards:", error);
+    throw error;
+  }
+
+  return data || [];
+};
+
+export const getBoardStats = async (clerkUserId: string) => {
+  const supabase = createSupabaseClient();
+  
+  const user = await createUserIfNotExists(clerkUserId);
+  
+  // Get total boards count
+  const { count: totalBoards, error: countError } = await supabase
+    .from("boards")
+    .select('*', { count: 'exact', head: true })
+    .eq("owner_id", user.id);
+
+  if (countError) {
+    console.error("❌ Error counting boards:", countError);
+    throw countError;
+  }
+
+  // Get public boards count
+  const { count: publicBoards, error: publicError } = await supabase
+    .from("boards")
+    .select('*', { count: 'exact', head: true })
+    .eq("owner_id", user.id)
+    .eq("is_public", true);
+
+  if (publicError) {
+    console.error("❌ Error counting public boards:", publicError);
+    throw publicError;
+  }
+
+  return {
+    totalBoards: totalBoards || 0,
+    publicBoards: publicBoards || 0,
+    teamMembers: 0, // We'll implement this later with teams
+    activeProjects: totalBoards || 0 // Using total boards as active projects for now
+  };
+};
+
+// Add this function to your existing board-actions.ts
+export const getUserBoardsWithFavorites = async (clerkUserId: string, clerkUserData?: any) => {
+  const supabase = createSupabaseClient();
+  
+  const user = await createUserIfNotExists(clerkUserId, clerkUserData);
+  
+  // Get user's boards
+  const { data: boards, error: boardsError } = await supabase
+    .from("boards")
+    .select(`
+      *,
+      users:owner_id (
+        username,
+        full_name,
+        avatar_url
+      )
+    `)
+    .eq("owner_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (boardsError) {
+    console.error("❌ Error fetching user boards:", boardsError);
+    throw boardsError;
+  }
+
+  // Get user's favorites
+  const { data: favorites, error: favoritesError } = await supabase
+    .from("user_favorites")
+    .select("board_id")
+    .eq("user_id", user.id);
+
+  if (favoritesError) {
+    console.error("❌ Error fetching favorites:", favoritesError);
+    throw favoritesError;
+  }
+
+  const favoriteBoardIds = new Set(favorites?.map(fav => fav.board_id) || []);
+
+  // Merge favorites data with boards
+  const boardsWithFavorites = boards?.map(board => ({
+    ...board,
+    is_favorited: favoriteBoardIds.has(board.id)
+  })) || [];
+
+  return boardsWithFavorites;
 };
