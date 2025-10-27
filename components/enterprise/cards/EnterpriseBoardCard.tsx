@@ -17,6 +17,43 @@ import {
 import { updateBoard, deleteBoard } from "@/lib/actions/board-actions"
 import { toggleFavorite } from "@/lib/actions/favorite-actions"
 import { useUser } from "@clerk/nextjs"
+import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal"
+
+// const ShareBoardModal = ({
+//   isOpen,
+//   onClose,
+//   boardId,
+//   boardTitle
+// }: {
+//   isOpen: boolean
+//   onClose: () => void
+//   boardId: string
+//   boardTitle: string
+// }) => {
+//   if (!isOpen) return null
+
+//   return (
+//     <div className="fixed inset-0 z-50 flex items-center justify-center">
+//       <div
+//         className="absolute inset-0 bg-black opacity-50"
+//         onClick={onClose}
+//       />
+//       <div className="bg-white rounded-lg p-4 z-10 max-w-md w-full">
+//         <h3 className="text-lg font-semibold mb-2">Share "{boardTitle}"</h3>
+//         <p className="text-sm text-gray-600 mb-4">Board ID: {boardId}</p>
+//         <div className="flex justify-end gap-2">
+//           <button
+//             onClick={onClose}
+//             className="px-3 py-1 bg-gray-100 rounded"
+//           >
+//             Close
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   )
+// }
+
 
 interface EnterpriseBoardCardProps {
   id: string
@@ -49,6 +86,7 @@ export default function EnterpriseBoardCard({
   const [menuOpen, setMenuOpen] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [localIsFavorite, setLocalIsFavorite] = useState(isFavorite)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -123,6 +161,7 @@ export default function EnterpriseBoardCard({
   }
 
   return (
+    <>
     <div 
       onClick={onClick}
       className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all duration-200 cursor-pointer group relative"
@@ -193,7 +232,14 @@ export default function EnterpriseBoardCard({
                   {isPublic ? <Lock className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
                   <span>Make {isPublic ? "Private" : "Public"}</span>
                 </button>
-                <button className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+               <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsShareModalOpen(true) // ← ADD THIS
+                    setMenuOpen(false)
+                  }}
+                  className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
                   <Share2 className="w-4 h-4" />
                   <span>Share board</span>
                 </button>
@@ -249,6 +295,15 @@ export default function EnterpriseBoardCard({
           <span>{formatDate(lastModified)}</span>
         </div>
       </div>
+
     </div>
+         <ShareBoardModal 
+      isOpen={isShareModalOpen}
+      onClose={() => setIsShareModalOpen(false)}
+      boardId={id}
+      boardTitle={title}
+    />
+
+    </>
   )
 }

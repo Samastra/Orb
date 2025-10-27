@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/sheet";
 import ResourceList from "@/components/ResourceList";
 import SaveBoardModal from "@/components/save-modal-board";
-import ChatModal from "@/components/ChatModal"; // New import
+import ChatModal from "@/components/ChatModal";
+import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal"; // NEW IMPORT
 import { useUser } from "@clerk/nextjs";
 import { 
   Mic, 
@@ -24,7 +25,11 @@ import {
   UserPlus, 
   Users,
   X,
-  Circle
+  Circle,
+  MoreVertical, // NEW ICON
+  Download,
+  Share2,
+  Camera
 } from "lucide-react";
 
 interface BoardHeaderProps {
@@ -57,16 +62,65 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   boardElements
 }) => {
   const { user } = useUser();
-  const [isChatOpen, setIsChatOpen] = useState(false); // New state for chat modal
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false); // NEW STATE
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // NEW STATE
 
   return (
     <>
       <section className="flex items-center justify-between gap-4">
         <div className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur-sm px-6 py-4 shadow-lg border-b border-gray-200/80">
           <div className="flex items-center gap-4">
-            <button className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100/80 transition-all duration-300">
-              <img src="/image/three-dots-vertical.svg" alt="Menu" className="w-5 h-5" />
-            </button>
+            {/* UPDATED MENU BUTTON WITH DROPDOWN */}
+            <div className="relative">
+              <button 
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-100/80 transition-all duration-300"
+              >
+                <MoreVertical className="w-5 h-5 text-gray-600" />
+              </button>
+              
+              {/* DROPDOWN MENU */}
+              {isMenuOpen && (
+                <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                  <button 
+                    onClick={() => {
+                      setIsShareModalOpen(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span>Share Board</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => {
+                      // Placeholder for download functionality
+                      console.log("Download board");
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Board</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => {
+                      // Placeholder for snapshot functionality
+                      console.log("Send snapshot");
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Send Snapshot</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center gap-3">
               <Link 
                 href={"/"} 
@@ -116,7 +170,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
               </SheetContent>
             </Sheet>
             <Button
-              onClick={() => setIsChatOpen(true)} // Toggle chat modal
+              onClick={() => setIsChatOpen(true)}
               className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group"
             >
               <MessageSquare className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
@@ -169,15 +223,26 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
           </div>
         </div>
       </section>
+      
+      {/* MODALS */}
       <SaveBoardModal 
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         tempBoardId={currentBoardId}
         boardElements={boardElements}
       />
+      
       <ChatModal
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
+      />
+
+      {/* NEW SHARE MODAL */}
+      <ShareBoardModal 
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        boardId={currentBoardId}
+        boardTitle={boardInfo.title}
       />
     </>
   );

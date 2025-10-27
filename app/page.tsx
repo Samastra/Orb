@@ -72,7 +72,7 @@ export default function Home() {
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-6 text-lg font-semibold rounded-2xl shadow-2xl shadow-blue-500/25"
                 >
                   <Zap className="w-5 h-5 mr-2" />
-                  Get Lifetime Access - $299
+                  Get Lifetime Access - $99
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
               </Link>
@@ -314,8 +314,8 @@ export default function Home() {
       <PricingCard
         title="Lifetime Access"
         description="Never pay again. Get unlimited access to all current and future Orb features forever."
-        price="$299"
-        originalPrice="$999"
+        price="$99"
+        originalPrice="$499"
         period="One-time payment • Never pay again"
         features={[
           "Unlimited boards and sessions",
@@ -338,7 +338,7 @@ export default function Home() {
       <PricingCard
         title="Yearly Plan"
         description="Perfect for trying out Orb with our special launch discount."
-        price="$30"
+        price="$60"
         period="Per year • Cancel anytime"
         features={[
           "All core features included",
@@ -530,8 +530,8 @@ export default function Home() {
 
             <div className="space-y-4">
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-white">$299</span>
-                <span className="text-lg text-blue-200 line-through">$999</span>
+                <span className="text-3xl font-bold text-white">$99</span>
+                <span className="text-lg text-blue-200 line-through">$599</span>
                 <span className="bg-green-500/20 text-green-300 text-sm px-2 py-1 rounded-full">
                   Founder's Price
                 </span>
@@ -570,7 +570,7 @@ export default function Home() {
                 size="lg"
                 className="w-full border-white/30 text-white hover:bg-white/10 hover:text-white font-semibold py-3 rounded-xl"
               >
-                Launch Yearly Plan - $30
+                Launch Yearly Plan - $60
               </Button>
             </Link>
             <p className="text-blue-200/70 text-xs">

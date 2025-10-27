@@ -353,3 +353,5 @@ export const getUserBoardsWithFavorites = async (clerkUserId: string, clerkUserD
 
   return boardsWithFavorites;
 };
+
+
