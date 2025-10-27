@@ -1,5 +1,6 @@
 import { Tool } from "../types/board-types";
 
+
 export const toolIcons: Record<Tool, string> = {
   select: "/image/navigation-fill.svg",
   stickyNote: "/image/stickynotes.svg",
@@ -15,6 +16,7 @@ export const toolIcons: Record<Tool, string> = {
   arrow: "/image/arrow-icon.svg",
   ellipse: "/image/ellipse.svg",
   stage: "/image/rectangle.svg",
+  image: "/image/image-icon.svg" // ← ADD THIS LINE
 };
 
 export const shapeOptions = [
