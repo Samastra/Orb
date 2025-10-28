@@ -46,11 +46,11 @@ interface ResourceListProps {
   onAddToBoard?: (imageUrl: string, altText: string) => void;
   onPlayVideo?: (videoId: string, title: string) => void;
   boardElements?: {
-    reactShapes: unknown[]; // Replace `any[]`
-    konvaShapes: unknown[]; // Replace `any[]`
-    stageFrames: unknown[]; // Replace `any[]`
-    images: unknown[]; // Replace `any[]`
-    connections: unknown[]; // Replace `any[]`
+    reactShapes: unknown[];
+    konvaShapes: unknown[]; 
+    stageFrames: unknown[];
+    images: unknown[]; 
+    connections: unknown[]; 
   };
 }
 
@@ -93,8 +93,8 @@ const ResourceList = ({
       if (user?.id) {
         try {
           const userBoards = await getUserBoards(user.id, {
-            username: user.username,
-            fullName: user.fullName,
+            username: user.username || undefined,
+            fullName: user.fullName || undefined,
             imageUrl: user.imageUrl,
             email: user.primaryEmailAddress?.emailAddress,
           });
@@ -354,7 +354,7 @@ const handleSearch = useCallback(
           body={resource.body}
           image={resource.image}
           alt={resource.alt}
-          type={resource.type as any}
+          type={resource.type as "video" | "website" | "book" | "photo" | "vector"}
           url={getResourceUrl(resource)}
           onAddToBoard={onAddToBoard}
           onPlayVideo={onPlayVideo}

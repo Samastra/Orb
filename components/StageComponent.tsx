@@ -725,8 +725,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
                       stroke={konvaItem.fill ?? konvaItem.stroke}
                       fill={konvaItem.fill}
                       strokeWidth={konvaItem.strokeWidth ?? 2}
-                      pointerLength={(konvaItem as any).pointerLength ?? 10}
-                      pointerWidth={(konvaItem as any).pointerWidth ?? 10}
+                      pointerLength={(konvaItem as KonvaShape & { pointerLength?: number }).pointerLength ?? 10}
+                      pointerWidth={(konvaItem as KonvaShape & { pointerWidth?: number }).pointerWidth ?? 10}
                       onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
                     />
                   );

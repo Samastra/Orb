@@ -49,11 +49,6 @@ interface FormattingUpdates {
 }
 
 
-type Line = { tool: "brush" | "eraser"; points: number[] };
-// Fix text rendering
-if (typeof window !== 'undefined') {
-  (Konva as any)._fixTextRendering = true;
-}
 
 // Simple debounce without complex types
 const useDebounce = (callback: (...args: unknown[]) => void, delay: number) => {
