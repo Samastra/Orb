@@ -414,7 +414,7 @@ export const useKonvaTools = (
       path.data(d);
       path.getLayer()?.batchDraw();
 
-      const connectionId = group.id();
+      const connectionId = tempGroupRef.current!.id();     
       const updatedConnection: Partial<Connection> = {
         from: { x: fx, y: fy, nodeId: null },
         to: { x: tx, y: ty, nodeId: null },

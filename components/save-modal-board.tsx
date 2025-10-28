@@ -34,11 +34,6 @@ export default function SaveBoardModal({
   const [isSignUp, setIsSignUp] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (isSignedIn && user && isOpen) {
-      handleSaveAfterAuth();
-    }
-  }, [isSignedIn, user, isOpen]);
 
   const handleSaveAfterAuth = async () => {
     if (!user) return;
@@ -73,6 +68,14 @@ export default function SaveBoardModal({
       setIsSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (isSignedIn && user && isOpen) {
+      handleSaveAfterAuth();
+    }
+  }, [isSignedIn, user, isOpen, handleSaveAfterAuth]);
+
+  
 
   const handleAuthClick = () => {
     if (isSignUp) {

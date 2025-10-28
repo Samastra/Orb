@@ -43,8 +43,8 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
         try {
           setLoading(true)
           const userBoards = await getUserBoardsWithDetails(user.id, {
-            username: user.username,
-            fullName: user.fullName,
+            username: user.username || undefined,
+            fullName: user.fullName || undefined,
             imageUrl: user.imageUrl,
             email: user.primaryEmailAddress?.emailAddress
           })

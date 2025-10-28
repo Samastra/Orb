@@ -82,8 +82,8 @@ export default function MainDashboard({
           // Fetch boards and stats in parallel
           const [boardsData, statsData] = await Promise.all([
             getUserBoardsWithDetails(user.id, {
-              username: user.username,
-              fullName: user.fullName,
+              username: user.username || undefined,
+              fullName: user.fullName || undefined,
               imageUrl: user.imageUrl,
               email: user.primaryEmailAddress?.emailAddress
             }),
@@ -134,8 +134,8 @@ export default function MainDashboard({
       if (!searchQuery.trim()) {
         // If search is empty, show all boards
         const boardsData = await getUserBoardsWithFavorites(user.id, {
-          username: user.username,
-          fullName: user.fullName,
+          username: user.username || undefined,
+          fullName: user.fullName || undefined,
           imageUrl: user.imageUrl,
           email: user.primaryEmailAddress?.emailAddress
         })
