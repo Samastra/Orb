@@ -3,6 +3,20 @@
 import { createSupabaseClient } from "../supabase";
 import { createUserIfNotExists } from "./user-actions";
 
+interface BoardData {
+  title?: string;
+  is_public?: boolean;
+  category?: string;
+  description?: string;
+}
+
+interface UserData {
+  username?: string;
+  fullName?: string;
+  imageUrl?: string;
+  email?: string;
+}
+
 export const fetchBoard = async (boardId: string) => {
   const supabase = createSupabaseClient();
   
@@ -61,7 +75,7 @@ export const saveAnonymousBoard = async (tempBoardId: string, clerkUserId: strin
   }
 };
 
-export const createNewBoard = async (clerkUserId: string, boardData: any) => {
+export const createNewBoard = async (clerkUserId: string, boardData: BoardData) => {
   const supabase = createSupabaseClient();
   
   const user = await createUserIfNotExists(clerkUserId);
@@ -165,7 +179,7 @@ export const updateBoard = async (boardId: string, updates: {
 
 export const getUserBoards = async (
   clerkUserId: string, 
-  clerkUserData?: any
+  clerkUserData?: UserData
 ) => {
   const supabase = createSupabaseClient();
   
@@ -212,8 +226,7 @@ export const getPublicBoards = async () => {
   return data;
 };
 
-
-export const getUserBoardsWithDetails = async (clerkUserId: string, clerkUserData?: any) => {
+export const getUserBoardsWithDetails = async (clerkUserId: string, clerkUserData?: UserData) => {
   const supabase = createSupabaseClient();
   
   const user = await createUserIfNotExists(clerkUserId, clerkUserData);
@@ -308,7 +321,7 @@ export const getBoardStats = async (clerkUserId: string) => {
 };
 
 // Add this function to your existing board-actions.ts
-export const getUserBoardsWithFavorites = async (clerkUserId: string, clerkUserData?: any) => {
+export const getUserBoardsWithFavorites = async (clerkUserId: string, clerkUserData?: UserData) => {
   const supabase = createSupabaseClient();
   
   const user = await createUserIfNotExists(clerkUserId, clerkUserData);

@@ -6,6 +6,13 @@ import { KonvaShape } from "@/hooks/useShapes";
 import { Connection } from "@/hooks/useBoardState";
 import { createUserIfNotExists } from "./user-actions";
 
+interface BoardElement {
+  board_id: string;
+  type: string;
+  properties: unknown;
+  created_by: string | null;
+}
+
 type Line = { tool: "brush" | "eraser"; points: number[] };
 
 const normalizeKonvaShape = (shape: KonvaShape): KonvaShape => {
@@ -102,7 +109,7 @@ export const saveBoardElements = async (
 
     if (deleteError) throw deleteError;
 
-    const allElements: any[] = [];
+    const allElements: BoardElement[] = [];
 
     allElements.push({
       board_id: boardId,

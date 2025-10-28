@@ -21,7 +21,7 @@ interface Resource {
   type: string;
   url?: string;
   videoId?: string;
-  sourceData?: any;
+  sourceData?: Record<string, unknown>; 
 }
 
 interface SearchResults {
@@ -46,11 +46,11 @@ interface ResourceListProps {
   onAddToBoard?: (imageUrl: string, altText: string) => void;
   onPlayVideo?: (videoId: string, title: string) => void;
   boardElements?: {
-    reactShapes: any[];
-    konvaShapes: any[];
-    stageFrames: any[];
-    images: any[];
-    connections: any[];
+    reactShapes: unknown[]; // Replace `any[]`
+    konvaShapes: unknown[]; // Replace `any[]`
+    stageFrames: unknown[]; // Replace `any[]`
+    images: unknown[]; // Replace `any[]`
+    connections: unknown[]; // Replace `any[]`
   };
 }
 
@@ -77,7 +77,6 @@ const ResourceList = ({
   const { recommendations } = useRecommendations();
   const { user } = useUser();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("boards");
@@ -117,13 +116,14 @@ const ResourceList = ({
     fetchBoards();
   }, [user?.id]);
 
-  const debounce = (func: Function, delay: number) => {
-  let timeoutId: NodeJS.Timeout;
-  return (...args: any[]) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
-  };
-};
+  // Replace the debounce function:
+      const debounce = (func: (value: string) => void, delay: number) => {
+        let timeoutId: NodeJS.Timeout;
+        return (value: string) => {
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => func(value), delay);
+        };
+      };
 
  const fetchResources = useCallback(async (query: string, isRefresh = false) => {
   if (!query.trim() && !isRefresh) {
@@ -180,22 +180,23 @@ const handleSearch = useCallback(
     }
   };
 
-  const getResourceUrl = (resource: Resource): string | undefined => {
-    switch (resource.type) {
-      case "video":
-        return resource.videoId ? `https://youtube.com/watch?v=${resource.videoId}` : resource.url;
-      case "website":
-        return resource.url || (resource.sourceData?.content_urls?.desktop?.page);
-      case "book":
-        return resource.url || (resource.sourceData?.volumeInfo?.infoLink);
-      case "photo":
-        return resource.url || (resource.sourceData?.url);
-      case "vector":
-        return resource.url || (resource.sourceData?.url);
-      default:
-        return resource.url;
-    }
-  };
+  // Replace the getResourceUrl function:
+        const getResourceUrl = (resource: Resource): string | undefined => {
+          switch (resource.type) {
+            case "video":
+              return resource.videoId ? `https://youtube.com/watch?v=${resource.videoId}` : resource.url;
+            case "website":
+              return resource.url || ((resource.sourceData as { content_urls?: { desktop?: { page?: string } } })?.content_urls?.desktop?.page);
+            case "book":
+              return resource.url || ((resource.sourceData as { volumeInfo?: { infoLink?: string } })?.volumeInfo?.infoLink);
+            case "photo":
+              return resource.url || ((resource.sourceData as { url?: string })?.url);
+            case "vector":
+              return resource.url || ((resource.sourceData as { url?: string })?.url);
+            default:
+              return resource.url;
+          }
+        };
 
   const getEmptyStateMessage = () => {
     if (searchLoading) return "Loading resources...";
@@ -213,24 +214,7 @@ const handleSearch = useCallback(
       : allImages.filter((image) => image.type === imageTypeFilter);
   };
 
-  const sortResources = (resources: Resource[]) => {
-    switch (sortOption) {
-      case "newest":
-        return [...resources].sort((a, b) =>
-          (b.sourceData?.publishedDate || "").localeCompare(
-            a.sourceData?.publishedDate || ""
-          )
-        );
-      case "popular":
-        return [...resources].sort(
-          (a, b) => (b.sourceData?.viewCount || 0) - (a.sourceData?.viewCount || 0)
-        );
-      default:
-        return [...resources];
-    }
-  };
-
-  const displayResources = useMemo(
+   const displayResources = useMemo(
     () => manualSearchResults || recommendations,
     [manualSearchResults, recommendations]
   );
@@ -339,16 +323,16 @@ const handleSearch = useCallback(
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 masonry">
           {currentResources.map((resource: Resource) => (
             <ResourceCard
-              key={resource.id}
-              heading={resource.heading}
-              body={resource.body}
-              image={resource.image}
-              alt={resource.alt}
-              type={resource.type as any}
-              url={getResourceUrl(resource)}
-              onAddToBoard={onAddToBoard}
-              onPlayVideo={onPlayVideo}
-            />
+          key={resource.id}
+          heading={resource.heading}
+          body={resource.body}
+          image={resource.image}
+          alt={resource.alt}
+          type={resource.type as "video" | "website" | "book" | "photo" | "vector"} // Add type assertion
+          url={getResourceUrl(resource)}
+          onAddToBoard={onAddToBoard}
+          onPlayVideo={onPlayVideo}
+        />
           ))}
           {hasMore && (
             <button
@@ -451,7 +435,7 @@ const handleSearch = useCallback(
         <div className="mt-3 text-sm text-gray-600 flex items-center gap-2">
           {manualSearchResults && (
             <span>
-              Showing results for: <span className="font-medium">"{searchQuery}"</span>
+              Showing results for: <span className="font-medium">&quot;{searchQuery}&quot;</span>
             </span>
           )}
           {searchLoading && (
@@ -464,7 +448,7 @@ const handleSearch = useCallback(
             boardTitle !== "Untitled Board" &&
             !manualSearchResults && (
               <span>
-                Recommendations for: <span className="font-medium">"{boardTitle}"</span>
+                Recommendations for: <span className="font-medium">&quot;{boardTitle}&quot;</span>
               </span>
             )}
         </div>

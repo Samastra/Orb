@@ -30,7 +30,7 @@ export default function DashboardHeader({
   const { user } = useUser()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [notifications, setNotifications] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<{ id: string; title: string; message: string; time: string }[]>([])
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   // In a real app, you'd fetch notifications from your database
   useEffect(() => {

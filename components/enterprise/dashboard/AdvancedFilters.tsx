@@ -3,8 +3,17 @@
 import { useState } from "react"
 import { Filter, X, ChevronDown, Save } from "lucide-react"
 
+interface FilterState {
+  status: string[];
+  type: string[];
+  dateRange: string;
+  owner: string;
+  tags: string[];
+}
+
+
 interface AdvancedFiltersProps {
-  onFiltersChange: (filters: any) => void
+  onFiltersChange: (filters: FilterState) => void 
 }
 
 export default function AdvancedFilters({ onFiltersChange }: AdvancedFiltersProps) {

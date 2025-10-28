@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useRef, useEffect, useCallback, useMemo, useState } from "react";
+import Image from "next/image";
 import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useParams } from "next/navigation";
-import { Tool, ReactShape } from "@/types/board-types";
+import { Tool } from "@/types/board-types";
 import { defaultStageDimensions } from "@/constants/tool-constants";
 // Components
 import Toolbar from "@/components/Toolbar";
@@ -27,6 +28,27 @@ import { useWindowSize } from "@/hooks/useWindowSize";
 import { cn } from "@/lib/utils";
 import { loadBoardElements } from "@/lib/actions/board-elements-actions";
 
+
+interface ShapeAttributes {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+  stroke?: string;
+  text?: string;
+  // Add other shape properties as needed
+}
+
+interface FormattingUpdates {
+  fill?: string;
+  stroke?: string;
+  fontSize?: number;
+  fontFamily?: string;
+  // Add other formatting properties
+}
+
+
 type Line = { tool: "brush" | "eraser"; points: number[] };
 // Fix text rendering
 if (typeof window !== 'undefined') {
@@ -34,10 +56,10 @@ if (typeof window !== 'undefined') {
 }
 
 // Simple debounce without complex types
-const useDebounce = (callback: Function, delay: number) => {
+const useDebounce = (callback: (...args: unknown[]) => void, delay: number) => {
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  return useCallback((...args: any[]) => {
+  return useCallback((...args: unknown[]) => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
@@ -49,22 +71,32 @@ const useDebounce = (callback: Function, delay: number) => {
 };
 
 // Utility for deep equality comparison
-const areEqual = (obj1: any, obj2: any): boolean => {
+// Replace the entire areEqual function:
+const areEqual = (obj1: unknown, obj2: unknown): boolean => {
   if (obj1 === obj2) return true;
   if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 == null || obj2 == null) {
     return obj1 === obj2;
   }
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
+  
+  const obj1Record = obj1 as Record<string, unknown>;
+  const obj2Record = obj2 as Record<string, unknown>;
+  
+  const keys1 = Object.keys(obj1Record);
+  const keys2 = Object.keys(obj2Record);
   if (keys1.length !== keys2.length) return false;
+  
   for (const key of keys1) {
     if (!keys2.includes(key)) return false;
-    if (Array.isArray(obj1[key]) && Array.isArray(obj2[key])) {
-      if (obj1[key].length !== obj2[key].length) return false;
-      for (let i = 0; i < obj1[key].length; i++) {
-        if (!areEqual(obj1[key][i], obj2[key][i])) return false;
+    
+    const val1 = obj1Record[key];
+    const val2 = obj2Record[key];
+    
+    if (Array.isArray(val1) && Array.isArray(val2)) {
+      if (val1.length !== val2.length) return false;
+      for (let i = 0; i < val1.length; i++) {
+        if (!areEqual(val1[i], val2[i])) return false;
       }
-    } else if (!areEqual(obj1[key], obj2[key])) {
+    } else if (!areEqual(val1, val2)) {
       return false;
     }
   }
@@ -73,17 +105,16 @@ const areEqual = (obj1: any, obj2: any): boolean => {
 
 const BoardPage = () => {
   const params = useParams();
-  const { width: windowWidth, height: windowHeight } = useWindowSize();
+
   
   // Refs
   const stageRef = useRef<Konva.Stage | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
   
-  const [stageKey, setStageKey] = useState(0);
-  const [isInteracting, setIsInteracting] = useState(false); // Track active user interactions
+ 
   const [hasChanges, setHasChanges] = useState(false); // Track if board has unsaved changes
   const [hasLoaded, setHasLoaded] = useState(false); // Track if board elements have been loaded
-
+  const [isInteracting, setIsInteracting] = useState(false);
   const {
     videoId,
     videoTitle, 
@@ -94,7 +125,7 @@ const BoardPage = () => {
 
   // State management
   const boardState = useBoardState();
-  
+  const [stageKey, setStageKey] = useState(0);
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
     isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeId, stageInstance, tempDimensions,
@@ -109,12 +140,9 @@ const BoardPage = () => {
     sendToBack,
     // Shape functions
     addShape,
-    updateShape,
     deleteShape,
-    addKonvaShape,
     addStageFrame,
     addImage,
-    addConnection,
     updateConnection,
     removeConnection,
   } = boardState;
@@ -168,7 +196,22 @@ const BoardPage = () => {
   const { triggerSave } = useAutoSave(currentBoardId, isTemporaryBoard, user?.id);
 
   // Debounced triggerSave for interaction end
-  const debouncedTriggerSave = useDebounce(triggerSave, 10000); // Increased to 10s
+          // Replace the debouncedTriggerSave in boards/[boardId]/page.tsx:
+        const debouncedTriggerSave = useDebounce((data: unknown) => {
+          if (typeof data === 'object' && data !== null) {
+            const saveData = data as {
+              reactShapes: typeof reactShapes;
+              konvaShapes: typeof konvaShapes;
+              stageFrames: typeof stageFrames;
+              images: typeof images;
+              connections: typeof connections;
+              lines: typeof lines;
+              scale?: number;
+              position?: { x: number; y: number };
+            };
+            triggerSave(saveData);
+          }
+        }, 10000);
 
   // Periodic auto-save (every 5 minutes)
   useEffect(() => {
@@ -198,28 +241,29 @@ const BoardPage = () => {
 
   // Track interactions for scaling, dragging, and adding elements
   const handleInteractionStart = useCallback(() => {
-    console.log("🖱️ Interaction started (scaling/dragging/adding)");
-    setIsInteracting(true);
-    setHasChanges(true); // Mark changes on interaction
-  }, []);
+  console.log("🖱️ Interaction started (scaling/dragging/adding)");
+  setIsInteracting(true);
+  setHasChanges(true);
+}, [setIsInteracting]);
+
 
   const handleInteractionEnd = useCallback(() => {
-    console.log("🖱️ Interaction ended (scaling/dragging/adding)");
-    setIsInteracting(false);
-    if (currentBoardId && !isTemporaryBoard && user && hasChanges) {
-      debouncedTriggerSave({
-        reactShapes,
-        konvaShapes,
-        stageFrames,
-        images,
-        connections,
-        lines,
-        scale,
-        position,
-      });
-      setHasChanges(false); // Reset after queuing save
-    }
-  }, [currentBoardId, isTemporaryBoard, user, debouncedTriggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, hasChanges]);
+  console.log("🖱️ Interaction ended (scaling/dragging/adding)");
+  setIsInteracting(false);
+  if (currentBoardId && !isTemporaryBoard && user && hasChanges) {
+    debouncedTriggerSave({
+      reactShapes,
+      konvaShapes,
+      stageFrames,
+      images,
+      connections,
+      lines,
+      scale,
+      position,
+    });
+    setHasChanges(false);
+  }
+}, [currentBoardId, isTemporaryBoard, user, debouncedTriggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, hasChanges, setIsInteracting]);
 
   // Fetch board data and initialize boardInfo
   useEffect(() => {
@@ -350,13 +394,14 @@ const BoardPage = () => {
 
   // Cleanup
   useEffect(() => {
-    return () => {
-      if (trRef.current) {
-        trRef.current.nodes([]);
-        trRef.current.destroy();
-      }
-    };
-  }, []);
+  const currentTrRef = trRef.current;
+  return () => {
+    if (currentTrRef) {
+      currentTrRef.nodes([]);
+      currentTrRef.destroy();
+    }
+  };
+}, []);
 
   // Memoize selected shape
   const selectedShape = useMemo(() => {
@@ -391,7 +436,7 @@ const BoardPage = () => {
     console.log("🔍 Zooming in:", { oldScale, newScale });
     boardState.setScale(newScale);
     setTimeout(handleInteractionEnd, 100); // End interaction after a short delay
-  }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd]);
+  }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd,boardState]);
 
   const handleZoomOut = useCallback(() => {
     const stage = stageRef.current;
@@ -408,9 +453,12 @@ const BoardPage = () => {
     console.log("🔍 Zooming out:", { oldScale, newScale });
     boardState.setScale(newScale);
     setTimeout(handleInteractionEnd, 100); // End interaction after a short delay
-  }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd]);
+  }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd, boardState]);
 
-  const debouncedUpdateShape = useDebounce((shapeId: string, updates: Partial<any>) => {
+  // Replace the useDebounce call:
+const debouncedUpdateShape = useDebounce((args: unknown) => {
+  if (Array.isArray(args) && args.length === 2) {
+    const [shapeId, updates] = args as [string, Partial<ShapeAttributes>];
     console.log('🔄 Debounced update for:', { shapeId, updates });
     
     const isReactShape = reactShapes.some((s) => s.id === shapeId);
@@ -450,62 +498,57 @@ const BoardPage = () => {
       updateConnection(shapeId, updates);
     }
 
-    setHasChanges(true); // Mark changes
-  }, 50);
+    setHasChanges(true);
+  }
+}, 50);
 
   // Handler for StageComponent (no immediate save)
-  const handleStageShapeUpdate = useCallback(
-    (id: string, attrs: Partial<any>) => {
-      console.log("🔄 Stage shape update triggered:", { id, attrs });
+  const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<ShapeAttributes>) => {
+  console.log("🔄 Stage shape update triggered:", { id, attrs });
 
-      if (!id) return;
+  if (!id) return;
 
-      const isReactShape = reactShapes.some((s) => s.id === id);
-      const isKonvaShape = konvaShapes.some((s) => s.id === id);
-      const isConnection = connections.some((c) => c.id === id);
+  const isReactShape = reactShapes.some((s) => s.id === id);
+  const isKonvaShape = konvaShapes.some((s) => s.id === id);
+  const isConnection = connections.some((c) => c.id === id);
 
-      if (isReactShape) {
-        setReactShapes((prev) =>
-          prev.map((shape) => (shape.id === id ? { ...shape, ...attrs } : shape))
-        );
-      } else if (isKonvaShape) {
-        debouncedUpdateShape(id, attrs);
-      } else if (isConnection) {
-        updateConnection(id, attrs);
-      }
+  if (isReactShape) {
+    setReactShapes((prev) =>
+      prev.map((shape) => (shape.id === id ? { ...shape, ...attrs } : shape))
+    );
+  } else if (isKonvaShape) {
+    debouncedUpdateShape([id, attrs]);
+  } else if (isConnection) {
+    updateConnection(id, attrs);
+  }
 
-      setHasChanges(true); // Mark changes
-    },
-    [debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection]
-  );
+  setHasChanges(true);
+}, [debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, setReactShapes]);
 
   // Formatting toolbar update (no immediate save)
-  const handleFormattingToolbarUpdate = useCallback(
-    (updates: Record<string, any>) => {
-      console.log("🔄 Formatting toolbar update:", { selectedNodeId, updates });
+  const handleFormattingToolbarUpdate = useCallback((updates: FormattingUpdates) => {
+  console.log("🔄 Formatting toolbar update:", { selectedNodeId, updates });
 
-      if (!selectedNodeId) return;
+  if (!selectedNodeId) return;
 
-      const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-      const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
-      const isConnection = connections.some((c) => c.id === selectedNodeId);
+  const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
+  const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
+  const isConnection = connections.some((c) => c.id === selectedNodeId);
 
-      if (isReactShape) {
-        setReactShapes((prev) =>
-          prev.map((shape) =>
-            shape.id === selectedNodeId ? { ...shape, ...updates } : shape
-          )
-        );
-      } else if (isKonvaShape) {
-        debouncedUpdateShape(selectedNodeId, updates);
-      } else if (isConnection) {
-        updateConnection(selectedNodeId, updates);
-      }
+  if (isReactShape) {
+    setReactShapes((prev) =>
+      prev.map((shape) =>
+        shape.id === selectedNodeId ? { ...shape, ...updates } : shape
+      )
+    );
+  } else if (isKonvaShape) {
+    debouncedUpdateShape([selectedNodeId, updates]);
+  } else if (isConnection) {
+    updateConnection(selectedNodeId, updates);
+  }
 
-      setHasChanges(true); // Mark changes
-    },
-    [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection]
-  );
+  setHasChanges(true);
+}, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, setReactShapes]);
 
   // Shape creation with immediate save
   const handleAddShape = useCallback((type: Tool) => {
@@ -538,7 +581,7 @@ const BoardPage = () => {
       setHasChanges(false); // Reset after immediate save
     }
     setTimeout(handleInteractionEnd, 100);
-  }, [stageRef, scale, position, addShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, handleInteractionStart, handleInteractionEnd]);
+  }, [stageRef, scale, position, addShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, handleInteractionStart, handleInteractionEnd,setReactShapes]);
 
   const handleImageUpload = useCallback(async (file: File) => {
     try {
@@ -572,30 +615,6 @@ const BoardPage = () => {
     }
   }, [addImage, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
 
-  // Handle connection deletion
-  const handleConnectionDelete = useCallback((connectionId: string) => {
-    console.log('🗑️ Deleting connection:', connectionId);
-    removeConnection(connectionId);
-    undoRedoAddAction({
-      type: "delete-connection",
-      connectionId: connectionId
-    });
-    if (currentBoardId && !isTemporaryBoard && user) {
-      console.log("💾 Immediate save for connection deletion:", { connectionId });
-      triggerSave({
-        reactShapes,
-        konvaShapes,
-        stageFrames,
-        images,
-        connections,
-        lines,
-        scale,
-        position,
-      }, true);
-      setHasChanges(false); // Reset after immediate save
-    }
-  }, [removeConnection, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position]);
-
   // Close without save
   const handleCloseWithoutSave = useCallback(async () => {
     try {
@@ -620,28 +639,28 @@ const BoardPage = () => {
     const shapeToDelete = allShapes.find(shape => shape.id === id);
     
     if (shapeToDelete) {
-      let actionType: any;
-      
-      if (reactShapes.find(s => s.id === id)) {
-        actionType = 'delete-react-shape';
-      } else if (konvaShapes.find(s => s.id === id)) {
-        actionType = 'delete-konva-shape';
-      } else if (images.find(s => s.id === id)) {
-        actionType = 'delete-image';
-      } else if (connections.find(s => s.id === id)) {
-        actionType = 'delete-connection';
-      } else if (stageFrames.find(s => s.id === id)) {
-        actionType = 'delete-stage-frame';
-      } else {
-        actionType = 'delete-shape';
-      }
-      
-      console.log('💾 Recording deletion action:', actionType, shapeToDelete);
-      undoRedoAddAction({
-        type: actionType,
-        data: shapeToDelete
-      });
-    }
+      let actionType: 
+          | 'delete-react-shape' 
+          | 'delete-konva-shape' 
+          | 'delete-image' 
+          | 'delete-connection' 
+          | 'delete-stage-frame';
+
+        if (reactShapes.find(s => s.id === id)) {
+          actionType = 'delete-react-shape';
+        } else if (konvaShapes.find(s => s.id === id)) {
+          actionType = 'delete-konva-shape';
+        } else if (images.find(s => s.id === id)) {
+          actionType = 'delete-image';
+        } else if (connections.find(s => s.id === id)) {
+          actionType = 'delete-connection';
+        } else if (stageFrames.find(s => s.id === id)) {
+          actionType = 'delete-stage-frame';
+        } else {
+          // If it's an unknown shape type, log error and use a safe fallback
+          console.warn('Unknown shape type for deletion, using delete-konva-shape as fallback');
+          actionType = 'delete-konva-shape';
+        }
     
     console.log('🗑️ Actually deleting shape:', id);
     deleteShape(id);
@@ -659,6 +678,7 @@ const BoardPage = () => {
       }, true);
       setHasChanges(false); // Reset after immediate save
     }
+  }
   }, [reactShapes, konvaShapes, images, connections, stageFrames, deleteShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, scale, position]);
 
   // Enhanced tool change handler
@@ -673,7 +693,7 @@ const BoardPage = () => {
         handleAddShape(tool);
       }, 100);
     }
-  }, [toolHandlers.handleToolChange, setActiveTool, handleAddShape]);
+  }, [toolHandlers.handleToolChange, setActiveTool, handleAddShape,toolHandlers]);
 
   // Calculate viewport center
   const calculateViewportCenter = useCallback(() => {
@@ -689,7 +709,7 @@ const BoardPage = () => {
     };
   }, [scale, position, stageRef]);
 
-  const handleAddImageFromRecommendations = useCallback((imageUrl: string, altText: string) => {
+  const handleAddImageFromRecommendations = useCallback((imageUrl: string) => {
     handleInteractionStart();
     const viewportCenter = calculateViewportCenter();
     console.log('🎯 Adding image from recommendations at:', viewportCenter);
@@ -820,20 +840,20 @@ const BoardPage = () => {
               className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110"
               title="Zoom Out"
             >
-              <img src="/image/connect-nodes2.svg" alt="zoom-out" className="w-5 h-5 transition-transform duration-300" />
+              <Image src="/image/connect-nodes2.svg" alt="zoom-out" width={20} height={20} className="w-5 h-5 transition-transform duration-300" />
             </button>
             <div className="flex items-center gap-2 min-w-[80px] justify-center">
               <span className="text-sm font-medium text-gray-700 bg-gray-100/80 px-2 py-1 rounded-lg">
                 {Math.round(scale * 100)}%
               </span>
             </div>
-            <button 
-              onClick={handleZoomIn}
-              className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110"
-              title="Zoom In"
-            >
-              <img src="/image/add-icon.svg" alt="zoom-in" className="w-5 h-5 transition-transform duration-300" />
-            </button>
+           <button 
+            onClick={handleZoomIn}
+            className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110"
+            title="Zoom In"
+          >
+            <Image src="/image/add-icon.svg" alt="zoom-in" width={20} height={20} className="w-5 h-5 transition-transform duration-300" />
+          </button>
           </div>
           <div className="w-px h-6 bg-gray-300/80"></div>
           <div className="flex items-center gap-2">

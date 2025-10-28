@@ -48,7 +48,7 @@ const SelectOptions = ({ options, placeholder = "Select...", value, onValueChang
         <Command>
           <CommandInput placeholder={`${placeholder}...`} className="h-9" />
           <CommandList>
-            <CommandEmpty>Can't find {placeholder.split(" ")[1] || placeholder}</CommandEmpty>
+            <CommandEmpty>Can&apos;t find {placeholder.split(" ")[1] || placeholder}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem

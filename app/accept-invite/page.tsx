@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useUser } from "@clerk/nextjs"
 import { useRouter, useSearchParams } from "next/navigation"
-import { acceptInvitation, getInvitationByToken } from "@/lib/actions/share-actions"
+import { acceptInvitation } from "@/lib/actions/share-actions"
 import { Loader2, CheckCircle, XCircle } from "lucide-react"
 
 export default function AcceptInvitePage() {

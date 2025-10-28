@@ -34,7 +34,7 @@ export default function ContactPage() {
             <GlassCard className="inline-flex items-center gap-2 px-4 py-2">
               <MessageCircle className="w-4 h-4 text-blue-600" />
               <span className="text-sm font-medium text-gray-700">
-                We'd Love to Hear From You
+                We&apos;d Love to Hear From You
               </span>
             </GlassCard>
           </motion.div>
@@ -54,7 +54,7 @@ export default function ContactPage() {
             
             <p className="text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
               Have questions, feedback, or want to collaborate? 
-              We're here to help and would love to connect with you.
+              We&apos;re here to help and would love to connect with you.
             </p>
           </motion.div>
         </div>

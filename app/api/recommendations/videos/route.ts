@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface YouTubeItem {
+  id: { videoId: string };
+  snippet: {
+    title: string;
+    channelTitle: string;
+    thumbnails: {
+      medium?: { url: string };
+      default?: { url: string };
+    };
+  };
+}
+
+interface YouTubeResponse {
+  items?: YouTubeItem[];
+}
+
 // Same retry function
 const fetchWithRetry = async (url: string, retries = 5, delay = 2000) => {
   for (let i = 0; i < retries; i++) {
@@ -45,9 +61,9 @@ export async function GET(request: NextRequest) {
       throw new Error(`YouTube API request failed: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: YouTubeResponse = await response.json();
 
-    const videos = data.items?.map((item: any) => ({
+    const videos = data.items?.map((item: YouTubeItem) => ({
       id: item.id.videoId,
       heading: item.snippet.title,
       body: item.snippet.channelTitle,
@@ -60,7 +76,7 @@ export async function GET(request: NextRequest) {
     })) || [];
 
     return NextResponse.json(videos);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Videos API error:', error);
     return NextResponse.json([]);
   }

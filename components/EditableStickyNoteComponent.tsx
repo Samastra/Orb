@@ -1,22 +1,39 @@
 import React, { useRef, forwardRef, useImperativeHandle } from "react";
 import { Group, Rect } from "react-konva";
 import Konva from "konva";
-import EditableTextComponent from "./editableTextCompoent";
-import EditableTextComponentProps from "./editableTextCompoent";
+import EditableTextComponent, { type TextAttributes } from "./editableTextCompoent";
+
 
 interface StickyNoteProps {
-  shapeData: any;
+  shapeData: {
+    id: string;
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    backgroundColor?: string;
+    textColor?: string;
+    text?: string;
+    fontSize?: number;
+    fontFamily?: string;
+    fontWeight?: string;
+    fontStyle?: string;
+    textDecoration?: string;
+    align?: string;
+    letterSpacing?: number;
+    lineHeight?: number;
+    textTransform?: string;
+  };
   isSelected: boolean;
   activeTool: string | null;
   onSelect: () => void;
-  onUpdate: (newAttrs: any) => void;
+  onUpdate: (newAttrs: Record<string, unknown>) => void;
 }
 
 const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
   ({ shapeData, isSelected, activeTool, onSelect, onUpdate }, ref) => {
     const groupRef = useRef<Konva.Group>(null);
     
-    // Use imperative handle to expose the group ref
     useImperativeHandle(ref, () => groupRef.current as Konva.Group);
 
     const { 
@@ -39,17 +56,14 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
       textTransform = "none"
     } = shapeData;
 
-    // Handle text updates
-    const handleTextUpdate = (textAttrs: any) => {
+    const handleTextUpdate = (textAttrs: Record<string, unknown>) => {
       onUpdate({
         ...shapeData,
         ...textAttrs
       });
     };
 
-    // Handle position updates (when text is dragged)
     const handlePositionUpdate = (positionAttrs: { x?: number; y?: number }) => {
-      // Update the entire sticky note position
       onUpdate({
         ...shapeData,
         x: positionAttrs.x !== undefined ? positionAttrs.x : x,
@@ -57,8 +71,7 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
       });
     };
 
-    // Handle group drag (move entire sticky note)
-    const handleGroupDragEnd = (e: any) => {
+    const handleGroupDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
       onUpdate({
         ...shapeData,
         x: e.target.x(),
@@ -75,10 +88,8 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
         onClick={onSelect}
         onTap={onSelect}
         onDragEnd={handleGroupDragEnd}
-        // Prevent transformation of the entire group
         transformsEnabled={"position"}
       >
-        {/* Sticky Note Background */}
         <Rect
           width={width}
           height={height}
@@ -90,15 +101,13 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
           shadowOffsetX={2}
           shadowOffsetY={2}
           cornerRadius={8}
-          // Prevent background transformation
           transformsEnabled={"position"}
         />
         
-        {/* Editable Text Component */}
         <EditableTextComponent
           id={id}
-          x={10} // Padding from left
-          y={10} // Padding from top
+          x={10}
+          y={10}
           text={text}
           fontSize={fontSize}
           fill={textColor}
@@ -106,24 +115,21 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
           fontWeight={fontWeight}
           fontStyle={fontStyle}
           textDecoration={textDecoration}
-          align={align}
+          align={align as "left" | "center" | "right" | "justify"}
           letterSpacing={letterSpacing}
           lineHeight={lineHeight}
           textTransform={textTransform}
           isSelected={isSelected}
           activeTool={activeTool}
           onSelect={onSelect}
-          onUpdate={(attrs) => {
-            // If position changed, update the entire sticky note
+          onUpdate={(attrs: TextAttributes) => {
             if (attrs.x !== undefined || attrs.y !== undefined) {
               handlePositionUpdate(attrs);
             } else {
-              // Otherwise just update text properties
-              handleTextUpdate(attrs);
+             handleTextUpdate(attrs as Record<string, unknown>);
             }
           }}
-          // Text should be constrained to sticky note boundaries
-          width={width - 20} // Account for padding
+          width={width - 20}
         />
       </Group>
     );

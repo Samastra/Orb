@@ -460,7 +460,7 @@ export default function Home() {
           
           <p className="text-xl text-blue-100 leading-relaxed">
             Join Orb during our launch period and secure lifetime access at a special 
-            founder's price. Perfect time to get in on the ground floor.
+            founder&apos;s price. Perfect time to get in on the ground floor.
           </p>
         </div>
 
@@ -523,7 +523,7 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <Crown className="w-6 h-6 text-yellow-300" />
               <div>
-                <h3 className="text-xl font-bold text-white">Founder's Deal</h3>
+                <h3 className="text-xl font-bold text-white">Founder&apos;s Deal</h3>
                 <p className="text-blue-100 text-sm">Lifetime Access</p>
               </div>
             </div>
@@ -533,7 +533,7 @@ export default function Home() {
                 <span className="text-3xl font-bold text-white">$99</span>
                 <span className="text-lg text-blue-200 line-through">$599</span>
                 <span className="bg-green-500/20 text-green-300 text-sm px-2 py-1 rounded-full">
-                  Founder's Price
+                  Founder&apos;s Price
                 </span>
               </div>
 

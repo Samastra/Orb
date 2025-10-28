@@ -22,6 +22,24 @@ import Link from "next/link"
 
 type ViewType = "grid" | "list" | "kanban"
 
+interface BoardData {
+  id: string;
+  title?: string;
+  description?: string;
+  category?: string;
+  is_public?: boolean;
+  updated_at?: string;
+  created_at: string;
+  is_favorited?: boolean;
+}
+
+interface StatsData {
+  totalBoards: number;
+  teamMembers: number;
+  activeProjects: number;
+  publicBoards: number;
+}
+
 interface Board {
   id: string
   title: string
@@ -73,7 +91,7 @@ export default function MainDashboard({
           ])
 
           // Transform boards data to match our component
-          const transformedBoards: Board[] = (boardsData || []).map((board: any) => ({
+          const transformedBoards: Board[] = (boardsData || []).map((board: BoardData) => ({
             id: board.id,
             title: board.title || "Untitled Board",
             description: board.description || "Add a description to your board...",
@@ -123,7 +141,7 @@ export default function MainDashboard({
         })
 
         
-        const transformedBoards: Board[] = (boardsData || []).map((board: any) => ({
+        const transformedBoards: Board[] = (boardsData || []).map((board: BoardData) => ({
           id: board.id,
           title: board.title || "Untitled Board",
           description: board.description || "Add a description to your board...",
@@ -142,8 +160,8 @@ export default function MainDashboard({
       // Perform actual search
       try {
         const searchResults = await searchBoards(user.id, searchQuery)
-        
-        const transformedBoards: Board[] = (searchResults || []).map((board: any) => ({
+
+        const transformedBoards: Board[] = (searchResults || []).map((board: BoardData) => ({
           id: board.id,
           title: board.title || "Untitled Board",
           description: board.description || "Add a description to your board...",
@@ -164,7 +182,13 @@ export default function MainDashboard({
     handleSearch()
   }, [searchQuery, user])
 
-  const handleFiltersChange = (filters: any) => {
+  const handleFiltersChange = (filters: {
+        status: string[];
+        type: string[];
+        dateRange: string;
+        owner: string;
+        tags: string[];
+      }) => {
     // For now, we'll implement basic filtering client-side
     // We can enhance this with server-side filtering later
     let filtered = boards

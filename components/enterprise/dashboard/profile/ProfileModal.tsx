@@ -326,7 +326,7 @@ export default function ProfileModal({ isOpen, onClose, onSave }: ProfileModalPr
 
                 <div className="p-4 border border-gray-200 rounded-lg">
                   <h4 className="font-medium text-gray-900">Active Sessions</h4>
-                  <p className="text-sm text-gray-600 mt-1 mb-3">You're currently signed in on this device</p>
+                  <p className="text-sm text-gray-600 mt-1 mb-3">You&apos;re currently signed in on this device</p>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                     <div>

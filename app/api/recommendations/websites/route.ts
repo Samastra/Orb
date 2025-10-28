@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface SerpApiResult {
+  title: string;
+  snippet: string;
+  link: string;
+  source?: string;
+}
+
+interface SerpApiResponse {
+  organic_results?: SerpApiResult[];
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
@@ -24,13 +35,13 @@ export async function GET(request: NextRequest) {
       throw new Error('SerpAPI request failed');
     }
 
-    const data = await response.json();
+    const data: SerpApiResponse = await response.json();
 
     // Transform organic search results
-    const websites = data.organic_results?.map((result: any, index: number) => ({
+    const websites = data.organic_results?.map((result: SerpApiResult, index: number) => ({
       id: `web-${index}`,
       heading: result.title,
-      body: result.snippet,
+      body: result.snippet, // Fixed: Changed 'such as result.snippet' to 'result.snippet'
       image: '/website-placeholder.png', // SerpAPI doesn't provide images in organic results
       alt: `Website: ${result.title}`,
       type: 'website',

@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Define proper TypeScript interfaces
+interface GroqResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
 export async function POST(request: NextRequest) {
   if (!process.env.GROQ_API_KEY) {
     console.error("GROQ_API_KEY is missing in .env.local");
@@ -40,12 +49,13 @@ export async function POST(request: NextRequest) {
       throw new Error(`Groq API error: ${groqResponse.status}`);
     }
 
-    const data: any = await groqResponse.json();
+    // FIX 1: Replace 'any' with proper interface
+    const data: GroqResponse = await groqResponse.json();
     const aiResponse: string = data.choices?.[0]?.message?.content?.trim() || "Sorry, something went wrong with the AI response.";
 
     return NextResponse.json({ response: aiResponse });
-  } catch (error: any) {
-    console.error("Unexpected error in /api/chat:", error.message || error);
+  } catch (error: unknown) { // FIX 2: Replace 'any' with 'unknown'
+    console.error("Unexpected error in /api/chat:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Failed to connect to AI service" }, { status: 500 });
   }
 }

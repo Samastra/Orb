@@ -1,23 +1,22 @@
 "use client";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { SignIn, SignUp } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { saveAnonymousBoard } from "@/lib/actions/board-actions";
-import { saveBoardElements } from "@/lib/actions/board-elements-actions"; // ADD THIS
+import { saveBoardElements } from "@/lib/actions/board-elements-actions";
+import type { ReactShape, ImageShape, Connection } from "@/types/board-types";
+import type { KonvaShape } from "@/hooks/useShapes";
 
-// IN components/save-modal-board.tsx - UPDATE THE INTERFACE
-// IN components/save-modal-board.tsx - UPDATE THE INTERFACE
 interface SaveBoardModalProps {
   isOpen: boolean;
   onClose: () => void;
   tempBoardId: string;
   boardElements?: {
-    reactShapes: any[];
-    konvaShapes: any[];
-    stageFrames: any[];
-    images: any[];
-    connections: any[];
-    stageState?: { // MAKE THIS OPTIONAL with ?
+    reactShapes: ReactShape[];
+    konvaShapes: KonvaShape[];
+    stageFrames: KonvaShape[];
+    images: ImageShape[];
+    connections: Connection[];
+    stageState?: {
       scale: number;
       position: { x: number; y: number };
     };
@@ -28,61 +27,52 @@ export default function SaveBoardModal({
   isOpen, 
   onClose, 
   tempBoardId,
-  boardElements // ADD THIS PROP
+  boardElements
 }: SaveBoardModalProps) {
   const { isSignedIn, user } = useUser();
   const { openSignIn, openSignUp } = useClerk();
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // ADD LOADING STATE
+  const [isSaving, setIsSaving] = useState(false);
 
-  console.log("🔍 Modal received tempBoardId:", tempBoardId);
-
-  // Handle save after user authenticates
   useEffect(() => {
     if (isSignedIn && user && isOpen) {
       handleSaveAfterAuth();
     }
   }, [isSignedIn, user, isOpen]);
 
-  // IN components/save-modal-board.tsx - UPDATE handleSaveAfterAuth
-// IN components/save-modal-board.tsx - UPDATE handleSaveAfterAuth
-// IN components/save-modal-board.tsx - UPDATE handleSaveAfterAuth
-const handleSaveAfterAuth = async () => {
-  if (!user) return;
-  
-  setIsSaving(true);
-  try {
-    // 1. Save board metadata
-    await saveAnonymousBoard(tempBoardId, user.id);
+  const handleSaveAfterAuth = async () => {
+    if (!user) return;
     
-    // 2. Save board elements if they exist
-    if (boardElements) {
-      // Provide default stage state if missing
-      const stageState = boardElements.stageState || { scale: 1, position: { x: 0, y: 0 } };
+    setIsSaving(true);
+    try {
+      await saveAnonymousBoard(tempBoardId, user.id);
       
-      await saveBoardElements(
-        tempBoardId, 
-        {
-          reactShapes: boardElements.reactShapes,
-          konvaShapes: boardElements.konvaShapes,
-          stageFrames: boardElements.stageFrames,
-          images: boardElements.images,
-          connections: boardElements.connections
-        },
-        stageState, // USE THE STAGE STATE (WITH FALLBACK)
-        user.id
-      );
+      if (boardElements) {
+        const stageState = boardElements.stageState || { scale: 1, position: { x: 0, y: 0 } };
+        
+        await saveBoardElements(
+          tempBoardId, 
+          {
+            reactShapes: boardElements.reactShapes,
+            konvaShapes: boardElements.konvaShapes,
+            stageFrames: boardElements.stageFrames,
+            images: boardElements.images,
+            connections: boardElements.connections
+          },
+          stageState,
+          user.id
+        );
+      }
+      
+      onClose();
+      alert("Board saved successfully!");
+    } catch (error: unknown) {
+      console.error("Failed to save board:", error);
+      alert(`Failed to save board: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
     }
-    
-    onClose();
-    alert("Board saved successfully!");
-  } catch (error: any) {
-    console.error("Failed to save board:", error);
-    alert(`Failed to save board: ${error.message || 'Unknown error'}`);
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
 
   const handleAuthClick = () => {
     if (isSignUp) {

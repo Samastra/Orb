@@ -11,7 +11,7 @@ import React, {
 import { Text, Transformer } from "react-konva";
 import Konva from "konva";
 
-interface TextAttributes {
+export interface TextAttributes {
   x?: number;
   y?: number;
   text?: string;
@@ -433,13 +433,13 @@ const EditableTextComponentInner: React.FC<
     align,
   ]);
 
-  const handleDragEnd = useCallback(
-    (e: any) => {
-      if (isEditing) return;
-      onUpdate({ x: e.target.x(), y: e.target.y() });
-    },
-    [onUpdate, isEditing]
-  );
+      const handleDragEnd = useCallback(
+        (e: Konva.KonvaEventObject<DragEvent>) => { // Replace `any`
+          if (isEditing) return;
+          onUpdate({ x: e.target.x(), y: e.target.y() });
+        },
+        [onUpdate, isEditing]
+      );
 
   return (
     <>

@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface PixabayImage {
+  id: number;
+  webformatURL: string;
+  tags: string;
+  pageURL: string;
+}
+
+interface PixabayResponse {
+  hits?: PixabayImage[];
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
@@ -109,11 +120,11 @@ export async function GET(request: NextRequest) {
       throw new Error('Pixabay API request failed');
     }
 
-    const photosData = await photosResponse.json();
-    const vectorsData = await vectorsResponse.json();
+    const photosData: PixabayResponse = await photosResponse.json();
+    const vectorsData: PixabayResponse = await vectorsResponse.json();
 
     // Process photos - NO TEXT
-    const photos = photosData.hits?.map((photo: any) => ({
+    const photos = photosData.hits?.map((photo: PixabayImage) => ({
       id: `photo-${photo.id}-${refreshCount || '0'}`,
       heading: '', // Empty
       body: '', // Empty
@@ -125,7 +136,7 @@ export async function GET(request: NextRequest) {
     })) || [];
 
     // Process vectors - NO TEXT
-    const vectors = vectorsData.hits?.map((vector: any) => ({
+    const vectors = vectorsData.hits?.map((vector: PixabayImage) => ({
       id: `vector-${vector.id}-${refreshCount || '0'}`,
       heading: '', // Empty
       body: '', // Empty

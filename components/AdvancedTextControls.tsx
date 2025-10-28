@@ -28,10 +28,22 @@ import {
 } from "lucide-react";
 import ColorPicker from "./ColorPicker";
 
-interface AdvancedTextControlsProps {
-  selectedShape: any;
-  onChange: (updates: Record<string, any>) => void;
+  interface AdvancedTextControlsProps {
+  selectedShape: {
+    type?: string;
+    letterSpacing?: number;
+    lineHeight?: number;
+    textTransform?: string;
+    textShadow?: {
+      color: string;
+      blur: number;
+      offsetX: number;
+      offsetY: number;
+    };
+  } | null;
+  onChange: (updates: Record<string, unknown>) => void;
 }
+
 
 // Define proper TypeScript types
 type TextTransformValue = "none" | "uppercase" | "lowercase" | "capitalize";

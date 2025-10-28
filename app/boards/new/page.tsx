@@ -9,11 +9,11 @@ export default async function NewBoardPage() {
     const board = await createTemporaryBoard(user?.id);
     console.log("✅ BOARD CREATED SUCCESSFULLY! Redirecting to:", `/boards/${board.id}`);
     redirect(`/boards/${board.id}`);
-  } catch (error: any) {
-    // Check if this is a redirect error (normal) or a real error
-    if (error.digest?.includes('NEXT_REDIRECT')) {
+  } catch (error) { // ← Just remove the type annotation entirely
+    // Simple check for redirect error
+    if (error && typeof error === 'object' && 'digest' in error) {
       console.log("🔄 Normal redirect happening");
-      throw error; // Re-throw redirect errors
+      throw error;
     }
     
     console.error("❌ Real error creating board:", error);

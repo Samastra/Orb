@@ -271,7 +271,7 @@ export default function FeaturesPage() {
               </h2>
               <p className="text-xl text-gray-600 max-w-2xl mx-auto">
                 Join thousands of creators and teams who are already building 
-                better ideas with Orb's powerful features.
+                better ideas with Orb&apos;s powerful features.
               </p>
               <Link href="/sign-up">
                 <Button 

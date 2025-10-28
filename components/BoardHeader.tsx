@@ -32,6 +32,33 @@ import {
   Camera
 } from "lucide-react";
 
+interface ReactShape {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  // Add other properties as needed
+}
+
+interface KonvaShape {
+  id: string;
+  type: string;
+  // Add other properties as needed  
+}
+
+interface ImageShape {
+  id: string;
+  type: 'image';
+  src: string;
+  // Add other properties as needed
+}
+
+interface Connection {
+  id: string;
+  // Add other properties as needed
+}
+
+
 interface BoardHeaderProps {
   boardInfo: { title: string; category: string };
   isTemporaryBoard: boolean;
@@ -42,11 +69,11 @@ interface BoardHeaderProps {
   onAddImageFromRecommendations?: (imageUrl: string, altText: string) => void;
   onPlayVideo?: (videoId: string, title: string) => void;
   boardElements?: {
-    reactShapes: any[];
-    konvaShapes: any[];
-    stageFrames: any[];
-    images: any[];
-    connections: any[];
+    reactShapes: ReactShape[];
+    konvaShapes: KonvaShape[];
+    stageFrames: KonvaShape[];
+    images: ImageShape[];
+    connections: Connection[];
   };
 }
 
@@ -214,7 +241,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                 <AvatarImage src={user?.imageUrl} alt={user?.fullName || " "} />
                 <AvatarFallback className="rounded-xl bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 font-medium">
                   {user?.fullName?.split(" ")
-                    .map((word: any) => word.charAt(0).toUpperCase())
+                    .map((word: string) => word.charAt(0).toUpperCase())
                     .join("")
                   }
                 </AvatarFallback>

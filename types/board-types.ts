@@ -29,6 +29,7 @@ export type Action =
   | { type: "add-connection"; data: Connection } // ADD THIS
   | { type: "delete-connection"; connectionId: string } // ADD THIS
   | { type: "update-connection"; id: string; prevData: Connection; newData: Connection }; // ADD THIS
+   
 
 // ---------- Tool Types ----------
 export type Tool =

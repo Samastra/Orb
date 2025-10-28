@@ -16,6 +16,22 @@ import {
 import { useUser } from "@clerk/nextjs"
 import { getUserBoardsWithDetails } from "@/lib/actions/board-actions"
 
+interface BoardData {
+  id: string;
+  title?: string;
+  category?: string;
+  is_public?: boolean;
+  updated_at?: string;
+  created_at: string;
+}
+
+interface UserData {
+  username?: string;
+  fullName?: string;
+  imageUrl?: string;
+  email?: string;
+}
+
 interface RightPanelProps {
   onClose: () => void
 }
@@ -32,7 +48,7 @@ interface Activity {
 export default function RightPanel({ onClose }: RightPanelProps) {
   const { user } = useUser()
   const [activeTab, setActiveTab] = useState<"activity" | "details" | "comments">("activity")
-  const [boards, setBoards] = useState<any[]>([])
+  const [boards, setBoards] = useState<BoardData[]>([])
   const [recentActivity, setRecentActivity] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -53,9 +69,9 @@ export default function RightPanel({ onClose }: RightPanelProps) {
 
           // Generate real activity from user's boards
           const activity: Activity[] = (userBoards || [])
-            .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+            .sort((a: BoardData, b: BoardData) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
             .slice(0, 4)
-            .map((board: any, index: number) => ({
+            .map((board: BoardData, index: number) => ({
               id: board.id,
               user: "You",
               action: index === 0 ? "created" : "updated",
@@ -94,7 +110,7 @@ export default function RightPanel({ onClose }: RightPanelProps) {
     { 
       label: "Total Boards", 
       value: boards.length.toString(), 
-      change: `${boards.filter((b: any) => b.is_public).length} public` 
+      change: `${boards.filter((b: BoardData) => b.is_public).length} public` 
     },
     { 
       label: "Team Members", 
@@ -115,7 +131,7 @@ export default function RightPanel({ onClose }: RightPanelProps) {
 
   const getRecentBoards = () => {
     return boards
-      .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .sort((a: BoardData, b: BoardData) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
       .slice(0, 3)
   }
 
@@ -142,7 +158,7 @@ export default function RightPanel({ onClose }: RightPanelProps) {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as "activity" | "details" | "comments")}
             className={`
               flex items-center gap-2 flex-1 px-4 py-3 text-sm font-medium transition-colors
               ${activeTab === tab.id 
@@ -242,7 +258,7 @@ export default function RightPanel({ onClose }: RightPanelProps) {
             <div className="pt-4 border-t border-gray-200">
               <h4 className="text-sm font-semibold text-gray-900 mb-3">Recent Boards</h4>
               <div className="space-y-2">
-                {getRecentBoards().map((board: any) => (
+                {getRecentBoards().map((board: BoardData) => (
                   <div 
                     key={board.id}
                     onClick={() => window.location.href = `/boards/${board.id}`}

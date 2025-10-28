@@ -38,8 +38,31 @@ import ColorPicker from "./ColorPicker";
 import { ChevronUp,Layers } from "lucide-react";
 
 interface FormattingToolbarProps {
-  selectedShape: any;
-  onChange: (updates: Record<string, any>) => void;
+    selectedShape: {
+    type?: string;
+    fontSize?: number;
+    fontFamily?: string;
+    fontWeight?: string;
+    fontStyle?: string;
+    fill?: string;
+    textColor?: string;
+    backgroundColor?: string;
+    align?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    cornerRadius?: number;
+    textDecoration?: string;
+    letterSpacing?: number;
+    lineHeight?: number;
+    textTransform?: string;
+    textShadow?: {
+      color: string;
+      blur: number;
+      offsetX: number;
+      offsetY: number;
+    };
+} | null;
+  onChange: (updates: Record<string, unknown>) => void;
   onBringForward: () => void;
   onSendBackward: () => void;
   onBringToFront: () => void;
@@ -162,9 +185,9 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     
   const isText = selectedShape.type === "text";
   const isStickyNote = selectedShape.type === "stickyNote";
-  const isShape = ["rect", "circle", "ellipse", "triangle", "arrow"].includes(selectedShape.type);
+  const isShape = ["rect", "circle", "ellipse", "triangle", "arrow"].includes(selectedShape.type || "");
   const hasStroke = isShape || selectedShape.type === "stage";
-  const hasCorners = ["rect", "stage"].includes(selectedShape.type);
+  const hasCorners = ["rect", "stage"].includes(selectedShape.type || "");
   
   // FIXED: Proper color handling for different shape types
   const currentFontSize = selectedShape.fontSize || (isStickyNote ? 16 : 20);
@@ -365,7 +388,7 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
                   className="flex justify-between hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
                   style={{ 
                     fontWeight: weight.value,
-                    fontFamily: currentFontFamily 
+                    fontFamily: currentFontFamily || "Arial" 
                   }}
                 >
                   {weight.label}
@@ -402,7 +425,7 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
                   className="flex justify-between hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
                   style={{ 
                     fontStyle: style.value,
-                    fontFamily: currentFontFamily 
+                     fontFamily: currentFontFamily || "Arial"
                   }}
                 >
                   {style.label}

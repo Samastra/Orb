@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface GoogleBooksItem {
+  id: string;
+  volumeInfo: {
+    title: string;
+    authors?: string[];
+    imageLinks?: { thumbnail: string };
+    infoLink: string;
+  };
+}
+
+interface GoogleBooksResponse {
+  items?: GoogleBooksItem[];
+}
+
 // Retry function with exponential backoff
 const fetchWithRetry = async (url: string, retries = 5, delay = 2000) => {
   for (let i = 0; i < retries; i++) {
@@ -45,10 +59,10 @@ export async function GET(request: NextRequest) {
       throw new Error(`Google Books API request failed: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data: GoogleBooksResponse = await response.json();
 
     // Transform the data to match ResourceCard props
-    const books = data.items?.map((item: any) => ({
+    const books = data.items?.map((item: GoogleBooksItem) => ({
       id: item.id,
       heading: item.volumeInfo.title,
       body: item.volumeInfo.authors?.join(', ') || 'Unknown Author',
@@ -60,7 +74,7 @@ export async function GET(request: NextRequest) {
     })) || [];
 
     return NextResponse.json(books);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Books API error:', error);
     
     // Return empty array instead of error to prevent breaking the UI

@@ -64,7 +64,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose }) => {
         <div className="max-h-[400px] overflow-y-auto p-4">
           {messages.length === 0 && (
             <div className="text-gray-500 text-sm text-center">
-              Ask Orb anything, like "Best roadmap to study Python in 3 months"!
+              Ask Orb anything, like &ldquo;Best roadmap to study Python in 3 months&rdquo;!
             </div>
           )}
           {messages.map((msg, index) => (
