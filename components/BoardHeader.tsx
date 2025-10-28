@@ -16,49 +16,22 @@ import {
 import ResourceList from "@/components/ResourceList";
 import SaveBoardModal from "@/components/save-modal-board";
 import ChatModal from "@/components/ChatModal";
-import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal"; // NEW IMPORT
+import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal";
 import { useUser } from "@clerk/nextjs";
 import { 
   Mic, 
   MessageSquare, 
   Save, 
-  UserPlus, 
-  Users,
+  UserPlus,
   X,
   Circle,
-  MoreVertical, // NEW ICON
+  MoreVertical,
   Download,
   Share2,
   Camera
 } from "lucide-react";
-
-interface ReactShape {
-  id: string;
-  type: string;
-  x: number;
-  y: number;
-  // Add other properties as needed
-}
-
-interface KonvaShape {
-  id: string;
-  type: string;
-  // Add other properties as needed  
-}
-
-interface ImageShape {
-  id: string;
-  type: 'image';
-  src: string;
-  // Add other properties as needed
-}
-
-interface Connection {
-  id: string;
-  // Add other properties as needed
-}
-
-
+import type { ReactShape, ImageShape, Connection } from "@/types/board-types";
+import type { KonvaShape } from "@/hooks/useShapes";
 interface BoardHeaderProps {
   boardInfo: { title: string; category: string };
   isTemporaryBoard: boolean;
@@ -90,15 +63,14 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
 }) => {
   const { user } = useUser();
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false); // NEW STATE
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // NEW STATE
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <>
       <section className="flex items-center justify-between gap-4">
         <div className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur-sm px-6 py-4 shadow-lg border-b border-gray-200/80">
           <div className="flex items-center gap-4">
-            {/* UPDATED MENU BUTTON WITH DROPDOWN */}
             <div className="relative">
               <button 
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -107,7 +79,6 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                 <MoreVertical className="w-5 h-5 text-gray-600" />
               </button>
               
-              {/* DROPDOWN MENU */}
               {isMenuOpen && (
                 <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
                   <button 
@@ -123,7 +94,6 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                   
                   <button 
                     onClick={() => {
-                      // Placeholder for download functionality
                       console.log("Download board");
                       setIsMenuOpen(false);
                     }}
@@ -135,7 +105,6 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                   
                   <button 
                     onClick={() => {
-                      // Placeholder for snapshot functionality
                       console.log("Send snapshot");
                       setIsMenuOpen(false);
                     }}
@@ -251,7 +220,6 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
         </div>
       </section>
       
-      {/* MODALS */}
       <SaveBoardModal 
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
@@ -264,7 +232,6 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
         onClose={() => setIsChatOpen(false)}
       />
 
-      {/* NEW SHARE MODAL */}
       <ShareBoardModal 
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
