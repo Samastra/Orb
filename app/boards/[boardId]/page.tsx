@@ -6,7 +6,7 @@ import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useParams } from "next/navigation";
-import { Tool } from "@/types/board-types";
+import { ReactShape, Tool } from "@/types/board-types";
 import { defaultStageDimensions } from "@/constants/tool-constants";
 // Components
 import Toolbar from "@/components/Toolbar";
@@ -15,6 +15,8 @@ import StageComponent from "@/components/StageComponent";
 import CreateBoard from "@/components/createBoard";
 import { deleteBoard } from "@/lib/actions/board-actions";
 import VideoPlayerModal from '@/components/VideoPlayerModal';
+import TextCreateTool from "@/components/TextCreateTool";
+import FigmaTextComponent from "@/components/FigmaTextComponent";
 // Hooks
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { useBoardState } from "@/hooks/useBoardState";
@@ -259,6 +261,41 @@ const BoardPage = () => {
     setHasChanges(false);
   }
 }, [currentBoardId, isTemporaryBoard, user, debouncedTriggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, hasChanges, setIsInteracting]);
+
+
+  const handleTextCreate = useCallback((position: { x: number; y: number }) => {
+    console.log('🎯 Creating text at position:', position);
+    
+    const shapeId = `text-${Date.now()}`;
+    
+    const newTextShape: ReactShape = {
+      id: shapeId,
+      type: 'text',
+      x: position.x,
+      y: position.y,
+      text: "Type something...",
+      fontSize: 20,
+      fill: "#000000",
+      fontFamily: "Inter, Arial, sans-serif",
+      fontWeight: "400",
+      fontStyle: "normal",
+      align: "left",
+      draggable: true,
+    };
+    
+    setReactShapes(prev => [...prev, newTextShape]);
+    setSelectedNodeId(shapeId);
+    setActiveTool("text");
+    
+    // Add to undo/redo
+    undoRedoAddAction({
+      type: "add-react-shape",
+      shapeType: 'text',
+      data: newTextShape
+    });
+    
+    setHasChanges(true);
+  }, [setReactShapes, setSelectedNodeId, setActiveTool, undoRedoAddAction]);
 
   // Fetch board data and initialize boardInfo
   useEffect(() => {
@@ -825,6 +862,12 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
           onBringToFront={bringToFront}
           onSendToBack={sendToBack}
         />
+
+        <TextCreateTool
+          stageRef={stageRef}
+          activeTool={activeTool}
+          onTextCreate={handleTextCreate}
+        />
         <div className={cn(
           "absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-4",
           "bg-white/95 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-xl border border-gray-200/80",
@@ -907,6 +950,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
           setStageInstance={setStageInstance}
           updateConnection={updateConnection}
           onDelete={handleDeleteShape}
+          setActiveTool={setActiveTool}
         />
       </div>
       <CreateBoard 

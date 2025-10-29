@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Konva from "konva";
 import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, RegularPolygon, Image, Path, Group } from "react-konva";
 import GridLayer from "@/components/gridLayer";
-import EditableTextComponent from "@/components/editableTextCompoent";
+import FigmaTextComponent from "@/components/FigmaTextComponent";
 import { ReactShape, Tool, ImageShape } from "../types/board-types";
 import { KonvaShape } from "@/hooks/useShapes";
 import { Connection } from "@/hooks/useBoardState";
@@ -48,6 +48,8 @@ interface StageComponentProps {
   setStageInstance: (stage: Konva.Stage | null) => void;
   updateConnection: (id: string, updates: Partial<Connection>) => void;
   onDelete: (id: string) => void;
+  // ADD THESE TWO NEW PROPS:
+  setActiveTool: (tool: Tool | null) => void; // ADD THIS LINE
 }
 
 // Simple combined shape type
@@ -314,6 +316,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setStageInstance,
   updateConnection,
   onDelete,
+  setActiveTool,
 }) => {
   const shapeRefs = useRef<{ [key: string]: React.RefObject<Konva.Node | null> }>({});
 
@@ -352,7 +355,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
             const newH = Math.max(1, rectNode.height() * rectNode.scaleY());
             rectNode.scaleX(1);
             rectNode.scaleY(1);
-            updateShape(item.id, { x: rectNode.x(), y: rectNode.y(), width: newW, height: newH, rotation: rectNode.rotation() });
+            updateShape(item.id, { x: rectNode.x(), y: rectNode.y(), width: newW, height: newH, rotation: rectNode.rotation(), });
             break;
           }
           case 'circle': {
@@ -734,41 +737,49 @@ const StageComponent: React.FC<StageComponentProps> = ({
                   return null;
               }
             } else {
-              if (item.type === 'text') {
-                const textItem = item as ReactShape;
-                return (
-                  <EditableTextComponent
-                    key={item.id}
-                    ref={shapeRefs.current[item.id] as React.RefObject<Konva.Text>}
-                    id={item.id}
-                    x={item.x}
-                    y={item.y}
-                    text={textItem.text ?? "Double click to edit"}
-                    fontSize={textItem.fontSize ?? 20}
-                    fill={textItem.fill ?? "black"}
-                    fontFamily={textItem.fontFamily ?? "Arial"}
-                    fontWeight={textItem.fontWeight ?? "normal"}
-                    fontStyle={textItem.fontStyle ?? "normal"}
-                    textDecoration={textItem.textDecoration ?? "none"}
-                    align={["left", "center", "right", "justify"].includes((textItem.align ?? "left") as string) ? (textItem.align as "left" | "center" | "right" | "justify") : "left"}
-                    letterSpacing={textItem.letterSpacing ?? 0}
-                    lineHeight={textItem.lineHeight ?? 1.2}
-                    textTransform={textItem.textTransform ?? "none"}
-                    textShadow={textItem.textShadow}
-                    isSelected={selectedNodeId === item.id}
-                    activeTool={activeTool}
-                    onSelect={() => {
-                      if (activeTool === "select") {
-                        setSelectedNodeId(item.id);
-                      }
-                    }}
-                    onUpdate={(newAttrs: Partial<ReactShape>) => {
-                      setReactShapes(prev => prev.map(shape => 
-                        shape.id === item.id ? { ...shape, ...newAttrs } : shape
-                      ));
-                    }}
-                  />
-                );
+                if (item.type === 'text') {
+                  const textItem = item as ReactShape;
+                  const isEditing = selectedNodeId === item.id && activeTool === "text";
+                  
+                  return (
+                    <FigmaTextComponent
+                      key={item.id}
+                      ref={shapeRefs.current[item.id] as React.RefObject<Konva.Group>}
+                      id={item.id}
+                      x={item.x}
+                      y={item.y}
+                      text={textItem.text ?? "Type something..."}
+                      fontSize={textItem.fontSize ?? 20}
+                      fill={textItem.fill ?? "black"}
+                      fontFamily={textItem.fontFamily ?? "Inter, Arial, sans-serif"}
+                      fontWeight={textItem.fontWeight ?? "normal"}
+                      fontStyle={textItem.fontStyle ?? "normal"}
+                      align={(textItem.align as "left" | "center" | "right") ?? "left"}
+                      isSelected={selectedNodeId === item.id}
+                      isEditing={isEditing}
+                      onSelect={() => {
+                        if (activeTool === "select") {
+                          setSelectedNodeId(item.id);
+                        }
+                      }}
+                      onUpdate={(newAttrs: Partial<ReactShape>) => {
+                        setReactShapes(prev => prev.map(shape => 
+                          shape.id === item.id ? { ...shape, ...newAttrs } : shape
+                        ));
+                      }}
+                      onStartEditing={() => {
+                        setActiveTool("text");
+                      }}
+                      onFinishEditing={(newText?: string) => {
+                        if (newText !== undefined) {
+                          setReactShapes(prev => prev.map(shape => 
+                            shape.id === item.id ? { ...shape, text: newText } : shape
+                          ));
+                        }
+                        setActiveTool("select");
+                      }}
+                    />
+                  );
               } else if (item.type === 'stickyNote') {
                 return (
                   <EditableStickyNoteComponent
