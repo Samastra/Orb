@@ -114,7 +114,7 @@ const STICKY_NOTE_COLORS = [
 
 const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72];
 const strokeWidths = [1, 2, 3, 4, 5, 6, 8, 10, 12];
-const borderRadiusValues = [0, 2, 4, 6, 8, 12, 16, 20, 24, 32];
+const borderRadiusValues = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80];
 
 const getKonvaFontWeight = (weight: string): string => {
   const weightMap: { [key: string]: string } = {

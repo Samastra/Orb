@@ -836,7 +836,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
               className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110"
               title="Zoom Out"
             >
-              <Image src="/image/connect-nodes2.svg" alt="zoom-out" width={20} height={20} className="w-5 h-5 transition-transform duration-300" />
+              <Image src="/image/minus.png" alt="zoom-out" width={20} height={20} className="w-5 h-5 transition-transform duration-300" />
             </button>
             <div className="flex items-center gap-2 min-w-[80px] justify-center">
               <span className="text-sm font-medium text-gray-700 bg-gray-100/80 px-2 py-1 rounded-lg">

@@ -211,7 +211,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
           <div className="flex items-center gap-3">
             <button 
               className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group"
-              title="Voice commands - Coming soon"
+              title="stream feature - Coming soon"
             >
               <Mic className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
             </button>
