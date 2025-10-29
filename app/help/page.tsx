@@ -1,9 +1,5 @@
-import React from 'react'
+import { redirect } from 'next/navigation';
 
-const Help = () => {
-  return (
-    <div>Help</div>
-  )
+export default function Help() {
+  redirect('/contact');
 }
-
-export default Help

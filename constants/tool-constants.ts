@@ -16,7 +16,7 @@ export const toolIcons: Record<Tool, string> = {
   arrow: "/image/arrow-icon.svg",
   ellipse: "/image/ellipse.svg",
   stage: "/image/rectangle.svg",
-  image: "/image/image-icon.svg" // ← ADD THIS LINE
+  image: "/image/image-icon.png" // ← ADD THIS LINE
 };
 
 export const shapeOptions = [

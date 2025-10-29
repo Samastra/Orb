@@ -28,10 +28,12 @@ import {
   MoreVertical,
   Download,
   Share2,
-  Camera
+  Camera,
+  Sparkles
 } from "lucide-react";
 import type { ReactShape, ImageShape, Connection } from "@/types/board-types";
 import type { KonvaShape } from "@/hooks/useShapes";
+
 interface BoardHeaderProps {
   boardInfo: { title: string; category: string };
   isTemporaryBoard: boolean;
@@ -69,7 +71,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   return (
     <>
       <section className="flex items-center justify-between gap-4">
-        <div className="fixed top-0 left-0 right-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur-sm px-6 py-4 shadow-lg border-b border-gray-200/80">
+        <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between bg-white/95 backdrop-blur-sm px-6 py-4 shadow-lg border-b border-gray-200/80">
           <div className="flex items-center gap-4">
             <div className="relative">
               <button 
@@ -80,7 +82,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
               </button>
               
               {isMenuOpen && (
-                <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                <div className="absolute left-0 top-full mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50">
                   <button 
                     onClick={() => {
                       setIsShareModalOpen(true);
@@ -98,6 +100,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                       setIsMenuOpen(false);
                     }}
                     className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    title="Coming soon"
                   >
                     <Download className="w-4 h-4" />
                     <span>Download Board</span>
@@ -109,6 +112,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                       setIsMenuOpen(false);
                     }}
                     className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    title="Coming soon"
                   >
                     <Camera className="w-4 h-4" />
                     <span>Send Snapshot</span>
@@ -118,12 +122,9 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
-              <Link 
-                href={"/"} 
-                className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent hover:from-blue-700 hover:to-blue-900 transition-all duration-300"
-              >
+              <div className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                 Orb
-              </Link>
+              </div>
               <div className="w-px h-6 bg-gray-300/80"></div>
               <div className="flex items-center gap-2">
                 <p className="text-gray-700 font-medium">
@@ -141,13 +142,17 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group">
+            <button 
+              className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group"
+              title="Voice commands - Coming soon"
+            >
               <Mic className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
             </button>
+            
             <Sheet>
               <SheetTrigger asChild>
                 <button className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group">
-                  <MessageSquare className="w-4 h-4 text-gray-600 group-hover:text-purple-600" />
+                  <Sparkles className="w-4 h-4 text-gray-600 group-hover:text-purple-600" />
                 </button>
               </SheetTrigger>
               <SheetContent 
@@ -165,18 +170,21 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                 />
               </SheetContent>
             </Sheet>
+            
             <Button
               onClick={() => setIsChatOpen(true)}
               className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group"
             >
               <MessageSquare className="w-4 h-4 text-gray-600 group-hover:text-blue-600" />
             </Button>
+            
             <div className="flex items-center gap-2 px-3 py-2 bg-gray-100/80 rounded-xl border border-gray-200">
               <div className="flex items-center gap-1.5">
                 <Circle className="w-2 h-2 fill-green-500 text-green-500" />
                 <span className="text-sm font-medium text-gray-700">Solo</span>
               </div>
             </div>
+            
             {isTemporaryBoard && (
               <Button 
                 onClick={handleCloseWithoutSave}
@@ -187,13 +195,16 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                 Close
               </Button>
             )}
+            
             <Button
               variant="outline"
               className="border-green-500 text-green-600 hover:bg-green-50 hover:border-green-600 rounded-xl px-4 py-2 transition-all duration-300 group"
+              title="Invite collaborators - Coming soon"
             >
               <UserPlus className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
               Invite
             </Button>
+            
             <Button  
               onClick={() => {
                 console.log("🔄 Save button clicked - currentBoardId:", currentBoardId);
@@ -205,6 +216,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
               <Save className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
               Save Board
             </Button>
+            
             <Link href="/dashboard">
               <Avatar className="h-10 w-10 rounded-xl border-2 border-gray-200/80 hover:border-blue-500 transition-all duration-300 hover:scale-105">
                 <AvatarImage src={user?.imageUrl} alt={user?.fullName || " "} />

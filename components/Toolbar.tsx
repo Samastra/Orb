@@ -61,7 +61,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
   return (
     <div className={cn(
-      "fixed md:absolute left-4 top-24 md:top-24 flex flex-col items-center z-50 transition-all duration-300",
+      "fixed md:absolute left-4 top-24 md:top-24 flex flex-col items-center z-30 transition-all duration-300",
       compact ? "scale-90 origin-left" : ""
     )}>
       {/* Premium Glass Morphism Toolbar */}
@@ -129,7 +129,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 title="Upload image"
               />
               <button className="flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl hover:bg-gray-100/80 transition-all duration-300 border-2 border-transparent hover:border-gray-300 hover:scale-105">
-                <img src="/image/upload-icon.svg" alt="upload" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
+                <img src="/image/image-icon.png" alt="upload" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
               </button>
             </div>
           </TooltipTrigger>

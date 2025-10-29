@@ -2,12 +2,17 @@
 
 import Link from "next/link"
 import { Button } from "./ui/button"
-import { SignOutButton, useUser } from "@clerk/nextjs"
+import { useUser } from "@clerk/nextjs"
 import { motion } from "framer-motion"
 import { Command, Zap } from "lucide-react"
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar"
 
 const Navbar = () => {
-  const { isSignedIn } = useUser()
+  const { isSignedIn, user } = useUser()
 
   return (
     <motion.nav 
@@ -63,17 +68,17 @@ const Navbar = () => {
                 variant="outline" 
                 className="border-gray-300 hover:border-blue-300 text-gray-700 hover:text-blue-600 transition-all duration-300"
               >
-                My Boards
+                Explore Boards
               </Button>
             </Link>
-            <SignOutButton>
-              <Button 
-                variant="ghost" 
-                className="text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all duration-300"
-              >
-                Sign Out
-              </Button>
-            </SignOutButton>
+            <Link href="/dashboard">
+              <Avatar className="h-10 w-10 rounded-xl border-2 border-gray-200/80 hover:border-blue-500 transition-all duration-300 hover:scale-105 cursor-pointer">
+                <AvatarImage src={user?.imageUrl} alt={user?.fullName || "User"} />
+                <AvatarFallback className="rounded-xl bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 font-medium">
+                  {user?.fullName?.split(" ").map(word => word.charAt(0).toUpperCase()).join("")}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
           </>
         ) : (
           <>

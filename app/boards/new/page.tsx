@@ -11,7 +11,7 @@ export default async function NewBoardPage() {
     redirect(`/boards/${board.id}`);
   } catch (error) { // ← Just remove the type annotation entirely
     // Simple check for redirect error
-    if (error && typeof error === 'object' && 'digest' in error) {
+    if (error && typeof error === 'object' && 'digest' in error) { 
       console.log("🔄 Normal redirect happening");
       throw error;
     }
