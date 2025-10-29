@@ -29,16 +29,24 @@ import {
   Download,
   Share2,
   Camera,
-  Sparkles
+  Sparkles,
+  FileImage,
+  FileText,
+  Image
 } from "lucide-react";
 import type { ReactShape, ImageShape, Connection } from "@/types/board-types";
 import type { KonvaShape } from "@/hooks/useShapes";
+import { downloadAsImage, downloadAsPDF } from "@/lib/download-utils";
+
+// Add Konva import
+import type Konva from "konva";
 
 interface BoardHeaderProps {
   boardInfo: { title: string; category: string };
   isTemporaryBoard: boolean;
   currentBoardId: string;
   showSaveModal: boolean;
+  stageRef?: React.RefObject<Konva.Stage | null>;
   setShowSaveModal: (show: boolean) => void;
   handleCloseWithoutSave: () => void;
   onAddImageFromRecommendations?: (imageUrl: string, altText: string) => void;
@@ -57,6 +65,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   isTemporaryBoard,
   currentBoardId,
   showSaveModal,
+  stageRef,
   setShowSaveModal,
   handleCloseWithoutSave,
   onAddImageFromRecommendations,
@@ -67,6 +76,35 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDownloadSubmenuOpen, setIsDownloadSubmenuOpen] = useState(false);
+
+  const handleDownload = async (format: 'png' | 'jpeg' | 'pdf'): Promise<void> => {
+  setIsMenuOpen(false);
+  setIsDownloadSubmenuOpen(false);
+  
+  try {
+    const stage = stageRef?.current;
+    
+    if (!stage) {
+      console.error('Stage not found');
+      return;
+    }
+
+    switch (format) {
+      case 'png':
+        downloadAsImage(stage, 'png');
+        break;
+      case 'jpeg':
+        downloadAsImage(stage, 'jpeg');
+        break;
+      case 'pdf':
+        downloadAsPDF(stage);
+        break;
+    }
+  } catch (error) {
+    console.error('Download failed:', error);
+  }
+};
 
   return (
     <>
@@ -94,17 +132,46 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                     <span>Share Board</span>
                   </button>
                   
-                  <button 
-                    onClick={() => {
-                      console.log("Download board");
-                      setIsMenuOpen(false);
-                    }}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                    title="Coming soon"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Download Board</span>
-                  </button>
+                  {/* Download with Submenu */}
+                  <div className="relative">
+                    <button 
+                      onClick={() => setIsDownloadSubmenuOpen(!isDownloadSubmenuOpen)}
+                      className="flex items-center justify-between w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Download className="w-4 h-4" />
+                        <span>Download Board</span>
+                      </div>
+                      <span className="text-xs">▶</span>
+                    </button>
+                    
+                    {/* Download Submenu */}
+                    {isDownloadSubmenuOpen && (
+                      <div className="absolute left-full top-0 ml-1 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-50">
+                        <button 
+                          onClick={() => handleDownload('png')}
+                          className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <FileImage className="w-4 h-4" />
+                          <span>Download as PNG</span>
+                        </button>
+                        <button 
+                          onClick={() => handleDownload('jpeg')}
+                          className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <Image className="w-4 h-4" />
+                          <span>Download as JPEG</span>
+                        </button>
+                        <button 
+                          onClick={() => handleDownload('pdf')}
+                          className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>Download as PDF</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   
                   <button 
                     onClick={() => {

@@ -794,6 +794,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
           setShowSaveModal={setShowSaveModal}
           handleCloseWithoutSave={handleCloseWithoutSave}
           onAddImageFromRecommendations={handleAddImageFromRecommendations}
+          stageRef={stageRef}
           onPlayVideo={openVideo}
           boardElements={{
             reactShapes,
