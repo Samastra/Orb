@@ -56,6 +56,7 @@ const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
     const textRef = useRef<Konva.Text>(null);
     const trRef = useRef<Konva.Transformer>(null);
     const editorRef = useRef<HTMLDivElement>(null);
+    const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null); // FIXED LINE
 
     // **1. SELECT → SHOW TRANSFORMER**
     useEffect(() => {
@@ -193,7 +194,7 @@ const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
       });
     }, [onUpdate]);
 
-    // **4. TRANSFORM - HANDLED IN REAL-TIME (FIXED!)**
+    // **4. TRANSFORM - DEBOUNCED UPDATES (NO VIBRATION!)**
     const handleTransform = useCallback(() => {
       const group = groupRef.current;
       const transformer = trRef.current;
@@ -203,12 +204,20 @@ const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
       const activeAnchor = transformer.getActiveAnchor();
       const isMiddleAnchor = activeAnchor?.includes('middle-left') || activeAnchor?.includes('middle-right');
       
+      // **CLEAR ANY PENDING UPDATES**
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+
       if (isMiddleAnchor) {
         // MIDDLE ANCHOR: Update width only, reset scale immediately
         const newWidth = Math.max(50, width * group.scaleX());
         group.scaleX(1); // RESET SCALE IMMEDIATELY
         
-        onUpdate({ width: newWidth });
+        // **DEBOUNCED STATE UPDATE**
+        updateTimeoutRef.current = setTimeout(() => {
+          onUpdate({ width: newWidth });
+        }, 16); // ~60fps
       } else {
         // CORNER ANCHOR: Scale proportionally
         const newWidth = Math.max(50, width * group.scaleX());
@@ -216,14 +225,26 @@ const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
         group.scaleX(1);
         group.scaleY(1);
         
-        onUpdate({ 
-          width: newWidth, 
-          fontSize: newFontSize 
-        });
+        // **DEBOUNCED STATE UPDATE**
+        updateTimeoutRef.current = setTimeout(() => {
+          onUpdate({ 
+            width: newWidth, 
+            fontSize: newFontSize 
+          });
+        }, 16); // ~60fps
       }
     }, [width, fontSize, onUpdate]);
 
-    // **5. CLICK → SELECT (NOT EDIT)**
+    // **5. CLEANUP TIMEOUT ON UNMOUNT**
+    useEffect(() => {
+      return () => {
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+        }
+      };
+    }, []);
+
+    // **6. CLICK → SELECT (NOT EDIT)**
     const handleClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
       e.cancelBubble = true;
       if (activeTool === "select" && !isEditing) {
@@ -231,7 +252,7 @@ const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
       }
     }, [activeTool, isEditing, onSelect]);
 
-    // **6. DOUBLE-CLICK → EDIT (FOR EXISTING TEXT)**
+    // **7. DOUBLE-CLICK → EDIT (FOR EXISTING TEXT)**
     const handleDblClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
       e.cancelBubble = true;
       if (!isEditing) {
@@ -248,7 +269,7 @@ const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
           rotation={rotation}
           draggable={!isEditing}
           onDragEnd={handleDragEnd}
-          onTransform={handleTransform} // CHANGED: onTransform instead of onTransformEnd
+          onTransform={handleTransform}
           onClick={handleClick}
           onTap={handleClick}
           onDblClick={handleDblClick}
