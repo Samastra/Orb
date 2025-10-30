@@ -82,6 +82,7 @@ export type ReactShape = {
   draggable?: boolean;
   width?: number;
   height?: number;
+  rotation?: number;
   backgroundColor?: string;
   textColor?: string;
   letterSpacing?: number;

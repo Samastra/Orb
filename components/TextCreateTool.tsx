@@ -1,3 +1,4 @@
+// components/TextCreateTool.tsx
 "use client";
 
 import React, { useCallback, useEffect, useRef } from "react";
@@ -22,10 +23,8 @@ const TextCreateTool: React.FC<TextCreateToolProps> = ({
     const stage = stageRef.current;
     if (!stage) return;
 
-    // Prevent creating text on existing shapes
+    // Prevent creating text when clicking on existing elements
     if (e.target !== stage) return;
-
-    isCreating.current = true;
 
     // Get click position in stage coordinates
     const pointerPos = stage.getPointerPosition();
@@ -38,25 +37,23 @@ const TextCreateTool: React.FC<TextCreateToolProps> = ({
     console.log('📝 Creating text at:', stagePos);
     onTextCreate(stagePos);
 
-    // Reset after a short delay to prevent multiple creations
+    isCreating.current = true;
     setTimeout(() => {
       isCreating.current = false;
     }, 100);
   }, [activeTool, stageRef, onTextCreate]);
 
-  // Setup event listeners
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
 
     stage.on('click', handleStageClick);
-
     return () => {
       stage.off('click', handleStageClick);
     };
   }, [stageRef, handleStageClick]);
 
-  return null; // This component doesn't render anything
+  return null;
 };
 
 export default TextCreateTool;

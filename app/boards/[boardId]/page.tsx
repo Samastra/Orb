@@ -16,7 +16,7 @@ import CreateBoard from "@/components/createBoard";
 import { deleteBoard } from "@/lib/actions/board-actions";
 import VideoPlayerModal from '@/components/VideoPlayerModal';
 import TextCreateTool from "@/components/TextCreateTool";
-import FigmaTextComponent from "@/components/FigmaTextComponent";
+import QuillTextEditor from "@/components/QuillTextEditor";
 // Hooks
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { useBoardState } from "@/hooks/useBoardState";
@@ -144,6 +144,37 @@ const BoardPage = () => {
     removeConnection,
   } = boardState;
 
+    const [editingText, setEditingText] = useState<{
+  isEditing: boolean;
+  position: { x: number; y: number };
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  width: number;
+  onSave: (text: string) => void;
+} | null>(null);
+
+// Add handler for text editing
+const handleStartTextEditing = useCallback((textProps: {
+  position: { x: number; y: number };
+  text: string;
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  width: number;
+  onSave: (text: string) => void;
+}) => {
+  setEditingText({
+    isEditing: true,
+    ...textProps
+  });
+}, []);
+
+const handleFinishTextEditing = useCallback(() => {
+  setEditingText(null);
+}, []);
+
   // Undo/Redo functionality
   const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
     stageRef,
@@ -262,40 +293,34 @@ const BoardPage = () => {
   }
 }, [currentBoardId, isTemporaryBoard, user, debouncedTriggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, hasChanges, setIsInteracting]);
 
-
-  const handleTextCreate = useCallback((position: { x: number; y: number }) => {
-    console.log('🎯 Creating text at position:', position);
-    
-    const shapeId = `text-${Date.now()}`;
-    
-    const newTextShape: ReactShape = {
-      id: shapeId,
-      type: 'text',
-      x: position.x,
-      y: position.y,
-      text: "Type something...",
-      fontSize: 20,
-      fill: "#000000",
-      fontFamily: "Inter, Arial, sans-serif",
-      fontWeight: "400",
-      fontStyle: "normal",
-      align: "left",
-      draggable: true,
-    };
-    
-    setReactShapes(prev => [...prev, newTextShape]);
-    setSelectedNodeId(shapeId);
-    setActiveTool("text");
-    
-    // Add to undo/redo
-    undoRedoAddAction({
-      type: "add-react-shape",
-      shapeType: 'text',
-      data: newTextShape
-    });
-    
-    setHasChanges(true);
-  }, [setReactShapes, setSelectedNodeId, setActiveTool, undoRedoAddAction]);
+const handleTextCreate = useCallback((position: { x: number; y: number }) => {
+  console.log('🎯 Creating text at position:', position);
+  
+  const shapeId = `text-${Date.now()}`;
+  
+  const newTextShape: ReactShape = {
+    id: shapeId,
+    type: 'text',
+    x: position.x,
+    y: position.y,
+    text: "Type something...",
+    fontSize: 20,
+    fill: "#000000",
+    fontFamily: "Inter, Arial, sans-serif",
+    fontWeight: "400",
+    fontStyle: "normal",
+    align: "left",
+    draggable: true,
+    width: 200,
+    rotation: 0,
+  };
+  
+  setReactShapes(prev => [...prev, newTextShape]);
+  setSelectedNodeId(shapeId);
+  setActiveTool("text"); // This will put the text in editing mode immediately
+  
+  console.log('✅ Text created and set to editing mode');
+}, [setReactShapes, setSelectedNodeId, setActiveTool]);
 
   // Fetch board data and initialize boardInfo
   useEffect(() => {
@@ -719,12 +744,12 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
     toolHandlers.handleToolChange(tool);
     setActiveTool(tool);
     
-    if (tool === 'text' || tool === 'stickyNote') {
-      setTimeout(() => {
-        console.log('📝 Auto-creating shape from keyboard shortcut:', tool);
-        handleAddShape(tool);
-      }, 100);
-    }
+    // if (tool === 'text' || tool === 'stickyNote') {
+    //   setTimeout(() => {
+    //     console.log('📝 Auto-creating shape from keyboard shortcut:', tool);
+    //     handleAddShape(tool);
+    //   }, 100);
+    // }
   }, [toolHandlers.handleToolChange, setActiveTool, handleAddShape,toolHandlers]);
 
   // Calculate viewport center
@@ -951,6 +976,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
           updateConnection={updateConnection}
           onDelete={handleDeleteShape}
           setActiveTool={setActiveTool}
+          handleStartTextEditing={handleStartTextEditing}
         />
       </div>
       <CreateBoard 
@@ -971,6 +997,21 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
         isOpen={isVideoOpen}
         onClose={closeVideo}
       />
+
+         {editingText && (
+      <QuillTextEditor
+        isOpen={editingText.isEditing}
+        position={editingText.position}
+        initialText={editingText.text}
+        fontSize={editingText.fontSize}
+        fontFamily={editingText.fontFamily}
+        color={editingText.color}
+        width={editingText.width}
+        onSave={editingText.onSave}
+        onCancel={handleFinishTextEditing}
+      />
+    )}
+
     </>
   );
 };
