@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Konva from "konva";
 import { useParams } from "next/navigation";
-import { BoardState, Tool, Action, ReactShape, ImageShape } from "../types/board-types";
+import { Tool, Action, ReactShape, ImageShape } from "../types/board-types";
 import { defaultStageDimensions, defaultBoardInfo } from "../constants/tool-constants";
 import { KonvaShape } from "./useShapes";
 

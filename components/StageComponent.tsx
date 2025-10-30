@@ -754,7 +754,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                 return (
                   <TextComponent
                     key={item.id}
-                    ref={shapeRefs.current[item.id] as React.RefObject<Konva.Group>}
+                    ref={shapeRefs.current[item.id] as React.RefObject<Konva.Text>}
                     id={item.id}
                     x={item.x}
                     y={item.y}

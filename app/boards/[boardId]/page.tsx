@@ -26,7 +26,7 @@ import FormattingToolbar from "@/components/FormattingToolbar";
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 // Utils
 import { fetchBoard } from "@/lib/actions/board-actions";
-import { useWindowSize } from "@/hooks/useWindowSize";
+// import { useWindowSize } from "@/hooks/useWindowSize";
 import { cn } from "@/lib/utils";
 import { loadBoardElements } from "@/lib/actions/board-elements-actions";
 
