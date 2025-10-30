@@ -2,8 +2,9 @@
 "use client";
 
 import React, { useRef, useEffect, useCallback, forwardRef } from "react";
-import { Group, Text as KonvaText, Rect, Transformer } from "react-konva";
+import { Text as KonvaText, Transformer } from "react-konva";
 import Konva from "konva";
+import { KonvaEventObject } from "konva/lib/Node";
 
 interface TextComponentProps {
   id: string;
@@ -22,12 +23,19 @@ interface TextComponentProps {
   isEditing: boolean;
   activeTool: string | null;
   onSelect: () => void;
-  onUpdate: (attrs: any) => void;
+  onUpdate: (attrs: { 
+    x?: number; 
+    y?: number; 
+    width?: number; 
+    fontSize?: number; 
+    rotation?: number; 
+    text?: string;
+  }) => void;
   onStartEditing: () => void;
   onFinishEditing: () => void;
 }
 
-const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
+const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
   (
     {
       id,
@@ -52,127 +60,198 @@ const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
     },
     ref
   ) => {
-    const groupRef = useRef<Konva.Group>(null);
     const textRef = useRef<Konva.Text>(null);
     const trRef = useRef<Konva.Transformer>(null);
     const editorRef = useRef<HTMLDivElement>(null);
-    const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null); // FIXED LINE
+    const isNew = useRef(true);
 
-    // **1. SELECT → SHOW TRANSFORMER**
+    // **AUTO-EDIT ON CREATE**
     useEffect(() => {
-      if (isSelected && groupRef.current && trRef.current && !isEditing) {
-        trRef.current.nodes([groupRef.current]);
+      if (isNew.current && !isEditing) {
+        isNew.current = false;
+        onStartEditing();
+      }
+    }, [isEditing, onStartEditing]);
+
+    // **TRANSFORMER**
+    useEffect(() => {
+      if (isSelected && textRef.current && trRef.current && !isEditing) {
+        trRef.current.nodes([textRef.current]);
         trRef.current.getLayer()?.batchDraw();
       } else if (trRef.current) {
         trRef.current.nodes([]);
       }
     }, [isSelected, isEditing]);
 
-    // **2. IMMEDIATE EDITING WHEN CREATED**
-    useEffect(() => {
-      if (isEditing && groupRef.current && textRef.current) {
-        const stage = groupRef.current.getStage();
-        if (!stage) return;
+    // **LIVE WIDTH UPDATE ON TRANSFORM (NO STRETCH!)**
+    const handleTransform = useCallback(() => {
+      const node = textRef.current;
+      const transformer = trRef.current;
+      if (!node || !transformer) return;
 
-        // **CREATE CONTENTEDITABLE DIV**
-        const editor = document.createElement("div");
-        document.body.appendChild(editor);
-        editorRef.current = editor;
+      // Get current scale from the transform
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
 
-        // **EXACT POSITIONING**
-        const textNode = textRef.current;
-        const textPos = textNode.getAbsolutePosition();
-        const stageContainer = stage.container();
-        const stageRect = stageContainer.getBoundingClientRect();
+      // Detect if user is scaling diagonally (corner anchors)
+      const activeAnchor = transformer.getActiveAnchor();
+      const isCornerAnchor =
+        activeAnchor &&
+        (activeAnchor.includes("top") || activeAnchor.includes("bottom")) &&
+        (activeAnchor.includes("left") || activeAnchor.includes("right"));
 
-        const screenX = stageRect.left + textPos.x;
-        const screenY = stageRect.top + textPos.y;
+      if (isCornerAnchor) {
+        // --- CORNER ANCHOR: SCALE FONT SIZE + WIDTH ---
+        const oldFontSize = node.fontSize();
+        const oldWidth = node.width();
 
-        // **SET CONTENT AND EXACT STYLING (NO BORDERS/PADDING)**
-        editor.innerHTML = initialText || "";
-        Object.assign(editor.style, {
-          position: "fixed",
-          left: `${screenX}px`,
-          top: `${screenY}px`,
-          width: `${width}px`,
-          fontSize: `${fontSize}px`,
-          fontFamily,
-          fontWeight,
-          fontStyle,
-          color: fill,
-          textAlign: align,
-          lineHeight: "1.4",
-          border: "none",
-          padding: "0px",
-          margin: "0px",
-          borderRadius: "0px",
-          background: "transparent",
-          boxShadow: "none",
-          outline: "none",
-          zIndex: "10000",
-          transform: `rotate(${rotation}deg)`,
-          transformOrigin: "top left",
-          cursor: "text",
-          whiteSpace: "pre-wrap",
-          wordWrap: "break-word",
-          minHeight: `${fontSize * 1.4}px`,
-        });
+        // Update font size and width proportionally
+        const newFontSize = Math.max(6, oldFontSize * scaleY); // prevent collapse
+        const newWidth = Math.max(50, oldWidth * scaleX);
 
-        // **MAKE EDITABLE AND FOCUS**
-        editor.contentEditable = "true";
-        
-        setTimeout(() => {
-          editor.focus();
-          const selection = window.getSelection();
-          const range = document.createRange();
-          range.selectNodeContents(editor);
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-        }, 50);
+        node.fontSize(newFontSize);
+        node.width(newWidth);
 
-        // **AUTO-RESIZE HEIGHT AS YOU TYPE**
-        const resize = () => {
-          editor.style.height = "auto";
-          editor.style.height = `${editor.scrollHeight}px`;
-        };
-        editor.addEventListener("input", resize);
-        resize();
-
-        // **SAVE ON BLUR**
-        const handleBlur = () => {
-          if (editor.parentNode) {
-            onUpdate({ text: editor.innerHTML });
-            onFinishEditing();
-          }
-        };
-
-        // **SAVE ON ENTER**
-        const handleKeyDown = (e: KeyboardEvent) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            editor.blur();
-          } else if (e.key === "Escape") {
-            editor.blur();
-          }
-        };
-
-        editor.addEventListener("blur", handleBlur);
-        editor.addEventListener("keydown", handleKeyDown);
-
-        // **CLEANUP**
-        return () => {
-          if (editor.parentNode) {
-            editor.removeEventListener("input", resize);
-            editor.removeEventListener("keydown", handleKeyDown);
-            editor.removeEventListener("blur", handleBlur);
-            document.body.removeChild(editor);
-          }
-        };
+        // Reset scale so further transforms build correctly
+        node.scaleX(1);
+        node.scaleY(1);
+      } else {
+        // --- SIDE ANCHORS: ONLY ADJUST WIDTH (KEEP WRAPPING) ---
+        const newWidth = Math.max(50, node.width() * scaleX);
+        node.width(newWidth);
+        node.scaleX(1);
+        node.scaleY(1);
       }
+
+      node.getLayer()?.batchDraw();
+    }, []);
+
+    // **TRANSFORM END — UPDATE STATE**
+    const handleTransformEnd = useCallback(() => {
+      const node = textRef.current;
+      if (!node) return;
+
+      onUpdate({
+        x: node.x(),
+        y: node.y(),
+        width: node.width(),
+        fontSize: node.fontSize(),
+        rotation: node.rotation(),
+      });
+    }, [onUpdate]);
+
+    // **DRAG END**
+    const handleDragEnd = useCallback(
+      (e: KonvaEventObject<DragEvent>) => {
+        const node = e.target;
+        onUpdate({ x: node.x(), y: node.y() });
+      },
+      [onUpdate]
+    );
+
+    // **CLICK → SELECT**
+    const handleClick = useCallback(
+      (e: KonvaEventObject<MouseEvent>) => {
+        e.cancelBubble = true;
+        if (activeTool === "select" && !isEditing) onSelect();
+      },
+      [activeTool, isEditing, onSelect]
+    );
+
+    // **DOUBLE-CLICK → EDIT**
+    const handleDblClick = useCallback(
+      (e: KonvaEventObject<MouseEvent>) => {
+        e.cancelBubble = true;
+        if (!isEditing) onStartEditing();
+      },
+      [isEditing, onStartEditing]
+    );
+
+    // **INLINE EDITOR**
+    useEffect(() => {
+      if (!isEditing || !textRef.current) return;
+
+      const node = textRef.current;
+      const stage = node.getStage();
+      if (!stage) return;
+
+      const editor = document.createElement("div");
+      editorRef.current = editor;
+      document.body.appendChild(editor);
+
+      const { x: absX, y: absY } = node.getAbsolutePosition();
+      const stageBox = stage.container().getBoundingClientRect();
+
+      Object.assign(editor.style, {
+        position: "fixed",
+        left: `${stageBox.left + absX}px`,
+        top: `${stageBox.top + absY}px`,
+        width: `${node.width()}px`,
+        minHeight: `${fontSize * 1.4}px`,
+        fontSize: `${fontSize}px`,
+        fontFamily,
+        fontWeight,
+        fontStyle,
+        color: fill,
+        textAlign: align,
+        lineHeight: "1.4",
+        padding: "0",
+        margin: "0",
+        border: "none",
+        outline: "none",
+        background: "transparent",
+        whiteSpace: "pre-wrap",
+        wordWrap: "break-word",
+        cursor: "text",
+        zIndex: "10000",
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: "top left",
+      });
+
+      editor.contentEditable = "true";
+      editor.innerHTML = initialText || "";
+
+      const resize = () => {
+        editor.style.height = "auto";
+        editor.style.height = `${editor.scrollHeight}px`;
+      };
+
+      const handleInput = () => resize();
+      const handleBlur = () => {
+        const newText = editor.innerHTML;
+        onUpdate({ text: newText });
+        // Auto-resize text node width to fit new content
+        const tempText = new Konva.Text({ text: newText, fontSize, fontFamily });
+        const minWidth = tempText.width() + 20;
+        onUpdate({ width: Math.max(node.width(), minWidth) });
+        onFinishEditing();
+      };
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          editor.blur();
+        }
+        if (e.key === "Escape") editor.blur();
+      };
+
+      editor.addEventListener("input", handleInput);
+      editor.addEventListener("blur", handleBlur);
+      editor.addEventListener("keydown", handleKeyDown);
+      resize();
+      setTimeout(() => editor.focus(), 0);
+
+      return () => {
+        editor.removeEventListener("input", handleInput);
+        editor.removeEventListener("blur", handleBlur);
+        editor.removeEventListener("keydown", handleKeyDown);
+        if (document.body.contains(editor)) {
+          document.body.removeChild(editor);
+        }
+      };
     }, [
       isEditing,
       initialText,
-      width,
       fontSize,
       fill,
       fontFamily,
@@ -184,158 +263,52 @@ const TextComponent = forwardRef<Konva.Group, TextComponentProps>(
       onFinishEditing,
     ]);
 
-    // **3. DRAG END**
-    const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-      const node = e.target;
-      onUpdate({
-        x: node.x(),
-        y: node.y(),
-        rotation: node.rotation(),
-      });
-    }, [onUpdate]);
-
-    // **4. TRANSFORM - DEBOUNCED UPDATES (NO VIBRATION!)**
-    const handleTransform = useCallback(() => {
-      const group = groupRef.current;
-      const transformer = trRef.current;
-      
-      if (!group || !transformer) return;
-
-      const activeAnchor = transformer.getActiveAnchor();
-      const isMiddleAnchor = activeAnchor?.includes('middle-left') || activeAnchor?.includes('middle-right');
-      
-      // **CLEAR ANY PENDING UPDATES**
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-
-      if (isMiddleAnchor) {
-        // MIDDLE ANCHOR: Update width only, reset scale immediately
-        const newWidth = Math.max(50, width * group.scaleX());
-        group.scaleX(1); // RESET SCALE IMMEDIATELY
-        
-        // **DEBOUNCED STATE UPDATE**
-        updateTimeoutRef.current = setTimeout(() => {
-          onUpdate({ width: newWidth });
-        }, 16); // ~60fps
-      } else {
-        // CORNER ANCHOR: Scale proportionally
-        const newWidth = Math.max(50, width * group.scaleX());
-        const newFontSize = Math.max(12, fontSize * group.scaleX());
-        group.scaleX(1);
-        group.scaleY(1);
-        
-        // **DEBOUNCED STATE UPDATE**
-        updateTimeoutRef.current = setTimeout(() => {
-          onUpdate({ 
-            width: newWidth, 
-            fontSize: newFontSize 
-          });
-        }, 16); // ~60fps
-      }
-    }, [width, fontSize, onUpdate]);
-
-    // **5. CLEANUP TIMEOUT ON UNMOUNT**
-    useEffect(() => {
-      return () => {
-        if (updateTimeoutRef.current) {
-          clearTimeout(updateTimeoutRef.current);
-        }
-      };
-    }, []);
-
-    // **6. CLICK → SELECT (NOT EDIT)**
-    const handleClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-      e.cancelBubble = true;
-      if (activeTool === "select" && !isEditing) {
-        onSelect();
-      }
-    }, [activeTool, isEditing, onSelect]);
-
-    // **7. DOUBLE-CLICK → EDIT (FOR EXISTING TEXT)**
-    const handleDblClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-      e.cancelBubble = true;
-      if (!isEditing) {
-        onStartEditing();
-      }
-    }, [isEditing, onStartEditing]);
-
     return (
       <>
-        <Group
-          ref={groupRef}
+        <KonvaText
+          ref={textRef}
+          id={id}
           x={x}
           y={y}
+          text={initialText || "Click to edit"}
+          fontSize={fontSize}
+          fontFamily={fontFamily}
+          fontWeight={fontWeight}
+          fontStyle={fontStyle}
+          fill={fill}
+          align={align}
+          width={width}
+          wrap="word"
+          lineHeight={1.4}
           rotation={rotation}
           draggable={!isEditing}
           onDragEnd={handleDragEnd}
           onTransform={handleTransform}
+          onTransformEnd={handleTransformEnd}
           onClick={handleClick}
           onTap={handleClick}
           onDblClick={handleDblClick}
           onDblTap={handleDblClick}
-          name="selectable-shape"
-          id={id}
-        >
-          {/* **HIT BOX** */}
-          <Rect
-            width={width}
-            height={fontSize * 1.8}
-            fill="transparent"
-            stroke={isSelected ? "#0099e5" : "transparent"}
-            strokeWidth={isSelected ? 2 : 0}
-          />
+          visible={!isEditing}
+        />
 
-          {/* **VISIBLE TEXT** */}
-          <KonvaText
-            ref={textRef}
-            text={initialText || "Click to edit"}
-            fontSize={fontSize}
-            fontFamily={fontFamily}
-            fontWeight={fontWeight}
-            fontStyle={fontStyle}
-            fill={fill}
-            align={align}
-            width={width}
-            wrap="word"
-            lineHeight={1.4}
-            listening={false}
-          />
-        </Group>
-
-        {/* **TRANSFORMER WITH SMART ANCHOR BEHAVIOR** */}
         {isSelected && !isEditing && (
           <Transformer
             ref={trRef}
             boundBoxFunc={(oldBox, newBox) => {
-              const transformer = trRef.current;
-              if (transformer) {
-                const activeAnchor = transformer.getActiveAnchor();
-                const isMiddleAnchor = activeAnchor?.includes('middle-left') || activeAnchor?.includes('middle-right');
-                
-                if (isMiddleAnchor) {
-                  // Middle anchors: only change width, keep height
-                  return {
-                    ...newBox,
-                    width: Math.max(30, newBox.width),
-                    height: oldBox.height,
-                  };
-                }
-              }
-              
-              // Corner anchors: scale proportionally
-              return {
-                ...newBox,
-                width: Math.max(30, newBox.width),
-                height: Math.max(30, newBox.height),
-              };
+              newBox.width = Math.max(50, newBox.width);
+              return newBox;
             }}
-            rotateEnabled={true}
             enabledAnchors={[
-              'top-left', 'top-right', 
-              'bottom-left', 'bottom-right',
-              'middle-left', 'middle-right'
+              "top-left",
+              "top-right",
+              "bottom-left",
+              "bottom-right",
+              "middle-left",
+              "middle-right",
             ]}
+            rotateEnabled={true}
+            keepRatio={false}
           />
         )}
       </>

@@ -16,7 +16,7 @@ import CreateBoard from "@/components/createBoard";
 import { deleteBoard } from "@/lib/actions/board-actions";
 import VideoPlayerModal from '@/components/VideoPlayerModal';
 import TextCreateTool from "@/components/TextCreateTool";
-import QuillTextEditor from "@/components/QuillTextEditor";
+// import QuillTextEditor from "@/components/QuillTextEditor";
 // Hooks
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { useBoardState } from "@/hooks/useBoardState";
@@ -998,7 +998,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
         onClose={closeVideo}
       />
 
-         {editingText && (
+         {/* {editingText && (
       <QuillTextEditor
         isOpen={editingText.isEditing}
         position={editingText.position}
@@ -1010,7 +1010,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
         onSave={editingText.onSave}
         onCancel={handleFinishTextEditing}
       />
-    )}
+    )} */}
 
     </>
   );
