@@ -18,6 +18,7 @@ interface PricingCardProps {
   href: string
   delay?: number
   popular?: boolean
+  onCtaClick?: () => void // Add this
 }
 
 export function PricingCard({ 
@@ -31,8 +32,17 @@ export function PricingCard({
   ctaText, 
   href, 
   delay = 0,
-  popular = false 
+  popular = false,
+  onCtaClick // Add this
 }: PricingCardProps) {
+  
+  const handleClick = (e: React.MouseEvent) => {
+    if (onCtaClick) {
+      e.preventDefault();
+      onCtaClick();
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -103,8 +113,9 @@ export function PricingCard({
           </ul>
 
           {/* CTA Button */}
-          <Link href={href} className="block">
+          {onCtaClick ? (
             <Button 
+              onClick={handleClick}
               className={`w-full py-4 text-lg font-semibold rounded-xl transition-all duration-300 ${
                 featured 
                   ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-2xl shadow-blue-500/25' 
@@ -114,7 +125,20 @@ export function PricingCard({
             >
               {ctaText}
             </Button>
-          </Link>
+          ) : (
+            <Link href={href} className="block">
+              <Button 
+                className={`w-full py-4 text-lg font-semibold rounded-xl transition-all duration-300 ${
+                  featured 
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-2xl shadow-blue-500/25' 
+                    : 'bg-white/50 border-2 border-gray-300 hover:border-blue-300 text-gray-900 hover:bg-white/70'
+                }`}
+                size="lg"
+              >
+                {ctaText}
+              </Button>
+            </Link>
+          )}
 
           {/* Value Proposition */}
           {featured && (
