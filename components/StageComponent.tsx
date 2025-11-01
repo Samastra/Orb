@@ -70,74 +70,68 @@ type CombinedShape =
   | (Connection & { __kind: 'connection' });
 
 // Image Component
-const ImageElement = React.forwardRef(({ 
-  imageShape, 
-  onDragEnd,
-  onTransformEnd
-}: { 
-  imageShape: ImageShape;
-  onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
-  onTransformEnd?: (e: Konva.KonvaEventObject<Event>) => void;
-}, ref: React.Ref<Konva.Image>) => { // REMOVED | null
-  const [image, setImage] = React.useState<HTMLImageElement | null>(null);
-  const [imageDimensions, setImageDimensions] = React.useState<{width: number, height: number} | null>(null);
-  const internalRef = React.useRef<Konva.Image>(null);
+    const ImageElement = React.forwardRef(({ 
+      imageShape, 
+      onDragEnd,
+      onTransformEnd
+    }: { 
+      imageShape: ImageShape;
+      onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
+      onTransformEnd?: (e: Konva.KonvaEventObject<Event>) => void;
+    }, ref: React.Ref<Konva.Image>) => {
+      const [image, setImage] = React.useState<HTMLImageElement | null>(null);
+      const internalRef = React.useRef<Konva.Image>(null);
 
-  React.useImperativeHandle(ref, () => internalRef.current!);
+      React.useImperativeHandle(ref, () => internalRef.current!);
 
-  // Replace the image loading section (around line 78)
-  React.useEffect(() => {
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.src = imageShape.src;
-    img.onload = () => {
-      setImage(img);
-      setImageDimensions({
-        width: img.naturalWidth,
-        height: img.naturalHeight
-      });
-    };
-    img.onerror = () => {
-      console.error('Failed to load image:', imageShape.src);
-    };
-  }, [imageShape.src]);
+      React.useEffect(() => {
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.src = imageShape.src;
+        img.onload = () => {
+          setImage(img);
+        };
+        img.onerror = () => {
+          console.error('Failed to load image:', imageShape.src);
+        };
+      }, [imageShape.src]);
 
-  if (!image || !imageDimensions) {
-    return (
-      <Rect
-        ref={internalRef}
-        x={imageShape.x}
-        y={imageShape.y}
-        width={200}
-        height={150}
-        fill="#f0f0f0"
-        stroke="#ccc"
-        strokeWidth={1}
-        draggable={imageShape.draggable}
-        onDragEnd={onDragEnd}
-        onTransformEnd={onTransformEnd}
-        name="selectable-shape"
-      />
-    );
-  }
+      if (!image) {
+        return (
+          <Rect
+            ref={internalRef}
+            x={imageShape.x}
+            y={imageShape.y}
+            width={imageShape.width || 200}      // Use imageShape dimensions
+            height={imageShape.height || 150}    // Use imageShape dimensions
+            fill="#f0f0f0"
+            stroke="#ccc"
+            strokeWidth={1}
+            draggable={imageShape.draggable}
+            onDragEnd={onDragEnd}
+            onTransformEnd={onTransformEnd}
+            name="selectable-shape"
+          />
+        );
+      }
 
-  return (
-    <Image
-      ref={internalRef}
-      image={image!}
-      x={imageShape.x}
-      y={imageShape.y}
-      width={imageDimensions.width}
-      height={imageDimensions.height}
-      rotation={imageShape.rotation}
-      draggable={imageShape.draggable}
-      onDragEnd={onDragEnd}
-      onTransformEnd={onTransformEnd}
-      name="selectable-shape"
-      id={imageShape.id}
-    />
-  );
-});
+      return (
+        <Image
+          ref={internalRef}
+          image={image}
+          x={imageShape.x}
+          y={imageShape.y}
+          width={imageShape.width}        // Use transformed width from state
+          height={imageShape.height}      // Use transformed height from state  
+          rotation={imageShape.rotation}
+          draggable={imageShape.draggable}
+          onDragEnd={onDragEnd}
+          onTransformEnd={onTransformEnd}
+          name="selectable-shape"
+          id={imageShape.id}
+        />
+      );
+    });
 ImageElement.displayName = 'ImageElement';
 
 // Enhanced Connection Component with editable anchors
@@ -330,7 +324,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
 }) => {
   const shapeRefs = useRef<{ [key: string]: React.RefObject<Konva.Node | null> }>({});
 
-  const handleShapeTransformEnd = (item: CombinedShape, e: Konva.KonvaEventObject<Event>) => {
+    const handleShapeTransformEnd = (item: CombinedShape, e: Konva.KonvaEventObject<Event>) => {
     try {
       const node = e.target;
 
@@ -342,7 +336,20 @@ const StageComponent: React.FC<StageComponentProps> = ({
         const newHeight = Math.max(1, imageNode.height() * imageNode.scaleY());
         imageNode.scaleX(1);
         imageNode.scaleY(1);
-        updateShape(item.id, { x: imageNode.x(), y: imageNode.y(), width: newWidth, height: newHeight, rotation: imageNode.rotation() });
+        
+        // FIX: Update images state instead of calling updateShape
+        setImages(prev => prev.map(img => 
+          img.id === item.id 
+            ? { 
+                ...img, 
+                x: imageNode.x(), 
+                y: imageNode.y(), 
+                width: newWidth, 
+                height: newHeight, 
+                rotation: imageNode.rotation() 
+              }
+            : img
+        ));
         return;
       }
 

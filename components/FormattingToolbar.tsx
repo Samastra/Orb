@@ -116,24 +116,11 @@ const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56,
 const strokeWidths = [1, 2, 3, 4, 5, 6, 8, 10, 12];
 const borderRadiusValues = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80];
 
-const getKonvaFontWeight = (weight: string): string => {
-  const weightMap: { [key: string]: string } = {
-    "normal": "400",
-    "bold": "700",
-    "lighter": "300", 
-    "bolder": "800",
-    "100": "100",
-    "200": "200",
-    "300": "300",
-    "400": "400",
-    "500": "500",
-    "600": "600",
-    "700": "700",
-    "800": "800",
-    "900": "900"
-  };
-  return weightMap[weight] || "400";
-};
+// const getKonvaFontWeight = (weight: string): string => {
+//   const numericWeight = parseInt(weight, 10);
+//   if (numericWeight >= 600) return "bold";
+//   return "normal";
+// };
 
 const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   selectedShape,
@@ -203,10 +190,11 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   const currentCornerRadius = selectedShape.cornerRadius || 0;
 
   // Get display label for current weight
-  const getWeightLabel = (weight: string) => {
-    const weightObj = FONT_WEIGHTS.find(w => w.value === weight);
-    return weightObj ? weightObj.label : "Regular";
-  };
+  // Get display label for current weight
+      const getWeightLabel = (weight: string) => {
+      const weightObj = FONT_WEIGHTS.find(w => w.value === weight);
+      return weightObj ? weightObj.label : "Regular";
+    };
 
   // Get display label for current style
   const getStyleLabel = (style: string) => {
@@ -271,9 +259,9 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     onChange({ fontFamily });
   };
 
-  const handleFontWeightChange = (weight: string) => {
-    const konvaWeight = getKonvaFontWeight(weight);
-    onChange({ fontWeight: konvaWeight });
+    const handleFontWeightChange = (weight: string) => {
+    console.log('🎯 Changing font weight to:', weight);
+    onChange({ fontWeight: weight });
   };
 
   const handleFontStyleChange = (style: string) => {

@@ -30,6 +30,11 @@ interface TextComponentProps {
     fontSize?: number; 
     rotation?: number; 
     text?: string;
+    fontWeight?: string; // ← ADD THIS
+    fontFamily?: string; // ← ADD THIS
+    fontStyle?: string; // ← ADD THIS
+    fill?: string; // ← ADD THIS
+    align?: "left" | "center" | "right"; // ← ADD THIS
   }) => void;
   onStartEditing: () => void;
   onFinishEditing: () => void;
@@ -106,7 +111,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         const oldWidth = node.width();
 
         // Update font size and width proportionally
-        const newFontSize = Math.max(6, oldFontSize * scaleY); // prevent collapse
+        const newFontSize = Math.max(6, Math.round(oldFontSize * scaleY)); // prevent collapse
         const newWidth = Math.max(50, oldWidth * scaleX);
 
         node.fontSize(newFontSize);
@@ -190,7 +195,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         minHeight: `${fontSize * 1.4}px`,
         fontSize: `${fontSize}px`,
         fontFamily,
-        fontWeight,
+        fontWeight:fontWeight,
         fontStyle,
         color: fill,
         textAlign: align,
@@ -219,7 +224,19 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       const handleInput = () => resize();
       const handleBlur = () => {
         const newText = editor.innerHTML;
-        onUpdate({ text: newText });
+        
+        // Update text AND preserve all other text properties including fontWeight
+        onUpdate({ 
+          text: newText,
+          // Preserve the current fontWeight and other properties
+          fontWeight: fontWeight, // ← ADD THIS LINE
+          fontFamily: fontFamily,
+          fontSize: fontSize,
+          fontStyle: fontStyle,
+          fill: fill,
+          align: align
+        });
+        
         // Auto-resize text node width to fit new content
         const tempText = new Konva.Text({ text: newText, fontSize, fontFamily });
         const minWidth = tempText.width() + 20;
@@ -263,6 +280,40 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       onFinishEditing,
     ]);
 
+      const getKonvaFontWeight = (weight: string): string => {
+      const numericWeight = parseInt(weight, 10);
+      if (numericWeight >= 600) return "bold";
+      return "normal";
+    };
+
+
+    // Add this useEffect to debug what's being received
+      useEffect(() => {
+        console.log('🎯 TextComponent received fontWeight:', {
+          fontWeight,
+          type: typeof fontWeight,
+          fontFamily
+        });
+      }, [fontWeight, fontFamily]);
+
+      // Also add this right before the return to see what Konva is getting
+      console.log('🎨 Rendering KonvaText with:', {
+        fontWeight,
+        fontFamily,
+        fontSize
+      });
+
+
+    useEffect(() => {
+    console.log('🔧 TextComponent props:', {
+      id,
+      fontWeight,
+      fontFamily,
+      isEditing,
+      isSelected
+    });
+  }, [id, fontWeight, fontFamily, isEditing, isSelected]);
+
     return (
       <>
         <KonvaText
@@ -273,7 +324,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           text={initialText || "Click to edit"}
           fontSize={fontSize}
           fontFamily={fontFamily}
-          fontWeight={fontWeight}
+          fontWeight={getKonvaFontWeight(fontWeight)}
           fontStyle={fontStyle}
           fill={fill}
           align={align}
