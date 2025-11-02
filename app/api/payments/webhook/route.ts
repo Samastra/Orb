@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Paystack from "paystack";
+import Paystack from "paystack-api";
 import { createSupabaseClient } from "@/lib/supabase";
 import crypto from "crypto";
 

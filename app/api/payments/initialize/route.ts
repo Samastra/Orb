@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Paystack from "paystack";
+import Paystack from "paystack-api";
 import { createSupabaseClient } from "@/lib/supabase";
 import { auth } from "@clerk/nextjs/server";
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         plan_type: plan,
         clerk_user_id: userId
       },
-      callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?plan=${plan}`
+      callback_url: `https://orb-spb8.vercel.app/payment/success?plan=${plan}`
     });
 
     if (!transaction.status || !transaction.data.authorization_url) {

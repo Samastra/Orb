@@ -36,6 +36,7 @@
     "konva": "9.3.22",
     "lucide-react": "^0.542.0",
     "next": "15.5.2",
+    "paystack-api": "^2.0.6",
     "pixi.js": "^8.13.2",
     "quill": "^2.0.3",
     "react": "19.1.0",
