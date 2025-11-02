@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CheckCircle, Loader2, AlertCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,11 @@ import { GlassCard } from "@/components/ui/glass-card";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 
-export default function PaymentSuccess() {
+// Add this to make the page dynamic
+export const dynamic = 'force-dynamic';
+
+// Move the main logic to a separate component wrapped in Suspense
+function PaymentSuccessContent() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("");
   const searchParams = useSearchParams();
@@ -35,7 +39,8 @@ export default function PaymentSuccess() {
 
   const verifyPayment = async () => {
     try {
-      const response = await fetch("/api/payment/verify", {
+      // FIX: Update the API path to match your actual route
+      const response = await fetch("/api/payments/verify", { // Changed from "/api/payment/verify"
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -175,5 +180,22 @@ export default function PaymentSuccess() {
         </div>
       </GlassCard>
     </div>
+  );
+}
+
+// Main export wrapped in Suspense
+export default function PaymentSuccess() {
+  return (  
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+        <GlassCard className="p-8 max-w-md text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Loading...</h2>
+          <p className="text-gray-600">Preparing your payment details</p>
+        </GlassCard>
+      </div>
+    }>
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }
