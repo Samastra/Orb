@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import Paystack from "paystack-api";
 import { createSupabaseClient } from "@/lib/supabase";
 import crypto from "crypto";
 
-const paystack = Paystack(process.env.PAYSTACK_SECRET_KEY!);
+// Remove unused paystack import and initialization
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,11 +50,37 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleSuccessfulPayment(paymentData: any) {
+// Define proper types for Paystack webhook data
+interface PaymentMetadata {
+  user_id?: string;
+  plan_type?: string;
+  clerk_user_id?: string;
+}
+
+interface PaymentData {
+  reference: string;
+  metadata: PaymentMetadata;
+  customer?: {
+    email: string;
+  };
+}
+
+interface SubscriptionData {
+  id: string;
+  status: string;
+  customer: {
+    email: string;
+  };
+  plan: {
+    name: string;
+  };
+}
+
+async function handleSuccessfulPayment(paymentData: PaymentData) {
   const supabase = createSupabaseClient();
 
   try {
-    const { reference, metadata, customer } = paymentData;
+    const { reference } = paymentData; // Remove unused metadata and customer
 
     // Find payment record
     const { data: payment } = await supabase
@@ -106,14 +131,34 @@ async function handleSuccessfulPayment(paymentData: any) {
   }
 }
 
-async function handleSubscriptionCreation(subscriptionData: any) {
+async function handleSubscriptionCreation(subscriptionData: SubscriptionData) {
   // Handle yearly subscription creation
-  console.log("📅 Subscription created:", subscriptionData);
+  console.log("📅 Subscription created:", subscriptionData.id, "for", subscriptionData.customer.email);
   // You can implement subscription-specific logic here
+  
+  // Example: Update user to yearly plan
+  // const supabase = createSupabaseClient();
+  // await supabase
+  //   .from("users")
+  //   .update({ 
+  //     plan_type: "yearly",
+  //     subscription_status: "active"
+  //   })
+  //   .eq("email", subscriptionData.customer.email);
 }
 
-async function handleSubscriptionCancellation(subscriptionData: any) {
+async function handleSubscriptionCancellation(subscriptionData: SubscriptionData) {
   // Handle subscription cancellation
-  console.log("❌ Subscription cancelled:", subscriptionData);
+  console.log("❌ Subscription cancelled:", subscriptionData.id);
   // You can implement downgrade logic here
+  
+  // Example: Downgrade user to free plan
+  // const supabase = createSupabaseClient();
+  // await supabase
+  //   .from("users")
+  //   .update({ 
+  //     plan_type: "free",
+  //     subscription_status: "cancelled"
+  //   })
+  //   .eq("email", subscriptionData.customer.email);
 }
