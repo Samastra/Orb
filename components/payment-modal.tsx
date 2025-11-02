@@ -57,7 +57,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, plan }: PaymentModalP
 
     try {
       // Initialize payment with Paystack
-      const response = await fetch("/api/payment/initialize", {
+      const response = await fetch("/api/payments/initialize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
