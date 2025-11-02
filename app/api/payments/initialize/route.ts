@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import Paystack from "paystack-api";
 import { createSupabaseClient } from "@/lib/supabase";
 import { auth } from "@clerk/nextjs/server";
 
-const paystack = Paystack(process.env.PAYSTACK_SECRET_KEY!);
+// Add this line to prevent static generation
+export const dynamic = 'force-dynamic';
+
+// Use dynamic import to avoid TypeScript issues during build
+async function getPaystack() {
+  const Paystack = (await import('paystack-api')).default;
+  return Paystack(process.env.PAYSTACK_SECRET_KEY!);
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth(); // AWAIT the auth() function
+    const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -20,7 +26,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     }
 
-    // Get user from database using your existing pattern
+    // Get user from database
     const supabase = createSupabaseClient();
     const { data: dbUser } = await supabase
       .from("users")
@@ -32,8 +38,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Convert amount to kobo (Paystack uses smallest currency unit)
-    const amountInKobo = Math.round(amount * 100); // $99 = 9900 kobo
+    // Convert amount to kobo
+    const amountInKobo = Math.round(amount * 100);
+
+    // Initialize Paystack with dynamic import
+    const paystack = await getPaystack();
 
     // Initialize Paystack transaction
     const transaction = await paystack.transaction.initialize({

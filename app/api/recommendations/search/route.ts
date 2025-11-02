@@ -1,5 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Helper function to safely parse responses
+async function safeJsonParse(response: Response) {
+  try {
+    const text = await response.text();
+    
+    // Check if response is HTML (error page)
+    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+      console.warn('Received HTML response instead of JSON');
+      return [];
+    }
+    
+    // Try to parse as JSON
+    return JSON.parse(text);
+  } catch (error) {
+    console.warn('Failed to parse response as JSON:', error);
+    return [];
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
@@ -27,26 +46,57 @@ export async function GET(request: NextRequest) {
       enhancedQuery = `${query} ${variations[variationIndex]} ${category ? `${category} learning` : 'tutorial education'}`;
     }
 
-    // Fetch from all APIs in parallel
-    const [booksResponse, videosResponse, imagesResponse, websitesResponse] = await Promise.allSettled([
-      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/books?query=${encodeURIComponent(enhancedQuery)}`),
-      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/videos?query=${encodeURIComponent(enhancedQuery)}`),
-      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}`),
-      fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/websites?query=${encodeURIComponent(enhancedQuery)}`),
-    ]);
+    // Fetch from all APIs in parallel with better error handling
+    const apiCalls = [
+      { name: 'books', url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/books?query=${encodeURIComponent(enhancedQuery)}` },
+      { name: 'videos', url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/videos?query=${encodeURIComponent(enhancedQuery)}` },
+      { name: 'images', url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}` },
+      { name: 'websites', url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/websites?query=${encodeURIComponent(enhancedQuery)}` },
+    ];
 
-    // Process responses
-    const books = booksResponse.status === 'fulfilled' ? await booksResponse.value.json() : [];
-    const videos = videosResponse.status === 'fulfilled' ? await videosResponse.value.json() : [];
-    const images = imagesResponse.status === 'fulfilled' ? await imagesResponse.value.json() : [];
-    const websites = websitesResponse.status === 'fulfilled' ? await websitesResponse.value.json() : [];
+    const responses = await Promise.allSettled(
+      apiCalls.map(api => 
+        fetch(api.url, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // Add timeout
+          signal: AbortSignal.timeout(10000) // 10 second timeout
+        }).catch(error => {
+          console.warn(`Failed to fetch from ${api.name}:`, error);
+          return null;
+        })
+      )
+    );
+
+    // Process responses with safe parsing
+    const results = await Promise.all(
+      responses.map(async (response, index) => {
+        const apiName = apiCalls[index].name;
+        
+        if (response.status === 'fulfilled' && response.value) {
+          try {
+            const data = await safeJsonParse(response.value);
+            return Array.isArray(data) ? data : [];
+          } catch (error) {
+            console.warn(`Failed to parse ${apiName} response:`, error);
+            return [];
+          }
+        } else {
+          console.warn(`${apiName} API call failed:`, response.status === 'rejected' ? response.reason : 'No response');
+          return [];
+        }
+      })
+    );
+
+    const [books, videos, images, websites] = results;
 
     return NextResponse.json({
       query: enhancedQuery,
-      books: Array.isArray(books) ? books : [],
-      videos: Array.isArray(videos) ? videos : [],
-      images: Array.isArray(images) ? images : [],
-      websites: Array.isArray(websites) ? websites : [],
+      books,
+      videos, 
+      images,
+      websites,
       timestamp: new Date().toISOString(),
       refreshed: refresh === 'true'
     });
