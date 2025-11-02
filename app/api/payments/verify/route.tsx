@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import Paystack from "paystack-api";
 import { createSupabaseClient } from "@/lib/supabase";
 import { auth } from "@clerk/nextjs/server";
 
-const paystack = Paystack(process.env.PAYSTACK_SECRET_KEY!);
+// Add this line
+export const dynamic = 'force-dynamic';
+
+// Use dynamic import for Paystack to avoid build issues
+async function getPaystack() {
+  const Paystack = (await import('paystack-api')).default;
+  return Paystack(process.env.PAYSTACK_SECRET_KEY!);
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth(); // AWAIT the auth() function
+    const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,6 +24,9 @@ export async function POST(request: NextRequest) {
     if (!reference) {
       return NextResponse.json({ error: "Reference is required" }, { status: 400 });
     }
+
+    // Initialize Paystack with dynamic import
+    const paystack = await getPaystack();
 
     // Verify payment with Paystack
     const verification = await paystack.transaction.verify(reference);
@@ -33,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Payment not successful" }, { status: 400 });
     }
 
-    // Get user from database using your existing pattern
+    // Get user from database
     const supabase = createSupabaseClient();
     const { data: dbUser } = await supabase
       .from("users")

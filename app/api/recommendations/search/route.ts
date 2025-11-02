@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Helper function to safely parse responses
-async function safeJsonParse(response: Response) {
-  try {
-    const text = await response.text();
-    
-    // Check if response is HTML (error page)
-    if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-      console.warn('Received HTML response instead of JSON');
-      return [];
-    }
-    
-    // Try to parse as JSON
-    return JSON.parse(text);
-  } catch (error) {
-    console.warn('Failed to parse response as JSON:', error);
-    return [];
-  }
-}
+export const dynamic = 'force-dynamic';
+
+// Import the handler functions directly instead of making HTTP calls
+import { GET as getBooks } from '../books/route';
+import { GET as getVideos } from '../videos/route';
+import { GET as getImages } from '../images/route';
+import { GET as getWebsites } from '../websites/route';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -46,60 +35,32 @@ export async function GET(request: NextRequest) {
       enhancedQuery = `${query} ${variations[variationIndex]} ${category ? `${category} learning` : 'tutorial education'}`;
     }
 
-    // Fetch from all APIs in parallel with better error handling
-    const apiCalls = [
-      { name: 'books', url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/books?query=${encodeURIComponent(enhancedQuery)}` },
-      { name: 'videos', url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/videos?query=${encodeURIComponent(enhancedQuery)}` },
-      { name: 'images', url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}` },
-      { name: 'websites', url: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/recommendations/websites?query=${encodeURIComponent(enhancedQuery)}` },
-    ];
+    console.log('🔍 Calling internal APIs directly for query:', enhancedQuery);
 
-    const responses = await Promise.allSettled(
-      apiCalls.map(api => 
-        fetch(api.url, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          // Add timeout
-          signal: AbortSignal.timeout(10000) // 10 second timeout
-        }).catch(error => {
-          console.warn(`Failed to fetch from ${api.name}:`, error);
-          return null;
-        })
-      )
-    );
+    // Call the handlers directly instead of HTTP requests
+    const [booksResponse, videosResponse, imagesResponse, websitesResponse] = await Promise.allSettled([
+      getBooks(createRequest(`/api/recommendations/books?query=${encodeURIComponent(enhancedQuery)}`)),
+      getVideos(createRequest(`/api/recommendations/videos?query=${encodeURIComponent(enhancedQuery)}`)),
+      getImages(createRequest(`/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}`)),
+      getWebsites(createRequest(`/api/recommendations/websites?query=${encodeURIComponent(enhancedQuery)}`)),
+    ]);
 
-    // Process responses with safe parsing
-    const results = await Promise.all(
-      responses.map(async (response, index) => {
-        const apiName = apiCalls[index].name;
-        
-        if (response.status === 'fulfilled' && response.value) {
-          try {
-            const data = await safeJsonParse(response.value);
-            return Array.isArray(data) ? data : [];
-          } catch (error) {
-            console.warn(`Failed to parse ${apiName} response:`, error);
-            return [];
-          }
-        } else {
-          console.warn(`${apiName} API call failed:`, response.status === 'rejected' ? response.reason : 'No response');
-          return [];
-        }
-      })
-    );
-
-    const [books, videos, images, websites] = results;
+    // Process responses
+    const books = booksResponse.status === 'fulfilled' ? await booksResponse.value.json() : [];
+    const videos = videosResponse.status === 'fulfilled' ? await videosResponse.value.json() : [];
+    const images = imagesResponse.status === 'fulfilled' ? await imagesResponse.value.json() : [];
+    const websites = websitesResponse.status === 'fulfilled' ? await websitesResponse.value.json() : [];
 
     return NextResponse.json({
       query: enhancedQuery,
-      books,
-      videos, 
-      images,
-      websites,
+      books: Array.isArray(books) ? books : [],
+      videos: Array.isArray(videos) ? videos : [],
+      images: Array.isArray(images) ? images : [],
+      websites: Array.isArray(websites) ? websites : [],
       timestamp: new Date().toISOString(),
       refreshed: refresh === 'true'
     });
+
   } catch (error) {
     console.error('Search orchestration error:', error);
     return NextResponse.json({ 
@@ -110,4 +71,9 @@ export async function GET(request: NextRequest) {
       websites: []
     }, { status: 500 });
   }
+}
+
+// Helper to create mock request objects
+function createRequest(url: string): NextRequest {
+  return new NextRequest(new URL(url, 'http://localhost:3000'));
 }

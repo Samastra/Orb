@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseClient } from "@/lib/supabase";
 import crypto from "crypto";
 
+// Add this line
+export const dynamic = 'force-dynamic';
+
 // Remove unused paystack import and initialization
 
 export async function POST(request: NextRequest) {
