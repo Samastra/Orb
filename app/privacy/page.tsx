@@ -22,7 +22,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-800 mb-3">Data Sharing</h2>
             <p className="text-gray-600">
-              We only share with Paddle for payments. We don't sell your data.
+              We only share with Paddle for payments. We don&apos;t sell your data.
             </p>
           </section>
         </div>

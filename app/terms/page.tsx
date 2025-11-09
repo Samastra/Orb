@@ -8,7 +8,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-800 mb-3">1. Acceptance of Terms</h2>
             <p className="text-gray-600">
-              By using Orblin, you agree to these terms. We're a whiteboard app that helps you organize ideas.
+              By using Orblin, you agree to these terms. We&apos;re a whiteboard app that helps you organize ideas.
             </p>
           </section>
 

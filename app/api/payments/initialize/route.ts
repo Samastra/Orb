@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
           plan_type: plan,
           clerk_user_id: userId
         },
-        callback_url: `http://localhost:3000/payment/success?plan=${plan}`
+        callback_url: `http://localhost:3000/success?plan=${plan}`
       }),
     });
 

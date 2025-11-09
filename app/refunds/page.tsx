@@ -22,7 +22,7 @@ export default function RefundsPage() {
           <section>
             <h2 className="text-xl font-semibold text-gray-800 mb-3">Lifetime Access</h2>
             <p className="text-gray-600">
-              Refundable within 30 days. After that, it's yours forever.
+              Refundable within 30 days. After that, it&apos;s yours forever.
             </p>
           </section>
         </div>
