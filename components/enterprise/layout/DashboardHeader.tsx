@@ -8,7 +8,8 @@ import {
   PanelRight,
   User,
   Settings,
-  LogOut
+  LogOut,
+  Crown // Added Crown icon
 } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import Link from "next/link"
@@ -19,13 +20,17 @@ interface DashboardHeaderProps {
   onPanelToggle: () => void
   searchQuery: string
   onSearchChange: (query: string) => void
+  onUpgradeLifetime?: () => void // Added upgrade props
+  onUpgradeYearly?: () => void
 }
 
 export default function DashboardHeader({ 
   onMenuToggle, 
   onPanelToggle, 
   searchQuery, 
-  onSearchChange 
+  onSearchChange,
+  onUpgradeLifetime = () => {}, // Added with default functions
+  onUpgradeYearly = () => {}
 }: DashboardHeaderProps) {
   const { user } = useUser()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -51,7 +56,7 @@ export default function DashboardHeader({
           
           {/* Breadcrumbs */}
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-900 font-medium">Orb Brainstorming</span>
+            <span className="text-gray-900 font-medium">Orblin</span>
             <span className="text-gray-400">/</span>
             <span className="text-gray-600">Dashboard</span>
           </div>
@@ -93,6 +98,15 @@ export default function DashboardHeader({
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
             
+            {/* Upgrade Button - Added this section */}
+            <button 
+              onClick={onUpgradeLifetime}
+              className="hidden md:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium text-sm"
+            >
+              <Crown className="w-4 h-4" />
+              Upgrade
+            </button>
+
             {/* Notifications */}
             <div className="relative">
               <button 

@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseClient } from "@/lib/supabase";
 import { auth } from "@clerk/nextjs/server";
 
-// Add this line
 export const dynamic = 'force-dynamic';
-
-// Use dynamic import for Paystack to avoid build issues
-async function getPaystack() {
-  const Paystack = (await import('paystack-api')).default;
-  return Paystack(process.env.PAYSTACK_SECRET_KEY!);
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,11 +18,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Reference is required" }, { status: 400 });
     }
 
-    // Initialize Paystack with dynamic import
-    const paystack = await getPaystack();
+    // Verify payment with Paystack using direct fetch
+    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    // Verify payment with Paystack
-    const verification = await paystack.transaction.verify(reference);
+    const verification = await paystackResponse.json();
 
     if (!verification.status) {
       return NextResponse.json({ error: "Payment verification failed" }, { status: 400 });

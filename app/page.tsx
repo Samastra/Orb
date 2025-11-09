@@ -96,7 +96,7 @@ export default function Home() {
               </h1>
               
               <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-                Orb is the intelligent whiteboard that helps teams and individuals organize complex ideas, 
+                Orblin is the intelligent whiteboard that helps teams and individuals organize complex ideas, 
                 collaborate in real-time, and turn brainstorming sessions into concrete action plans.
               </p>
             </motion.div>
@@ -191,7 +191,7 @@ export default function Home() {
             <GlassCard className="inline-flex items-center gap-2 px-4 py-2">
               <Zap className="w-4 h-4 text-blue-600" />
               <span className="text-sm font-medium text-gray-700">
-                Why Teams Love Orb
+                Why Teams Love Orblin
               </span>
             </GlassCard>
             
@@ -212,7 +212,7 @@ export default function Home() {
             <FeatureCard
               icon={<Brain className="w-6 h-6 text-white" />}
               title="AI-Powered Insights"
-              description="Get smart suggestions and connections as you brainstorm. Orb's AI helps you see patterns and opportunities you might have missed."
+              description="Get smart suggestions and connections as you brainstorm. Orblin's AI helps you see patterns and opportunities you might have missed."
               delay={0.1}
               features={[
                 "Smart idea connections",
@@ -251,7 +251,7 @@ export default function Home() {
             <FeatureCard
               icon={<Search className="w-6 h-6 text-white" />}
               title="Smart Organization"
-              description="Never lose an idea again. Orb automatically organizes your sessions and makes everything searchable and accessible."
+              description="Never lose an idea again. Orblin automatically organizes your sessions and makes everything searchable and accessible."
               delay={0.4}
               features={[
                 "Auto-categorization",
@@ -302,7 +302,7 @@ export default function Home() {
                   Ready to Transform Your Brainstorming?
                 </h3>
                 <p className="text-gray-600">
-                  Join thousands of creators and teams who are already building better ideas with Orb.
+                  Join thousands of creators and teams who are already building better ideas with Orblin.
                 </p>
                 <Button 
                   onClick={handleGetLifetimeAccess}
@@ -338,7 +338,7 @@ export default function Home() {
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900">
               Choose Your{" "}
               <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Orb Journey
+                Orblin Journey
               </span>
             </h2>
             
@@ -352,7 +352,7 @@ export default function Home() {
             {/* Lifetime Deal - Featured */}
             <PricingCard
               title="Lifetime Access"
-              description="Never pay again. Get unlimited access to all current and future Orb features forever."
+              description="Never pay again. Get unlimited access to all current and future Orblin features forever."
               price="$99"
               originalPrice="$499"
               period="One-time payment • Never pay again"
@@ -376,7 +376,7 @@ export default function Home() {
             {/* Yearly Deal */}
             <PricingCard
               title="Yearly Plan"
-              description="Perfect for trying out Orb with our special launch discount."
+              description="Perfect for trying out Orblin with our special launch discount."
               price="$60"
               period="Per year • Cancel anytime"
               features={[
@@ -496,7 +496,7 @@ export default function Home() {
                 </h2>
                 
                 <p className="text-xl text-blue-100 leading-relaxed">
-                  Join Orb during our launch period and secure lifetime access at a special 
+                  Join Orblin during our launch period and secure lifetime access at a special 
                   founder's price. Perfect time to get in on the ground floor.
                 </p>
               </div>
@@ -629,7 +629,7 @@ export default function Home() {
                       <span className="font-semibold text-sm">Launch Week</span>
                     </div>
                     <p className="text-blue-200 text-xs">
-                      Be among the first to experience Orb and shape its future
+                      Be among the first to experience Orblin and shape its future
                     </p>
                   </div>
                 </GlassCard>
@@ -673,11 +673,23 @@ export default function Home() {
             <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
               <Command className="w-4 h-4 text-white" />
             </div>
-            <span className="text-xl font-bold text-white">Orb</span>
+            <span className="text-xl font-bold text-white">Orblin</span>
           </div>
           <p className="text-gray-400">
-            Transform your ideas into reality • © 2024 Orb. All rights reserved.
+            Transform your ideas into reality • © 2024 Orblin. All rights reserved.
           </p>
+        </div>
+
+        <div className="flex justify-center gap-6 mt-4">
+          <Link href="/terms" className="text-gray-400 hover:text-white text-sm">
+            Terms
+          </Link>
+          <Link href="/privacy" className="text-gray-400 hover:text-white text-sm">
+            Privacy
+          </Link>
+          <Link href="/refunds" className="text-gray-400 hover:text-white text-sm">
+            Refunds
+          </Link>
         </div>
       </footer>
     </main>

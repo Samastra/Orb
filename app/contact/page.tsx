@@ -134,7 +134,7 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">Email Us</h3>
-                        <p className="text-gray-600">hello@orb.com</p>
+                        <p className="text-gray-600">hello@orblin.com</p>
                         <p className="text-sm text-gray-500">We typically reply within 24 hours</p>
                       </div>
                     </div>
@@ -145,7 +145,7 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">Twitter</h3>
-                        <p className="text-gray-600">@orb</p>
+                        <p className="text-gray-600">@orblin</p>
                         <p className="text-sm text-gray-500">Follow us for updates and tips</p>
                       </div>
                     </div>
@@ -156,7 +156,7 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">GitHub</h3>
-                        <p className="text-gray-600">github.com/orb</p>
+                        <p className="text-gray-600">github.com/orblin</p>
                         <p className="text-sm text-gray-500">Open source components and issues</p>
                       </div>
                     </div>
@@ -198,7 +198,7 @@ export default function ContactPage() {
                 Ready to Get Started?
               </h2>
               <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                Join Orb today and start transforming your ideas into reality.
+                Join Orblin today and start transforming your ideas into reality.
               </p>
               <Link href="/sign-up">
                 <Button 

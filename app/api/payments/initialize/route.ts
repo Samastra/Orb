@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseClient } from "@/lib/supabase";
 import { auth } from "@clerk/nextjs/server";
 
-// Add this line to prevent static generation
 export const dynamic = 'force-dynamic';
-
-// Use dynamic import to avoid TypeScript issues during build
-async function getPaystack() {
-  const Paystack = (await import('paystack-api')).default;
-  return Paystack(process.env.PAYSTACK_SECRET_KEY!);
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { plan, amount, currency = "USD" } = await request.json();
+    const { plan, amount } = await request.json(); // Remove currency from destructuring
 
     // Validate plan
     if (!["lifetime", "yearly"].includes(plan)) {
@@ -38,28 +31,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Convert amount to kobo
+    // FORCE NGN for testing
+    const currency = "NGN";
     const amountInKobo = Math.round(amount * 100);
 
-    // Initialize Paystack with dynamic import
-    const paystack = await getPaystack();
-
-    // Initialize Paystack transaction
-    const transaction = await paystack.transaction.initialize({
+    console.log("🔄 Paystack API Request (FORCED NGN):", {
       amount: amountInKobo,
-      email: dbUser.email || "customer@example.com",
-      currency: currency,
-      reference: `orb_${plan}_${Date.now()}_${dbUser.id}`,
-      metadata: {
-        user_id: dbUser.id,
-        plan_type: plan,
-        clerk_user_id: userId
-      },
-      callback_url: `https://orb-spb8.vercel.app/payment/success?plan=${plan}`
+      currency: currency, // This will now always be "NGN"
+      email: dbUser.email,
     });
 
+    // Initialize Paystack transaction using direct fetch
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: amountInKobo,
+        email: dbUser.email || "customer@example.com",
+        currency: currency, // Now forced to NGN
+        reference: `orb_${plan}_${Date.now()}_${dbUser.id}`,
+        metadata: {
+          user_id: dbUser.id,
+          plan_type: plan,
+          clerk_user_id: userId
+        },
+        callback_url: `http://localhost:3000/payment/success?plan=${plan}`
+      }),
+    });
+
+    const transaction = await paystackResponse.json();
+    console.log("📄 Paystack API Response:", transaction);
+
     if (!transaction.status || !transaction.data.authorization_url) {
-      throw new Error("Failed to initialize payment");
+      throw new Error(transaction.message || "Failed to initialize payment");
     }
 
     // Create pending payment record
@@ -69,7 +76,7 @@ export async function POST(request: NextRequest) {
         user_id: dbUser.id,
         plan_type: plan,
         amount: amount,
-        currency: currency,
+        currency: currency, // Store as NGN
         paystack_reference: transaction.data.reference,
         status: "pending"
       });

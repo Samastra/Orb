@@ -51,44 +51,48 @@ export function PaymentModal({ isOpen, onClose, onSuccess, plan }: PaymentModalP
   const currentPlan = planDetails[plan];
 
   const handlePayment = async () => {
-    setIsProcessing(true);
-    setError(null);
-    setPaymentStep("processing");
+  setIsProcessing(true);
+  setError(null);
+  setPaymentStep("processing");
 
-    try {
-      // Initialize payment with Paystack
-      const response = await fetch("/api/payments/initialize", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          plan,
-          amount: currentPlan.price,
-          currency: "USD"
-        }),
-      });
+  try {
+    // 1. Initialize payment
+    const response = await fetch("/api/payments/initialize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        plan,
+        amount: currentPlan.price,
+        currency: "USD"
+      }),
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Payment initialization failed");
-      }
-
-      // Redirect to Paystack payment page
-      if (data.authorization_url) {
-        window.location.href = data.authorization_url;
-      } else {
-        throw new Error("No payment URL received");
-      }
-
-    } catch (err) {
-      console.error("Payment error:", err);
-      setError(err instanceof Error ? err.message : "Payment failed");
-      setPaymentStep("error");
-      setIsProcessing(false);
+    if (!response.ok) {
+      throw new Error(data.error || "Payment initialization failed");
     }
-  };
+
+    // 2. Redirect to Paystack
+    if (data.authorization_url) {
+      // Store reference for verification
+      localStorage.setItem('pending_payment_ref', data.reference);
+      localStorage.setItem('pending_payment_plan', plan);
+      
+      window.location.href = data.authorization_url;
+    } else {
+      throw new Error("No payment URL received");
+    }
+
+  } catch (err) {
+    console.error("Payment error:", err);
+    setError(err instanceof Error ? err.message : "Payment failed");
+    setPaymentStep("error");
+    setIsProcessing(false);
+  }
+};
 
   const handleRetry = () => {
     setPaymentStep("initial");

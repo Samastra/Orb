@@ -79,7 +79,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <Command className="size-4" />
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <p className="truncate font-semibold">Orb</p>
+                    <p className="truncate font-semibold">Orblin</p>
                     <p className="truncate text-xs text-gray-500">Whiteboard</p>
                   </div>
                 </Link>

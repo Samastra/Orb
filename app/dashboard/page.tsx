@@ -5,11 +5,29 @@ import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import EnterpriseLayout from "@/components/enterprise/layout/EnterpriseLayout"
 import MainDashboard from "@/components/enterprise/dashboard/MainDashboard"
+import { PaymentModal } from "@/components/payment-modal"
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser()
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<"lifetime" | "yearly">("lifetime")
+
+  const handleGetLifetimeAccess = () => {
+    setSelectedPlan("lifetime")
+    setShowPaymentModal(true)
+  }
+
+  const handleGetYearlyAccess = () => {
+    setSelectedPlan("yearly")
+    setShowPaymentModal(true)
+  }
+
+  const handlePaymentSuccess = () => {
+    setShowPaymentModal(false)
+    console.log("Payment successful!")
+  }
 
   useEffect(() => {
     if (isLoaded && !user) {
@@ -30,14 +48,27 @@ export default function DashboardPage() {
   }
 
   return (
-    <EnterpriseLayout 
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
-    >
-      <MainDashboard 
+    <>
+      <PaymentModal 
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={handlePaymentSuccess}
+        plan={selectedPlan}
+      />
+      
+      <EnterpriseLayout 
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-      />
-    </EnterpriseLayout>
+        onUpgradeLifetime={handleGetLifetimeAccess}
+        onUpgradeYearly={handleGetYearlyAccess}
+      >
+        <MainDashboard 
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onUpgradeLifetime={handleGetLifetimeAccess}
+          onUpgradeYearly={handleGetYearlyAccess}
+        />
+      </EnterpriseLayout>
+    </>
   )
 }

@@ -148,7 +148,7 @@ function PaymentSuccessContent() {
                 <div className="text-center">
                   <p className="text-sm text-gray-500">
                     Need help?{" "}
-                    <a href="mailto:support@orb.com" className="text-blue-600 hover:underline">
+                    <a href="mailto:support@orblin.com" className="text-blue-600 hover:underline">
                       Contact support
                     </a>
                   </p>
@@ -168,7 +168,7 @@ function PaymentSuccessContent() {
           {/* Success Benefits */}
           {status === "success" && plan === "lifetime" && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
-              <h3 className="font-semibold text-green-800 mb-2">🎉 Welcome to Orb Lifetime!</h3>
+              <h3 className="font-semibold text-green-800 mb-2">🎉 Welcome to Orblin Lifetime!</h3>
               <ul className="text-sm text-green-700 space-y-1 text-left">
                 <li>• Unlimited boards and sessions</li>
                 <li>• All AI features unlocked</li>

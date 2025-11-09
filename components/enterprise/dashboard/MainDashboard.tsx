@@ -10,7 +10,8 @@ import {
   Grid3X3, 
   Users,
   Zap,
-  Activity
+  Activity,
+  Crown
 } from "lucide-react"
 import { 
   getUserBoardsWithDetails, 
@@ -55,11 +56,15 @@ interface Board {
 interface MainDashboardProps {
   searchQuery?: string
   onSearchChange?: (query: string) => void
+  onUpgradeLifetime?: () => void
+  onUpgradeYearly?: () => void
 }
 
 export default function MainDashboard({ 
   searchQuery = "", 
-  onSearchChange = () => {} 
+  onSearchChange = () => {},
+  onUpgradeLifetime = () => {},
+  onUpgradeYearly = () => {}
 }: MainDashboardProps) {
   const { user, isLoaded } = useUser()
   const [currentView, setCurrentView] = useState<ViewType>("grid")
@@ -263,6 +268,36 @@ export default function MainDashboard({
           change={`${Math.round((stats.publicBoards / stats.totalBoards) * 100)}% of total`}
           trend="up"
         />
+      </div>
+
+      {/* Upgrade Banner */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-yellow-300" />
+              <h3 className="font-bold text-lg">Unlock Full Access</h3>
+            </div>
+            <p className="text-blue-100 max-w-2xl">
+              Get lifetime access to all Orblin features. Never pay again for unlimited boards, AI features, and premium collaboration tools.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button 
+              onClick={onUpgradeLifetime}
+              className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-gray-100 font-semibold transition-colors flex items-center gap-2 justify-center"
+            >
+              <Zap className="w-4 h-4" />
+              Lifetime - $99
+            </button>
+            <button 
+              onClick={onUpgradeYearly}
+              className="px-4 py-2 bg-blue-500/20 text-white border border-blue-400 rounded-lg hover:bg-blue-500/30 font-medium transition-colors"
+            >
+              Yearly - $60
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Header Bar */}

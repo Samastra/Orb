@@ -73,7 +73,7 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
   }, [user])
 
   const workspaces = [
-    { id: "personal", name: "Orb Brainstorming", type: "personal" },
+    { id: "personal", name: "Orblin", type: "personal" },
     // We'll add teams dynamically when we implement teams
   ]
 
@@ -128,7 +128,7 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
               <span className="text-white font-bold text-sm">O</span>
             </div>
             <div>
-              <h2 className="font-semibold text-gray-900">Orb Brainstorming</h2>
+              <h2 className="font-semibold text-gray-900">Orblin</h2>
               <p className="text-xs text-gray-500">Personal Workspace</p>
             </div>
           </div>

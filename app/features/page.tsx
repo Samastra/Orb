@@ -58,7 +58,7 @@ const features = [
   {
     icon: <Search className="w-8 h-8 text-white" />,
     title: "Smart Organization",
-    description: "Never lose an idea again. Orb automatically organizes your sessions and makes everything searchable and accessible.",
+    description: "Never lose an idea again. Orblin automatically organizes your sessions and makes everything searchable and accessible.",
     details: [
       "Auto-categorization by topic and type",
       "Advanced search across all content",
@@ -150,7 +150,7 @@ export default function FeaturesPage() {
             </h1>
             
             <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Orb brings together the best tools for brainstorming, collaboration, 
+              Orblin brings together the best tools for brainstorming, collaboration, 
               and organization in one beautiful, intuitive platform.
             </p>
           </motion.div>
@@ -235,7 +235,7 @@ export default function FeaturesPage() {
               Built with Modern Technology
             </h2>
             <p className="text-xl text-gray-600">
-              Orb is built on a robust, scalable infrastructure that ensures 
+              Orblin is built on a robust, scalable infrastructure that ensures 
               reliability, security, and performance.
             </p>
           </motion.div>
@@ -271,7 +271,7 @@ export default function FeaturesPage() {
               </h2>
               <p className="text-xl text-gray-600 max-w-2xl mx-auto">
                 Join thousands of creators and teams who are already building 
-                better ideas with Orb&apos;s powerful features.
+                better ideas with Orblin&apos;s powerful features.
               </p>
               <Link href="/sign-up">
                 <Button 

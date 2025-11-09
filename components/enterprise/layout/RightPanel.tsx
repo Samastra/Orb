@@ -239,7 +239,7 @@ export default function RightPanel({ onClose }: RightPanelProps) {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-gray-500">Workspace</label>
-                  <p className="text-sm font-medium">Orb Brainstorming</p>
+                  <p className="text-sm font-medium">Orblin Brainstorming</p>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500">Plan</label>

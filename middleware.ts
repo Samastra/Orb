@@ -5,6 +5,11 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)', 
   '/api/webhooks/clerk',
+  '/terms',
+  '/privacy', 
+  '/refunds',
+  '/boards/new',          // ← Allow creating new boards without auth
+  '/boards/(.*)',         // ← Allow accessing any board without auth
   // Add other public routes as needed
 ])
 
