@@ -1,6 +1,5 @@
 // components/TextComponent.tsx
 "use client";
-
 import React, { useRef, useEffect, useCallback, forwardRef } from "react";
 import { Text as KonvaText, Transformer } from "react-konva";
 import Konva from "konva";
@@ -23,18 +22,18 @@ interface TextComponentProps {
   isEditing: boolean;
   activeTool: string | null;
   onSelect: () => void;
-  onUpdate: (attrs: { 
-    x?: number; 
-    y?: number; 
-    width?: number; 
-    fontSize?: number; 
-    rotation?: number; 
+  onUpdate: (attrs: {
+    x?: number;
+    y?: number;
+    width?: number;
+    fontSize?: number;
+    rotation?: number;
     text?: string;
-    fontWeight?: string; // ← ADD THIS
-    fontFamily?: string; // ← ADD THIS
-    fontStyle?: string; // ← ADD THIS
-    fill?: string; // ← ADD THIS
-    align?: "left" | "center" | "right"; // ← ADD THIS
+    fontWeight?: string;
+    fontFamily?: string;
+    fontStyle?: string;
+    fill?: string;
+    align?: "left" | "center" | "right";
   }) => void;
   onStartEditing: () => void;
   onFinishEditing: () => void;
@@ -49,7 +48,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       text: initialText,
       fontSize,
       fill,
-      fontFamily = "Inter, Arial, sans-serif",
+      fontFamily = "Arial",
       fontWeight = "400",
       fontStyle = "normal",
       align = "left",
@@ -69,6 +68,44 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
     const trRef = useRef<Konva.Transformer>(null);
     const editorRef = useRef<HTMLDivElement>(null);
     const isNew = useRef(true);
+
+    // **FIX: Compute combined fontStyle for Konva (merges weight and style)**
+    const konvaFontStyle = (() => {
+      let stylePart = fontStyle === "normal" ? "" : fontStyle;
+      let weightPart =
+        fontWeight === "400" || fontWeight === "normal"
+          ? ""
+          : fontWeight === "bold"
+          ? "bold"
+          : fontWeight; // Use numeric like '700' directly
+      return `${stylePart} ${weightPart}`.trim() || "normal";
+    })();
+
+    // **CRITICAL FIX: Force Konva to update when font properties change**
+    useEffect(() => {
+      if (textRef.current && !isEditing) {
+        const node = textRef.current;
+        
+        // Update the Konva node using setAttrs (the correct way)
+        node.setAttrs({
+          fontFamily,
+          fontStyle: konvaFontStyle, // Use combined style
+          fontSize,
+          fill,
+          align
+        });
+        
+        // Clear cache if any (safe even if not cached)
+        node.clearCache();
+        
+        // Force a redraw of the entire layer
+        const layer = node.getLayer();
+        if (layer) {
+          layer.batchDraw();
+          console.log('🔄 Force redraw for font properties:', { konvaFontStyle, fontFamily });
+        }
+      }
+    }, [konvaFontStyle, fontFamily, fontSize, fill, align, isEditing]); // Depend on konvaFontStyle instead of separate fontWeight/fontStyle
 
     // **AUTO-EDIT ON CREATE**
     useEffect(() => {
@@ -93,41 +130,28 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       const node = textRef.current;
       const transformer = trRef.current;
       if (!node || !transformer) return;
-
-      // Get current scale from the transform
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
-
-      // Detect if user is scaling diagonally (corner anchors)
       const activeAnchor = transformer.getActiveAnchor();
       const isCornerAnchor =
         activeAnchor &&
         (activeAnchor.includes("top") || activeAnchor.includes("bottom")) &&
         (activeAnchor.includes("left") || activeAnchor.includes("right"));
-
       if (isCornerAnchor) {
-        // --- CORNER ANCHOR: SCALE FONT SIZE + WIDTH ---
         const oldFontSize = node.fontSize();
         const oldWidth = node.width();
-
-        // Update font size and width proportionally
-        const newFontSize = Math.max(6, Math.round(oldFontSize * scaleY)); // prevent collapse
+        const newFontSize = Math.max(6, Math.round(oldFontSize * scaleY));
         const newWidth = Math.max(50, oldWidth * scaleX);
-
         node.fontSize(newFontSize);
         node.width(newWidth);
-
-        // Reset scale so further transforms build correctly
         node.scaleX(1);
         node.scaleY(1);
       } else {
-        // --- SIDE ANCHORS: ONLY ADJUST WIDTH (KEEP WRAPPING) ---
         const newWidth = Math.max(50, node.width() * scaleX);
         node.width(newWidth);
         node.scaleX(1);
         node.scaleY(1);
       }
-
       node.getLayer()?.batchDraw();
     }, []);
 
@@ -135,7 +159,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
     const handleTransformEnd = useCallback(() => {
       const node = textRef.current;
       if (!node) return;
-
       onUpdate({
         x: node.x(),
         y: node.y(),
@@ -175,18 +198,14 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
     // **INLINE EDITOR**
     useEffect(() => {
       if (!isEditing || !textRef.current) return;
-
       const node = textRef.current;
       const stage = node.getStage();
       if (!stage) return;
-
       const editor = document.createElement("div");
       editorRef.current = editor;
       document.body.appendChild(editor);
-
       const { x: absX, y: absY } = node.getAbsolutePosition();
       const stageBox = stage.container().getBoundingClientRect();
-
       Object.assign(editor.style, {
         position: "fixed",
         left: `${stageBox.left + absX}px`,
@@ -195,8 +214,8 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         minHeight: `${fontSize * 1.4}px`,
         fontSize: `${fontSize}px`,
         fontFamily,
-        fontWeight:fontWeight,
-        fontStyle,
+        fontWeight, // Keep separate for CSS
+        fontStyle, // Keep separate for CSS
         color: fill,
         textAlign: align,
         lineHeight: "1.4",
@@ -212,38 +231,31 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         transform: `rotate(${rotation}deg)`,
         transformOrigin: "top left",
       });
-
       editor.contentEditable = "true";
       editor.innerHTML = initialText || "";
-
       const resize = () => {
         editor.style.height = "auto";
         editor.style.height = `${editor.scrollHeight}px`;
       };
-
       const handleInput = () => resize();
       const handleBlur = () => {
         const newText = editor.innerHTML;
         
-        // Update text AND preserve all other text properties including fontWeight
-        onUpdate({ 
+        onUpdate({
           text: newText,
-          // Preserve the current fontWeight and other properties
-          fontWeight: fontWeight, // ← ADD THIS LINE
-          fontFamily: fontFamily,
-          fontSize: fontSize,
-          fontStyle: fontStyle,
-          fill: fill,
-          align: align
+          fontWeight,
+          fontFamily,
+          fontSize,
+          fontStyle,
+          fill,
+          align
         });
         
-        // Auto-resize text node width to fit new content
         const tempText = new Konva.Text({ text: newText, fontSize, fontFamily });
         const minWidth = tempText.width() + 20;
         onUpdate({ width: Math.max(node.width(), minWidth) });
         onFinishEditing();
       };
-
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
@@ -251,13 +263,11 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         }
         if (e.key === "Escape") editor.blur();
       };
-
       editor.addEventListener("input", handleInput);
       editor.addEventListener("blur", handleBlur);
       editor.addEventListener("keydown", handleKeyDown);
       resize();
       setTimeout(() => editor.focus(), 0);
-
       return () => {
         editor.removeEventListener("input", handleInput);
         editor.removeEventListener("blur", handleBlur);
@@ -280,40 +290,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       onFinishEditing,
     ]);
 
-      const getKonvaFontWeight = (weight: string): string => {
-      const numericWeight = parseInt(weight, 10);
-      if (numericWeight >= 600) return "bold";
-      return "normal";
-    };
-
-
-    // Add this useEffect to debug what's being received
-      useEffect(() => {
-        console.log('🎯 TextComponent received fontWeight:', {
-          fontWeight,
-          type: typeof fontWeight,
-          fontFamily
-        });
-      }, [fontWeight, fontFamily]);
-
-      // Also add this right before the return to see what Konva is getting
-      console.log('🎨 Rendering KonvaText with:', {
-        fontWeight,
-        fontFamily,
-        fontSize
-      });
-
-
-    useEffect(() => {
-    console.log('🔧 TextComponent props:', {
-      id,
-      fontWeight,
-      fontFamily,
-      isEditing,
-      isSelected
-    });
-  }, [id, fontWeight, fontFamily, isEditing, isSelected]);
-
     return (
       <>
         <KonvaText
@@ -324,8 +300,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           text={initialText || "Click to edit"}
           fontSize={fontSize}
           fontFamily={fontFamily}
-          fontWeight={getKonvaFontWeight(fontWeight)}
-          fontStyle={fontStyle}
+          fontStyle={konvaFontStyle} // Use combined for Konva
           fill={fill}
           align={align}
           width={width}
@@ -342,7 +317,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           onDblTap={handleDblClick}
           visible={!isEditing}
         />
-
         {isSelected && !isEditing && (
           <Transformer
             ref={trRef}
