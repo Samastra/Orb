@@ -61,8 +61,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       onUpdate,
       onStartEditing,
       onFinishEditing,
-    },
-    ref
+    }
   ) => {
     const textRef = useRef<Konva.Text>(null);
     const trRef = useRef<Konva.Transformer>(null);
@@ -71,8 +70,8 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
 
     // **FIX: Compute combined fontStyle for Konva (merges weight and style)**
     const konvaFontStyle = (() => {
-      let stylePart = fontStyle === "normal" ? "" : fontStyle;
-      let weightPart =
+      const stylePart = fontStyle === "normal" ? "" : fontStyle;
+      const weightPart =
         fontWeight === "400" || fontWeight === "normal"
           ? ""
           : fontWeight === "bold"
