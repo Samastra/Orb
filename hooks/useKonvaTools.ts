@@ -111,7 +111,102 @@ export const useKonvaTools = (
   const endAnchorRef = useRef<Konva.Circle | null>(null);
   const pathNodeRef = useRef<Konva.Path | null>(null);
   const isPlacingConnection = useRef(false);
+  const isSpacePressed = useRef(false);
+  const isPanning = useRef(false);
+  const lastPointerPosition = useRef<{ x: number; y: number } | null>(null);
 
+  // ========== PANNING FUNCTIONS (DECLARE FIRST) ==========
+  const getCursorForTool = useCallback((tool: Tool | null, mode: "brush" | "eraser") => {
+    switch (tool) {
+      case "connect": return "crosshair";
+      case "select": return "default";
+      case "pen": return mode === "eraser" ? "cell" : "crosshair";
+      default: return "default";
+    }
+  }, []);
+
+  const handleKeyDown = useCallback((e: Konva.KonvaEventObject<KeyboardEvent>) => {
+    if (e.evt.key === ' ') {
+      isSpacePressed.current = true;
+      const stage = stageRef.current;
+      if (stage) {
+        stage.container().style.cursor = 'grab';
+      }
+      e.evt.preventDefault();
+    }
+  }, []);
+
+  const handleKeyUp = useCallback((e: Konva.KonvaEventObject<KeyboardEvent>) => {
+    if (e.evt.key === ' ') {
+      isSpacePressed.current = false;
+      isPanning.current = false;
+      const stage = stageRef.current;
+      if (stage) {
+        stage.container().style.cursor = getCursorForTool(activeTool, drawingMode);
+      }
+      e.evt.preventDefault();
+    }
+  }, [activeTool, drawingMode, getCursorForTool]);
+
+  const handlePanningMouseDown = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!isSpacePressed.current) return;
+
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      isPanning.current = true;
+      const pointerPos = stage.getPointerPosition();
+      if (pointerPos) {
+        lastPointerPosition.current = pointerPos;
+      }
+      stage.container().style.cursor = 'grabbing';
+      
+      e.cancelBubble = true;
+    },
+    []
+  );
+
+  const handlePanningMouseUp = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!isSpacePressed.current) return;
+
+      isPanning.current = false;
+      const stage = stageRef.current;
+      if (stage) {
+        stage.container().style.cursor = 'grab';
+      }
+    },
+    []
+  );
+
+  const handlePanningMouseMove = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!isSpacePressed.current || !isPanning.current) return;
+
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      const point = stage.getPointerPosition();
+      if (!point || !lastPointerPosition.current) return;
+
+      const dx = point.x - lastPointerPosition.current.x;
+      const dy = point.y - lastPointerPosition.current.y;
+
+      const newPos = {
+        x: stage.x() + dx,
+        y: stage.y() + dy,
+      };
+
+      stage.position(newPos);
+      stage.batchDraw();
+
+      lastPointerPosition.current = point;
+    },
+    []
+  );
+
+  // ========== EXISTING TOOL FUNCTIONS ==========
   const detectAndEraseLines = useCallback(
     (currentPoint: { x: number; y: number }) => {
       setLines(prevLines => {
@@ -179,13 +274,7 @@ export const useKonvaTools = (
     []
   );
 
-  useEffect(() => {
-    if (activeTool === "connect" && !isConnecting && !tempGroupRef.current) {
-      console.log("🔗 Connection tool activated - creating instant connection");
-      createInstantConnection();
-    }
-  }, [activeTool, isConnecting]);
-
+  // ========== CONNECTION FUNCTIONS ==========
   const createInstantConnection = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -380,13 +469,6 @@ export const useKonvaTools = (
     console.log("✅ Connection finalized and ready for adjustments");
   }, [stageRef, activeTool, addAction, setIsConnecting]);
 
-  useEffect(() => {
-    if (activeTool !== "connect" && tempGroupRef.current) {
-      console.log("🔗 Connection tool deactivated - cleaning up");
-      cleanupConnection();
-    }
-  }, [activeTool, cleanupConnection]);
-
   const handleConnectionMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (activeTool !== "connect" || !isPlacingConnection.current || !tempGroupRef.current) return;
@@ -464,6 +546,7 @@ export const useKonvaTools = (
     [activeTool, createInstantConnection]
   );
 
+  // ========== DRAWING FUNCTIONS ==========
   const handleDrawingMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (activeTool !== "pen") return;
@@ -612,19 +695,24 @@ export const useKonvaTools = (
     }
   }, [activeTool, drawingMode, lines, addAction]);
 
+  // ========== MAIN EVENT HANDLERS ==========
   const handleMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      handlePanningMouseDown(e);
+      
       if (activeTool === "pen") {
         handleDrawingMouseDown(e);
       } else if (activeTool === "connect") {
         handleConnectionStart(e);
       }
     },
-    [activeTool, handleDrawingMouseDown, handleConnectionStart]
+    [activeTool, handleDrawingMouseDown, handleConnectionStart, handlePanningMouseDown]
   );
 
   const handleMouseMove = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      handlePanningMouseMove(e);
+      
       if (activeTool === "pen") {
         handleDrawingMouseMove(e);
       } else if (activeTool === "connect") {
@@ -632,18 +720,20 @@ export const useKonvaTools = (
         handleConnectionHover(e);
       }
     },
-    [activeTool, handleDrawingMouseMove, handleConnectionMove, handleConnectionHover]
+    [activeTool, handleDrawingMouseMove, handleConnectionMove, handleConnectionHover, handlePanningMouseMove]
   );
 
   const handleMouseUp = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
+      handlePanningMouseUp(e);
+      
       if (activeTool === "pen") {
         handleDrawingMouseUp();
       } else if (activeTool === "connect") {
         handleConnectionEnd(e);
       }
     },
-    [activeTool, handleDrawingMouseUp, handleConnectionEnd]
+    [activeTool, handleDrawingMouseUp, handleConnectionEnd, handlePanningMouseUp]
   );
 
   const handleTouchStart = useCallback(
@@ -705,40 +795,33 @@ export const useKonvaTools = (
   );
 
   const handleToolChange = useCallback(
-    (tool: Tool | null) => {
-      if (activeTool === "pen" && tool !== "pen") {
-        isDrawing.current = false;
-        lastErasedLines.current = [];
-      }
+  (tool: Tool | null) => {
+    if (activeTool === "pen" && tool !== "pen") {
+      isDrawing.current = false;
+      lastErasedLines.current = [];
+    }
 
-      setActiveTool(tool);
+    setActiveTool(tool);
 
-      if (!stageRef.current) return;
+    if (!stageRef.current) return;
 
-      const drawLayer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
-      if (!drawLayer) return;
+    const drawLayer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
+    if (!drawLayer) return;
 
-      const shapes = drawLayer.find(".selectable-shape");
-      shapes.forEach((shape: Konva.Node) => {
-        shape.draggable(tool === "select");
-      });
+    const shapes = drawLayer.find(".selectable-shape");
+    shapes.forEach((shape: Konva.Node) => {
+      // Disable dragging if spacebar is pressed (panning mode)
+      shape.draggable(tool === "select" && !isSpacePressed.current);
+    });
 
-      const container = stageRef.current.container();
-      container.style.cursor =
-        tool === "connect"
-          ? "crosshair"
-          : tool === "select"
-          ? "move"
-          : tool === "pen"
-          ? drawingMode === "eraser"
-            ? "cell"
-            : "crosshair"
-          : "default";
+    const container = stageRef.current.container();
+    container.style.cursor = getCursorForTool(tool, drawingMode);
 
-      drawLayer.batchDraw();
-    },
-    [activeTool, drawingMode, setActiveTool, stageRef]
-  );
+    drawLayer.batchDraw();
+  },
+  [activeTool, drawingMode, setActiveTool, stageRef, getCursorForTool]
+);
+
 
   const handleZoomIn = useCallback(() => {
     const stage = stageRef.current;
@@ -764,6 +847,79 @@ export const useKonvaTools = (
     stage.batchDraw();
   }, [stageRef]);
 
+  // ========== EFFECTS ==========
+  useEffect(() => {
+    if (activeTool === "connect" && !isConnecting && !tempGroupRef.current) {
+      console.log("🔗 Connection tool activated - creating instant connection");
+      createInstantConnection();
+    }
+  }, [activeTool, isConnecting]);
+
+  useEffect(() => {
+    if (activeTool !== "connect" && tempGroupRef.current) {
+      console.log("🔗 Connection tool deactivated - cleaning up");
+      cleanupConnection();
+    }
+  }, [activeTool, cleanupConnection]);
+
+
+    // In useKonvaTools.ts - Add this useEffect right after the other useEffects at the bottom of the hook
+
+// ========== GLOBAL KEYBOARD EVENTS ==========
+useEffect(() => {
+  const handleGlobalKeyDown = (e: KeyboardEvent) => {
+    if (e.key === ' ') {
+      isSpacePressed.current = true;
+      const stage = stageRef.current;
+      if (stage) {
+        stage.container().style.cursor = 'grab';
+        
+        // Disable shape dragging when spacebar is pressed
+        const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
+        if (drawLayer) {
+          const shapes = drawLayer.find(".selectable-shape");
+          shapes.forEach((shape: Konva.Node) => {
+            shape.draggable(false);
+          });
+          drawLayer.batchDraw();
+        }
+      }
+      e.preventDefault(); // Prevent scrolling
+    }
+  };
+
+  const handleGlobalKeyUp = (e: KeyboardEvent) => {
+    if (e.key === ' ') {
+      isSpacePressed.current = false;
+      isPanning.current = false;
+      const stage = stageRef.current;
+      if (stage) {
+        stage.container().style.cursor = getCursorForTool(activeTool, drawingMode);
+        
+        // Re-enable shape dragging when spacebar is released (only if select tool is active)
+        const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
+        if (drawLayer) {
+          const shapes = drawLayer.find(".selectable-shape");
+          shapes.forEach((shape: Konva.Node) => {
+            shape.draggable(activeTool === "select");
+          });
+          drawLayer.batchDraw();
+        }
+      }
+      e.preventDefault(); // Prevent scrolling
+    }
+  };
+
+  // Add global event listeners
+  document.addEventListener('keydown', handleGlobalKeyDown);
+  document.addEventListener('keyup', handleGlobalKeyUp);
+
+  return () => {
+    document.removeEventListener('keydown', handleGlobalKeyDown);
+    document.removeEventListener('keyup', handleGlobalKeyUp);
+  };
+}, [activeTool, drawingMode, getCursorForTool, stageRef]);
+
   return {
     handleToolChange,
     handleMouseDown,
@@ -782,5 +938,6 @@ export const useKonvaTools = (
     handleZoomIn,
     handleZoomOut,
     isDrawing,
+
   };
 };
