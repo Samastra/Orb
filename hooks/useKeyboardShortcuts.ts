@@ -13,9 +13,9 @@ import {
 } from '@/constants/keyboard-shortcuts';
 
 interface UseKeyboardShortcutsProps {
-  selectedNodeId: string | null;
+  selectedNodeIds: string[]; // CHANGED: From selectedNodeId to selectedNodeIds
   deleteShape: (id: string) => void;
-  setSelectedNodeId: (id: string | null) => void;
+  setSelectedNodeIds: (ids: string[] | ((prev: string[]) => string[])) => void; // CHANGED: Updated setter
   activeTool: Tool | null;
   setActiveTool: (tool: Tool | null) => void;
   handleToolChange: (tool: Tool | null) => void;
@@ -82,7 +82,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
       currentKeys, 
       ctrlKey: event.ctrlKey, 
       metaKey: event.metaKey,
-      modifierPressed: isModifierPressed(event)
+      modifierPressed: isModifierPressed(event),
+      selectedNodeIds: currentProps.selectedNodeIds // ADDED: Log selected nodes
     });
 
     // CRITICAL: Prevent default for ALL problematic browser shortcuts EARLY
@@ -104,7 +105,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     switch(key) {
       case 'delete':
       case 'backspace':
-        if (currentProps.selectedNodeId) {
+        if (currentProps.selectedNodeIds.length > 0) { // CHANGED: Check if any nodes are selected
           console.log('🛑 Preventing default for delete/backspace');
           event.preventDefault();
           event.stopPropagation();
@@ -150,16 +151,19 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     // === SELECTION & EDITING ===
     if (keysMatch(currentKeys, PHASE_1_SHORTCUTS.DELETE.keys) || 
         keysMatch(currentKeys, PHASE_1_SHORTCUTS.BACKSPACE.keys)) {
-      if (props.selectedNodeId) {
-        console.log('🗑️ Deleting selected shape:', props.selectedNodeId);
-        props.deleteShape(props.selectedNodeId);
+      if (props.selectedNodeIds.length > 0) { // CHANGED: Check if any nodes are selected
+        console.log('🗑️ Deleting selected shapes:', props.selectedNodeIds);
+        // Delete all selected shapes
+        props.selectedNodeIds.forEach((id: string) => {
+          props.deleteShape(id);
+        });
         return true;
       }
     }
 
     if (keysMatch(currentKeys, PHASE_1_SHORTCUTS.ESCAPE.keys)) {
       console.log('⎋ Deselecting all');
-      props.setSelectedNodeId(null);
+      props.setSelectedNodeIds([]); // CHANGED: Clear array instead of setting null
       return true;
     }
 

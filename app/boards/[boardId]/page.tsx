@@ -125,10 +125,10 @@ const BoardPage = () => {
   const [stageKey, setStageKey] = useState(0);
   const {
     scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
-    isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeId, stageInstance, tempDimensions,
+    isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeIds, stageInstance, tempDimensions,
     showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
     setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
-    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setSelectedNodeId, setStageInstance,
+    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setSelectedNodeIds, setStageInstance,
     setTempDimensions, setShowSaveModal, setShowSetupDialog, setBoardInfo,
     // Layer functions
     bringForward,
@@ -207,14 +207,14 @@ const handleFinishTextEditing = useCallback(() => {
     connectionStart, 
     tempConnection, 
     isConnecting, 
-    selectedNodeId, 
+    selectedNodeIds, 
     setActiveTool, 
     setDrawingMode, 
     setLines, 
     setConnectionStart, 
     setTempConnection, 
     setIsConnecting, 
-    setSelectedNodeId, 
+    setSelectedNodeIds, 
     undoRedoAddAction,
     setConnections,
     updateConnection
@@ -316,11 +316,11 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
   };
   
   setReactShapes(prev => [...prev, newTextShape]);
-  setSelectedNodeId(shapeId);
+  setSelectedNodeIds([shapeId]); // FIXED: Use setSelectedNodeIds with array
   setActiveTool("text"); // This will put the text in editing mode immediately
   
   console.log('✅ Text created and set to editing mode');
-}, [setReactShapes, setSelectedNodeId, setActiveTool]);
+}, [setReactShapes, setSelectedNodeIds, setActiveTool]);
 
   // Fetch board data and initialize boardInfo
   useEffect(() => {
@@ -460,22 +460,26 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
   };
 }, []);
 
-  // Memoize selected shape
+  // Memoize selected shape - UPDATED FOR MULTI-SELECT
   const selectedShape = useMemo(() => {
-    if (!selectedNodeId) return null;
+    if (!selectedNodeIds || selectedNodeIds.length === 0) return null;
     
-    const reactShape = reactShapes.find((s) => s.id === selectedNodeId);
+    // For multi-select, return the first selected shape for backward compatibility
+    // You might want to update your FormattingToolbar to handle multiple shapes
+    const firstSelectedId = selectedNodeIds[0];
+    
+    const reactShape = reactShapes.find((s) => s.id === firstSelectedId);
     if (reactShape) return reactShape;
     
-    const konvaShape = konvaShapes.find((s) => s.id === selectedNodeId);
+    const konvaShape = konvaShapes.find((s) => s.id === firstSelectedId);
     if (konvaShape) return konvaShape;
     
-    const imageShape = images.find((img) => img.id === selectedNodeId);
+    const imageShape = images.find((img) => img.id === firstSelectedId);
     if (imageShape) return imageShape;
     
-    const connectionShape = connections.find((conn) => conn.id === selectedNodeId);
+    const connectionShape = connections.find((conn) => conn.id === firstSelectedId);
     return connectionShape || null;
-  }, [selectedNodeId, reactShapes, konvaShapes, images, connections]);
+  }, [selectedNodeIds, reactShapes, konvaShapes, images, connections]);
 
   // Zoom functions with interaction tracking
   const handleZoomIn = useCallback(() => {
@@ -582,30 +586,33 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
   setHasChanges(true);
 }, [debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, setReactShapes]);
 
-  // Formatting toolbar update (no immediate save)
+  // Formatting toolbar update (no immediate save) - UPDATED FOR MULTI-SELECT
   const handleFormattingToolbarUpdate = useCallback((updates: FormattingUpdates) => {
-  console.log("🔄 Formatting toolbar update:", { selectedNodeId, updates });
+  console.log("🔄 Formatting toolbar update:", { selectedNodeIds, updates });
 
-  if (!selectedNodeId) return;
+  if (!selectedNodeIds || selectedNodeIds.length === 0) return;
 
-  const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-  const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
-  const isConnection = connections.some((c) => c.id === selectedNodeId);
+  // Apply updates to all selected shapes
+  selectedNodeIds.forEach(selectedNodeId => {
+    const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
+    const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
+    const isConnection = connections.some((c) => c.id === selectedNodeId);
 
-  if (isReactShape) {
-    setReactShapes((prev) =>
-      prev.map((shape) =>
-        shape.id === selectedNodeId ? { ...shape, ...updates } : shape
-      )
-    );
-  } else if (isKonvaShape) {
-    debouncedUpdateShape([selectedNodeId, updates]);
-  } else if (isConnection) {
-    updateConnection(selectedNodeId, updates);
-  }
+    if (isReactShape) {
+      setReactShapes((prev) =>
+        prev.map((shape) =>
+          shape.id === selectedNodeId ? { ...shape, ...updates } : shape
+        )
+      );
+    } else if (isKonvaShape) {
+      debouncedUpdateShape([selectedNodeId, updates]);
+    } else if (isConnection) {
+      updateConnection(selectedNodeId, updates);
+    }
+  });
 
   setHasChanges(true);
-}, [selectedNodeId, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, setReactShapes]);
+}, [selectedNodeIds, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, setReactShapes]);
 
   // Shape creation with immediate save
   const handleAddShape = useCallback((type: Tool) => {
@@ -682,7 +689,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
     }
   }, [currentBoardId]);
 
-  // Enhanced delete function
+  // Enhanced delete function - UPDATED FOR MULTI-SELECT
   const handleDeleteShape = useCallback((id: string) => {
     console.log('🗑️ Keyboard delete triggered for:', id, {
       reactShapes: reactShapes.find(s => s.id === id),
@@ -826,11 +833,12 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
     }
   }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction, calculateViewportCenter, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts - UPDATED FOR MULTI-SELECT
+
   const keyboardShortcuts = useKeyboardShortcuts({
-    selectedNodeId,
+    selectedNodeIds, // FIXED: Now matches the updated interface
     deleteShape: handleDeleteShape,
-    setSelectedNodeId,
+    setSelectedNodeIds, // FIXED: Now matches the updated interface
     activeTool,
     setActiveTool: (tool: Tool | null) => {
       console.log('🔧 Keyboard tool change:', tool);
@@ -956,7 +964,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
           stageFrames={stageFrames}
           images={images}
           connections={connections}
-          selectedNodeId={selectedNodeId}
+          selectedNodeIds={selectedNodeIds}
           stageInstance={stageInstance}
           setStageFrames={setStageFrames}
           handleWheel={toolHandlers.handleWheel}
@@ -966,7 +974,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
           handleTouchStart={toolHandlers.handleTouchStart}
           handleTouchEnd={toolHandlers.handleTouchEnd}
           handleTouchMove={toolHandlers.handleTouchMove}
-          setSelectedNodeId={setSelectedNodeId}
+          setSelectedNodeIds={setSelectedNodeIds}
           setReactShapes={setReactShapes}
           setShapes={setKonvaShapes}
           setImages={setImages}
