@@ -848,6 +848,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     onFinishEditing={() => {
                       setActiveTool("select");
                     }}
+
+                    className = "text-component"
                   />
                 );
             } else if (item.type === 'stickyNote') {
@@ -868,6 +870,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                         shape.id === item.id ? { ...shape, ...newAttrs } : shape
                       ));
                     }}
+                    className="sticky-note"
                   />
                 );
               } else {

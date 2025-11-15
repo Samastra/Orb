@@ -140,70 +140,72 @@ export const useKonvaTools = (
     }
   }, []);
 
-    const handleSelectionStart = useCallback(
-      (e: Konva.KonvaEventObject<MouseEvent>) => {
-        if (activeTool !== "select" || isSpacePressed.current) return;
-        
-        const stage = stageRef.current;
-        if (!stage) return;
+  // FIXED: Selection rectangle now uses stage coordinates like the pen tool
+  const handleSelectionStart = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (activeTool !== "select" || isSpacePressed.current) return;
+      
+      const stage = stageRef.current;
+      if (!stage) return;
 
-        const pos = stage.getPointerPosition();
-        if (!pos) return;
+      // FIXED: Use getRelativePointerPosition like the pen tool for accurate stage coordinates
+      const pos = getRelativePointerPosition(stage);
+      if (!pos) return;
 
-        isSelecting.current = true;
-        selectionStart.current = { x: pos.x, y: pos.y };
+      isSelecting.current = true;
+      selectionStart.current = { x: pos.x, y: pos.y };
 
-        // Create selection rectangle
-        const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
-        if (!drawLayer) return;
+      // Create selection rectangle
+      const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
+      if (!drawLayer) return;
 
-        selectionRect.current = new Konva.Rect({
-          x: pos.x,
-          y: pos.y,
-          width: 0,
-          height: 0,
-          fill: 'rgba(0, 119, 255, 0.2)',
-          stroke: '#0077ff',
-          strokeWidth: 1,
-          dash: [5, 5],
-          name: 'selection-rect',
-          listening: false, // Don't interfere with other mouse events
-        });
+      selectionRect.current = new Konva.Rect({
+        x: pos.x,
+        y: pos.y,
+        width: 0,
+        height: 0,
+        fill: 'rgba(0, 119, 255, 0.2)',
+        stroke: '#0077ff',
+        strokeWidth: 1,
+        dash: [5, 5],
+        name: 'selection-rect',
+        listening: false, // Don't interfere with other mouse events
+      });
 
-        drawLayer.add(selectionRect.current);
-        drawLayer.batchDraw();
+      drawLayer.add(selectionRect.current);
+      drawLayer.batchDraw();
 
-        e.cancelBubble = true;
-      },
-      [activeTool]
-    );
+      e.cancelBubble = true;
+    },
+    [activeTool]
+  );
 
+  // FIXED: Selection rectangle movement now uses stage coordinates
+  const handleSelectionMove = useCallback(
+    (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!isSelecting.current || !selectionRect.current || !stageRef.current) return;
 
-    const handleSelectionMove = useCallback(
-  (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!isSelecting.current || !selectionRect.current || !stageRef.current) return;
+      const stage = stageRef.current;
+      // FIXED: Use getRelativePointerPosition for accurate stage coordinates
+      const pos = getRelativePointerPosition(stage);
+      if (!pos) return;
 
-    const stage = stageRef.current;
-    const pos = stage.getPointerPosition();
-    if (!pos) return;
+      // Update selection rectangle using stage coordinates
+      const x = Math.min(selectionStart.current.x, pos.x);
+      const y = Math.min(selectionStart.current.y, pos.y);
+      const width = Math.abs(pos.x - selectionStart.current.x);
+      const height = Math.abs(pos.y - selectionStart.current.y);
 
-    // Update selection rectangle
-    const x = Math.min(selectionStart.current.x, pos.x);
-    const y = Math.min(selectionStart.current.y, pos.y);
-    const width = Math.abs(pos.x - selectionStart.current.x);
-    const height = Math.abs(pos.y - selectionStart.current.y);
+      selectionRect.current.setAttrs({ x, y, width, height });
+      selectionRect.current.getLayer()?.batchDraw();
 
-    selectionRect.current.setAttrs({ x, y, width, height });
-    selectionRect.current.getLayer()?.batchDraw();
+      e.cancelBubble = true;
+    },
+    []
+  );
 
-    e.cancelBubble = true;
-  },
-  []
-);
-
-
-
-      const handleSelectionEnd = useCallback(
+  // FIXED: Selection now finds ALL selectable elements including text, sticky notes, etc.
+  const handleSelectionEnd = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (!isSelecting.current || !selectionRect.current || !stageRef.current) return;
 
@@ -215,8 +217,19 @@ export const useKonvaTools = (
         const selectionBox = selectionRect.current.getClientRect();
         const selectedShapes: string[] = [];
         
-        const shapes = drawLayer?.find(".selectable-shape") || [];
-        shapes.forEach((shape: Konva.Node) => {
+        // FIXED: Find ALL selectable elements including:
+        // - "selectable-shape" (konva shapes, images, stage frames)
+        // - "connection-group" (connections)
+        // - TextComponent elements
+        // - EditableStickyNoteComponent elements
+        const allSelectableElements = [
+          ...(drawLayer?.find(".selectable-shape") || []),
+          ...(drawLayer?.find(".connection-group") || []),
+          ...(drawLayer?.find(".text-component") || []),
+          ...(drawLayer?.find(".sticky-note") || [])
+        ];
+        
+        allSelectableElements.forEach((shape: Konva.Node) => {
           const shapeRect = shape.getClientRect();
           if (Konva.Util.haveIntersection(selectionBox, shapeRect)) {
             selectedShapes.push(shape.id());
@@ -226,7 +239,7 @@ export const useKonvaTools = (
         // Set multiple selected shapes
         if (selectedShapes.length > 0) {
           console.log('🔍 Multi-selected shapes:', selectedShapes);
-          setSelectedNodeIds(selectedShapes); // This now accepts an array
+          setSelectedNodeIds(selectedShapes);
         } else {
           setSelectedNodeIds([]); // Clear selection if nothing was selected
         }
@@ -242,8 +255,6 @@ export const useKonvaTools = (
     },
     [setSelectedNodeIds]
   );
-
-
 
   const handlePanningMouseDown = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent>) => {
