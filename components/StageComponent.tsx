@@ -25,10 +25,10 @@ interface StageComponentProps {
   lines: Array<{tool: 'brush' | 'eraser', points: number[]}>;
   reactShapes: ReactShape[];
   shapes: KonvaShape[];
-  stageFrames: KonvaShape[]; 
+  stageFrames: KonvaShape[];
   images: ImageShape[];
   connections: Connection[];
-  selectedNodeIds: string[]; 
+  selectedNodeIds: string[];
   stageInstance: Konva.Stage | null;
   width?: number;
   height?: number;
@@ -62,7 +62,7 @@ interface StageComponentProps {
 }
 
 // Simple combined shape type
-type CombinedShape = 
+type CombinedShape =
   | (KonvaShape & { __kind: 'konva' })
   | (ReactShape & { __kind: 'react' })
   | (KonvaShape & { __kind: 'stage' })
@@ -70,18 +70,18 @@ type CombinedShape =
   | (Connection & { __kind: 'connection' });
 
 // Image Component
-const ImageElement = React.forwardRef(({ 
-  imageShape, 
-  onDragEnd,
-  onTransformEnd
-}: { 
+const ImageElement = React.forwardRef<Konva.Image, {
   imageShape: ImageShape;
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onTransformEnd?: (e: Konva.KonvaEventObject<Event>) => void;
-}, ref: React.Ref<Konva.Image>) => {
+}>(({
+  imageShape,
+  onDragEnd,
+  onTransformEnd
+}, ref) => {
   const [image, setImage] = React.useState<HTMLImageElement | null>(null);
   const internalRef = React.useRef<Konva.Image>(null);
-
+  
   React.useImperativeHandle(ref, () => internalRef.current!);
 
   React.useEffect(() => {
@@ -99,11 +99,11 @@ const ImageElement = React.forwardRef(({
   if (!image) {
     return (
       <Rect
-        ref={internalRef}
+        ref={internalRef as React.RefObject<Konva.Rect>}
         x={imageShape.x}
         y={imageShape.y}
-        width={imageShape.width || 200}      // Use imageShape dimensions
-        height={imageShape.height || 150}    // Use imageShape dimensions
+        width={imageShape.width || 200}
+        height={imageShape.height || 150}
         fill="#f0f0f0"
         stroke="#ccc"
         strokeWidth={1}
@@ -121,8 +121,8 @@ const ImageElement = React.forwardRef(({
       image={image}
       x={imageShape.x}
       y={imageShape.y}
-      width={imageShape.width}        // Use transformed width from state
-      height={imageShape.height}      // Use transformed height from state  
+      width={imageShape.width}
+      height={imageShape.height}
       rotation={imageShape.rotation}
       draggable={imageShape.draggable}
       onDragEnd={onDragEnd}
@@ -135,24 +135,24 @@ const ImageElement = React.forwardRef(({
 ImageElement.displayName = 'ImageElement';
 
 // Enhanced Connection Component with editable anchors
-const ConnectionElement = React.forwardRef(({ 
-  connection, 
-  onDragEnd,
-  onClick,
-  updateConnection,
-  onDelete
-}: { 
+const ConnectionElement = React.forwardRef<Konva.Path, {
   connection: Connection;
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onClick: (e: Konva.KonvaEventObject<MouseEvent>) => void;
   updateConnection: (id: string, updates: Partial<Connection>) => void;
   onDelete: (id: string) => void;
-}, ref: React.Ref<Konva.Path>) => { // REMOVED | null
+}>(({
+  connection,
+  onDragEnd,
+  onClick,
+  updateConnection,
+  onDelete
+}, ref) => {
   const groupRef = React.useRef<Konva.Group>(null);
   const pathRef = React.useRef<Konva.Path>(null);
   const startAnchorRef = React.useRef<Konva.Circle>(null);
   const endAnchorRef = React.useRef<Konva.Circle>(null);
-
+  
   React.useImperativeHandle(ref, () => pathRef.current!);
 
   const computeSmartControlPoints = (from: {x: number, y: number}, to: {x: number, y: number}) => {
@@ -163,7 +163,7 @@ const ConnectionElement = React.forwardRef(({
       return {
         cp1x: from.x,
         cp1y: from.y,
-        cp2x: to.x, 
+        cp2x: to.x,
         cp2y: to.y,
         shouldSnapStraight: true
       };
@@ -187,17 +187,14 @@ const ConnectionElement = React.forwardRef(({
 
   const updatePathFromAnchors = () => {
     if (!startAnchorRef.current || !endAnchorRef.current || !pathRef.current) return;
-
     const fx = startAnchorRef.current.x();
     const fy = startAnchorRef.current.y();
     const tx = endAnchorRef.current.x();
     const ty = endAnchorRef.current.y();
-
     const { cp1x, cp1y, cp2x, cp2y, shouldSnapStraight } = computeSmartControlPoints({x: fx, y: fy}, {x: tx, y: ty});
     const d = buildPathData({x: fx, y: fy}, {x: tx, y: ty}, cp1x, cp1y, cp2x, cp2y, shouldSnapStraight);
     pathRef.current.data(d);
     pathRef.current.getLayer()?.batchDraw();
-
     updateConnection(connection.id, {
       from: { ...connection.from, x: fx, y: fy },
       to: { ...connection.to, x: tx, y: ty },
@@ -207,10 +204,8 @@ const ConnectionElement = React.forwardRef(({
 
   React.useEffect(() => {
     if (!groupRef.current || !pathRef.current || !startAnchorRef.current || !endAnchorRef.current) return;
-
     startAnchorRef.current.on('dragmove', updatePathFromAnchors);
     endAnchorRef.current.on('dragmove', updatePathFromAnchors);
-
     return () => {
       startAnchorRef.current?.off('dragmove', updatePathFromAnchors);
       endAnchorRef.current?.off('dragmove', updatePathFromAnchors);
@@ -322,31 +317,65 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setActiveTool,
   handleStartTextEditing,
 }) => {
-  const shapeRefs = useRef<{ [key: string]: React.RefObject<Konva.Node | null> }>({});
+   const shapeRefs = useRef<{ [key: string]: React.RefObject<Konva.Node | null> }>({});
 
+  // ========== UPDATED HANDLE SHAPE TRANSFORM END ==========
   const handleShapeTransformEnd = (item: CombinedShape, e: Konva.KonvaEventObject<Event>) => {
     try {
       const node = e.target;
-
       if (item.__kind === 'connection') return;
+      
+      // FIXED: Add type guard to check if item has x and y properties
+      const hasPosition = (shape: CombinedShape): shape is CombinedShape & { x: number; y: number } => {
+        return shape.__kind !== 'connection';
+      };
 
+      if (!hasPosition(item)) return;
+
+      if (item.__kind === 'react') {
+        const newX = node.x();
+        const newY = node.y();
+        const newRotation = node.rotation();
+        const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
+        const updates: Partial<ReactShape> = { x: newX, y: newY, rotation: newRotation };
+
+        if (item.type === 'text') {
+          const textItem = item as ReactShape;
+          updates.width = Math.max(20, (textItem.width ?? 200) * scaleX);
+          updates.fontSize = Math.max(8, (textItem.fontSize ?? 20) * scaleY);
+        } else if (item.type === 'stickyNote') {
+          const stickyItem = item as ReactShape;
+          updates.width = Math.max(50, (stickyItem.width ?? 200) * scaleX);
+          updates.height = Math.max(50, (stickyItem.height ?? 200) * scaleY);
+          if (stickyItem.fontSize) {
+            updates.fontSize = Math.max(8, stickyItem.fontSize * scaleY);
+          }
+        }
+
+        node.scaleX(1);
+        node.scaleY(1);
+        setReactShapes(prev => prev.map(s => s.id === item.id ? { ...s, ...updates } : s));
+        return;
+      }
+
+      // Handle other shape types (existing logic)
       if (item.__kind === 'image') {
         const imageNode = node as Konva.Image;
         const newWidth = Math.max(1, imageNode.width() * imageNode.scaleX());
         const newHeight = Math.max(1, imageNode.height() * imageNode.scaleY());
         imageNode.scaleX(1);
         imageNode.scaleY(1);
-        
-        // FIX: Update images state instead of calling updateShape
-        setImages(prev => prev.map(img => 
-          img.id === item.id 
-            ? { 
-                ...img, 
-                x: imageNode.x(), 
-                y: imageNode.y(), 
-                width: newWidth, 
-                height: newHeight, 
-                rotation: imageNode.rotation() 
+       
+        setImages(prev => prev.map(img =>
+          img.id === item.id
+            ? {
+                ...img,
+                x: imageNode.x(),
+                y: imageNode.y(),
+                width: newWidth,
+                height: newHeight,
+                rotation: imageNode.rotation()
               }
             : img
         ));
@@ -359,7 +388,13 @@ const StageComponent: React.FC<StageComponentProps> = ({
         const newHeight = Math.max(1, stageNode.height() * stageNode.scaleY());
         stageNode.scaleX(1);
         stageNode.scaleY(1);
-        updateShape(item.id, { x: stageNode.x(), y: stageNode.y(), width: newWidth, height: newHeight, rotation: stageNode.rotation() });
+        updateShape(item.id, {
+          x: stageNode.x(),
+          y: stageNode.y(),
+          width: newWidth,
+          height: newHeight,
+          rotation: stageNode.rotation()
+        });
         return;
       }
 
@@ -372,7 +407,13 @@ const StageComponent: React.FC<StageComponentProps> = ({
             const newH = Math.max(1, rectNode.height() * rectNode.scaleY());
             rectNode.scaleX(1);
             rectNode.scaleY(1);
-            updateShape(item.id, { x: rectNode.x(), y: rectNode.y(), width: newW, height: newH, rotation: rectNode.rotation(), });
+            updateShape(item.id, {
+              x: rectNode.x(),
+              y: rectNode.y(),
+              width: newW,
+              height: newH,
+              rotation: rectNode.rotation()
+            });
             break;
           }
           case 'circle': {
@@ -380,7 +421,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
             const newR = Math.max(1, circleNode.radius() * circleNode.scaleX());
             circleNode.scaleX(1);
             circleNode.scaleY(1);
-            updateShape(item.id, { x: circleNode.x(), y: circleNode.y(), radius: newR, rotation: circleNode.rotation() });
+            updateShape(item.id, {
+              x: circleNode.x(),
+              y: circleNode.y(),
+              radius: newR,
+              rotation: circleNode.rotation()
+            });
             break;
           }
           case 'ellipse': {
@@ -389,13 +435,23 @@ const StageComponent: React.FC<StageComponentProps> = ({
             const newRy = Math.max(1, ellipseNode.radiusY() * ellipseNode.scaleY());
             ellipseNode.scaleX(1);
             ellipseNode.scaleY(1);
-            updateShape(item.id, { x: ellipseNode.x(), y: ellipseNode.y(), radiusX: newRx, radiusY: newRy, rotation: ellipseNode.rotation() });
+            updateShape(item.id, {
+              x: ellipseNode.x(),
+              y: ellipseNode.y(),
+              radiusX: newRx,
+              radiusY: newRy,
+              rotation: ellipseNode.rotation()
+            });
             break;
           }
           case 'triangle':
           case 'arrow':
           default: {
-            const newAttrs: Partial<KonvaShape> = { x: node.x(), y: node.y(), rotation: node.rotation() };
+            const newAttrs: Partial<KonvaShape> = {
+              x: node.x(),
+              y: node.y(),
+              rotation: node.rotation()
+            };
             if ('width' in node.attrs && 'height' in node.attrs) {
               const shapeNode = node as Konva.Shape;
               const newW = Math.max(1, shapeNode.width() * shapeNode.scaleX());
@@ -411,17 +467,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
         }
         return;
       }
-
-      if (item.__kind === 'react') {
-        setReactShapes(prev => prev.map(s => s.id === item.id ? ({ ...s, x: node.x(), y: node.y() }) : s));
-        return;
-      }
     } catch (error) {
       console.error('Error in handleShapeTransformEnd:', error);
     }
   };
 
-  useEffect(() => {
+   useEffect(() => {
     const allIds = [
       ...stageFrames.map(s => s.id),
       ...shapes.map(s => s.id),
@@ -429,12 +480,14 @@ const StageComponent: React.FC<StageComponentProps> = ({
       ...images.map(i => i.id),
       ...connections.map(c => c.id)
     ];
-    const map: { [key: string]: React.RefObject<Konva.Node | null> } = { ...shapeRefs.current };
     
+    // FIXED: Allow null in the map type
+    const map: { [key: string]: React.RefObject<Konva.Node | null> } = { ...shapeRefs.current };
+   
     allIds.forEach(id => {
-      if (!map[id]) map[id] = React.createRef<Konva.Node>();
+      if (!map[id]) map[id] = React.createRef<Konva.Node | null>();
     });
-        
+       
     Object.keys(map).forEach(k => {
       if (!allIds.includes(k)) delete map[k];
     });
@@ -450,7 +503,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
       connections: connections.length,
       total: stageFrames.length + shapes.length + reactShapes.length + images.length + connections.length
     });
-    
+   
     return [
       ...stageFrames.map(s => ({ ...s, __kind: 'stage' as const })),
       ...shapes.map(s => ({ ...s, __kind: 'konva' as const })),
@@ -464,28 +517,34 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (!trRef.current) {
       return;
     }
-
     if (selectedNodeIds.length === 0) {
       trRef.current.nodes([]);
       trRef.current.getLayer()?.batchDraw();
       return;
     }
 
-    // Get all selected shape refs
+    // FIXED: Handle null refs properly
     const selectedRefs = selectedNodeIds
       .map(id => shapeRefs.current[id]?.current)
-      .filter(Boolean) as Konva.Node[];
+      .filter((node): node is Konva.Node => node !== null && node !== undefined);
 
-    // Filter out shapes that shouldn't have transformers (sticky notes, connections)
+    console.log('🔧 Transformer selected refs:', selectedRefs.map(r => ({
+      id: r.id(),
+      type: r.attrs.type,
+      name: r.name()
+    })));
+
+    // Filter out shapes that shouldn't have transformers
     const transformableNodes = selectedRefs.filter(node => {
       const shapeType = node.attrs.type;
-      return shapeType !== 'stickyNote' && shapeType !== 'connection';
+      return shapeType !== 'connection';
     });
 
     if (transformableNodes.length > 0) {
       try {
         trRef.current.nodes(transformableNodes);
         trRef.current.getLayer()?.batchDraw();
+        console.log('✅ Transformer nodes set:', transformableNodes.length);
       } catch (err) {
         console.error('Error setting transformer nodes:', err);
         trRef.current.nodes([]);
@@ -497,11 +556,11 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
   }, [selectedNodeIds, allShapesToRender, trRef]);
 
+
   // In StageComponent.tsx - Update the stage click handler for multi-select
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
-
     console.log('🖱️ Stage click - target:', {
       name: e.target.name(),
       id: e.target.id(),
@@ -514,22 +573,22 @@ const StageComponent: React.FC<StageComponentProps> = ({
       setSelectedNodeIds([]);
       return;
     }
-    
+   
     if (e.target.hasName('selectable-shape')) {
       const clickedId = e.target.id();
       console.log('✅ Clicked on selectable shape:', clickedId);
-      
+     
       // Check if modifier key is pressed for multi-select
       const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
-      
+     
       if (isMultiSelect) {
         // Add/remove from selection
         if (selectedNodeIds.includes(clickedId)) {
           // Remove from selection if already selected
-          setSelectedNodeIds(prev => prev.filter(id => id !== clickedId));
+          setSelectedNodeIds((prev: string[]) => prev.filter((id: string) => id !== clickedId));
         } else {
           // Add to selection
-          setSelectedNodeIds(prev => [...prev, clickedId]);
+          setSelectedNodeIds((prev: string[]) => [...prev, clickedId]);
         }
       } else {
         // Single select - replace selection
@@ -540,29 +599,92 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
   };
 
+  // FIXED: Multi-select dragging - move ALL selected shapes together
   const handleShapeDragEnd = (item: CombinedShape, e: Konva.KonvaEventObject<DragEvent>) => {
     try {
       if (item.__kind === 'connection') {
         return;
       }
 
-      const nx = e.target.x();
-      const ny = e.target.y();
+      // FIXED: Add type guard for shapes with position
+      const hasPosition = (shape: CombinedShape): shape is CombinedShape & { x: number; y: number } => {
+        return shape.__kind !== 'connection';
+      };
 
-      if (item.__kind === 'konva') {
-        updateShape(item.id, { x: nx, y: ny });
-      } else if (item.__kind === 'react') {
-        setReactShapes(prev => prev.map(s =>
-          s.id === item.id ? { ...s, x: nx, y: ny } : s
-        ));
-      } else if (item.__kind === 'image') {
-        setImages(prev => prev.map(img =>
-          img.id === item.id ? { ...img, x: nx, y: ny } : img
-        ));
-      } else if (item.__kind === 'stage') {
-        setStageFrames(prev => prev.map(f =>
-          f.id === item.id ? { ...f, x: nx, y: ny } : f
-        ));
+      if (!hasPosition(item)) return;
+
+      const node = e.target;
+      const nx = node.x();
+      const ny = node.y();
+
+      // For single shape dragging, just update the dragged shape
+      if (selectedNodeIds.length <= 1 || !selectedNodeIds.includes(item.id)) {
+        // Single shape drag or this shape isn't part of multi-select
+        if (item.__kind === 'konva') {
+          updateShape(item.id, { x: nx, y: ny });
+        } else if (item.__kind === 'react') {
+          setReactShapes((prev: ReactShape[]) => prev.map((s: ReactShape) =>
+            s.id === item.id ? { ...s, x: nx, y: ny } : s
+          ));
+        } else if (item.__kind === 'image') {
+          setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
+            img.id === item.id ? { ...img, x: nx, y: ny } : img
+          ));
+        } else if (item.__kind === 'stage') {
+          setStageFrames((prev: KonvaShape[]) => prev.map((f: KonvaShape) =>
+            f.id === item.id ? { ...f, x: nx, y: ny } : f
+          ));
+        }
+      } else {
+        // Multi-select drag - calculate delta and apply to all selected shapes
+        const dx = nx - item.x;
+        const dy = ny - item.y;
+       
+        console.log('🚀 Multi-drag delta:', { dx, dy, selectedCount: selectedNodeIds.length });
+        
+        // Update all selected shapes with the same delta
+        selectedNodeIds.forEach(selectedId => {
+          if (selectedId === item.id) return; // Skip the current one (already handled by Konva)
+         
+          const selectedItem = allShapesToRender.find(shape => shape.id === selectedId);
+          if (!selectedItem || !hasPosition(selectedItem)) return;
+          
+          const newX = selectedItem.x + dx;
+          const newY = selectedItem.y + dy;
+          
+          if (selectedItem.__kind === 'konva') {
+            updateShape(selectedId, { x: newX, y: newY });
+          } else if (selectedItem.__kind === 'react') {
+            setReactShapes((prev: ReactShape[]) => prev.map((s: ReactShape) =>
+              s.id === selectedId ? { ...s, x: newX, y: newY } : s
+            ));
+          } else if (selectedItem.__kind === 'image') {
+            setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
+              img.id === selectedId ? { ...img, x: newX, y: newY } : img
+            ));
+          } else if (selectedItem.__kind === 'stage') {
+            setStageFrames((prev: KonvaShape[]) => prev.map((f: KonvaShape) =>
+              f.id === selectedId ? { ...f, x: newX, y: newY } : f
+            ));
+          }
+        });
+
+        // Also update the dragged shape itself to its new position
+        if (item.__kind === 'konva') {
+          updateShape(item.id, { x: nx, y: ny });
+        } else if (item.__kind === 'react') {
+          setReactShapes((prev: ReactShape[]) => prev.map((s: ReactShape) =>
+            s.id === item.id ? { ...s, x: nx, y: ny } : s
+          ));
+        } else if (item.__kind === 'image') {
+          setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
+            img.id === item.id ? { ...img, x: nx, y: ny } : img
+          ));
+        } else if (item.__kind === 'stage') {
+          setStageFrames((prev: KonvaShape[]) => prev.map((f: KonvaShape) =>
+            f.id === item.id ? { ...f, x: nx, y: ny } : f
+          ));
+        }
       }
     } catch (error) {
       console.error('Error handling shape drag end:', error);
@@ -574,18 +696,18 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (activeTool === "select") {
       const clickedId = item.id;
       console.log('✅ Shape clicked:', clickedId);
-      
+     
       // Check if modifier key is pressed for multi-select
       const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
-      
+     
       if (isMultiSelect) {
         // Add/remove from selection
         if (selectedNodeIds.includes(clickedId)) {
           // Remove from selection if already selected
-          setSelectedNodeIds(prev => prev.filter(id => id !== clickedId));
+          setSelectedNodeIds((prev: string[]) => prev.filter((id: string) => id !== clickedId));
         } else {
           // Add to selection
-          setSelectedNodeIds(prev => [...prev, clickedId]);
+          setSelectedNodeIds((prev: string[]) => [...prev, clickedId]);
         }
       } else {
         // Single select - replace selection
@@ -599,18 +721,18 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (activeTool === "select") {
       console.log('🔗 Connection clicked:', connection.id);
       const clickedId = connection.id;
-      
+     
       // Check if modifier key is pressed for multi-select
       const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
-      
+     
       if (isMultiSelect) {
         // Add/remove from selection
         if (selectedNodeIds.includes(clickedId)) {
           // Remove from selection if already selected
-          setSelectedNodeIds(prev => prev.filter(id => id !== clickedId));
+          setSelectedNodeIds((prev: string[]) => prev.filter((id: string) => id !== clickedId));
         } else {
           // Add to selection
-          setSelectedNodeIds(prev => [...prev, clickedId]);
+          setSelectedNodeIds((prev: string[]) => [...prev, clickedId]);
         }
       } else {
         // Single select - replace selection
@@ -622,13 +744,13 @@ const StageComponent: React.FC<StageComponentProps> = ({
   const handleImageDragEnd = (imageShape: ImageShape, e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target as Konva.Image;
     const wasResized = node.width() !== imageShape.width || node.height() !== imageShape.height;
-    
+   
     if (wasResized) {
-      setImages(prev => prev.map(img => 
-        img.id === imageShape.id 
-          ? { 
-              ...img, 
-              x: node.x(), 
+      setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
+        img.id === imageShape.id
+          ? {
+              ...img,
+              x: node.x(),
               y: node.y(),
               width: node.width(),
               height: node.height()
@@ -636,8 +758,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
           : img
       ));
     } else {
-      setImages(prev => prev.map(img => 
-        img.id === imageShape.id 
+      setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
+        img.id === imageShape.id
           ? { ...img, x: node.x(), y: node.y() }
           : img
       ));
@@ -656,7 +778,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
         onWheel={handleWheel}
         onClick={handleStageClick}
         onTap={handleStageClick}
-        // ADD THESE KEYBOARD HANDLERS:
         ref={(node) => {
           if (node) {
             stageRef.current = node;
@@ -670,25 +791,52 @@ const StageComponent: React.FC<StageComponentProps> = ({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onTouchMove={handleTouchMove}
-        draggable={false} // ← CHANGED FROM activeTool === "select" to false
+        draggable={false}
       >
         <GridLayer stage={stageInstance} baseSize={30} color="#d6d4d4ff" />
         <Layer name="draw-layer">
           {allShapesToRender.map((item) => {
             console.log(`🎯 Rendering shape: ${item.id} (${item.__kind}:${item.type})`);
+            
+            // FIXED: Only include x and y for shapes that have them
+           const commonProps: any = {
+    id: item.id,
+    draggable: (item.draggable ?? true) && activeTool === "select",
+    name: 'selectable-shape',
+    onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragEnd(item, e),
+    onClick: (e: Konva.KonvaEventObject<MouseEvent>) => handleShapeClick(item, e),
+    onTap: (e: Konva.KonvaEventObject<MouseEvent>) => handleShapeClick(item, e),
+  };
 
-            const commonProps = {
-              id: item.id,
-              ...(item.__kind !== 'connection' && {
-                x: item.x,
-                y: item.y,
-              }),
-              draggable: (item.draggable ?? true) && activeTool === "select",
-              name: 'selectable-shape',
-              onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragEnd(item, e),
-              onClick: (e: Konva.KonvaEventObject<MouseEvent>) => handleShapeClick(item, e),
-              onTap: (e: Konva.KonvaEventObject<MouseEvent>) => handleShapeClick(item, e),
-            };
+  // Add x and y only for shapes that have position properties
+  if (item.__kind !== 'connection') {
+    const positionedItem = item as CombinedShape & { x: number; y: number };
+    commonProps.x = positionedItem.x;
+    commonProps.y = positionedItem.y;
+    commonProps.onDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
+      const node = e.target;
+      node.setAttr('lastX', node.x());
+      node.setAttr('lastY', node.y());
+    };
+    commonProps.onDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+      if (selectedNodeIds.length <= 1 || !selectedNodeIds.includes(item.id)) return;
+      const node = e.target;
+      const dx = node.x() - node.getAttr('lastX');
+      const dy = node.y() - node.getAttr('lastY');
+      selectedNodeIds.forEach(id => {
+        if (id === item.id) return;
+        const other = shapeRefs.current[id]?.current;
+        if (other) {
+          other.x(other.x() + dx);
+          other.y(other.y() + dy);
+        }
+      });
+      node.setAttr('lastX', node.x());
+      node.setAttr('lastY', node.y());
+      if (trRef.current) trRef.current.forceUpdate();
+      node.getLayer()?.batchDraw();
+    };
+  }
 
             if (item.__kind === 'stage') {
               const stageItem = item as KonvaShape;
@@ -812,7 +960,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                 if (item.type === 'text') {
                 const textItem = item as ReactShape;
                 const isEditing = selectedNodeIds.includes(item.id) && activeTool === "text";
-                
+               
                 return (
                   <TextComponent
                     key={item.id}
@@ -838,7 +986,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                       }
                     }}
                     onUpdate={(newAttrs: Partial<ReactShape>) => {
-                      setReactShapes(prev => prev.map(shape => 
+                      setReactShapes(prev => prev.map(shape =>
                         shape.id === item.id ? { ...shape, ...newAttrs } : shape
                       ));
                     }}
@@ -848,8 +996,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     onFinishEditing={() => {
                       setActiveTool("select");
                     }}
-
-                    className = "text-component"
                   />
                 );
             } else if (item.type === 'stickyNote') {
@@ -866,11 +1012,10 @@ const StageComponent: React.FC<StageComponentProps> = ({
                       }
                     }}
                     onUpdate={(newAttrs: Partial<ReactShape>) => {
-                      setReactShapes(prev => prev.map(shape => 
+                      setReactShapes(prev => prev.map(shape =>
                         shape.id === item.id ? { ...shape, ...newAttrs } : shape
                       ));
                     }}
-                    className="sticky-note"
                   />
                 );
               } else {
@@ -878,7 +1023,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
               }
             }
           })}
-          
+         
           {lines.map((line, i) => (
             <Line
               key={`line-${i}`}
@@ -894,7 +1039,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
               listening={false}
             />
           ))}
-
           <Transformer
             ref={trRef}
             enabledAnchors={[
@@ -905,36 +1049,36 @@ const StageComponent: React.FC<StageComponentProps> = ({
             ]}
             boundBoxFunc={(oldBox, newBox) => {
               const selectedShapes = allShapesToRender.filter(item => selectedNodeIds.includes(item.id));
-              
+             
               // Handle image aspect ratio for first selected image
               const selectedImage = selectedShapes.find(item => item.__kind === 'image');
               if (selectedImage) {
                 const imageShape = selectedImage as ImageShape;
                 const aspectRatio = imageShape.width / imageShape.height;
-                
+               
                 let width = newBox.width;
                 let height = newBox.height;
-                
+               
                 if (Math.abs(width - oldBox.width) > Math.abs(height - oldBox.height)) {
                   height = width / aspectRatio;
                 } else {
                   width = height * aspectRatio;
                 }
-                
+               
                 return {
                   ...newBox,
                   width: Math.max(20, width),
                   height: Math.max(20, height),
                 };
               }
-              
+             
               return {
                 ...newBox,
                 width: Math.max(20, newBox.width),
                 height: Math.max(20, newBox.height),
               };
             }}
-            keepRatio={false}
+            keepRatio={true}
             rotateEnabled={true}
             resizeEnabled={true}
             anchorSize={10}
