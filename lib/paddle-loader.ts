@@ -38,8 +38,8 @@ export const loadPaddle = async (): Promise<boolean> => {
     script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
     script.onload = () => {
       window.Paddle.Initialize({
-        environment: 'production',
-        token: 'pdl_live_apikey_01kab6dq8911kgq6wycw9vjwkw_pPTQy0ewZGB6sXZWs6wjm7_AGC'
+        environment: process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT as 'production' | 'sandbox',
+        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN! // ← USE ENV VARIABLE
       });
       paddleLoaded = true;
       resolve(true);
