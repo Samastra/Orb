@@ -1,6 +1,24 @@
 declare global {
   interface Window {
-    Paddle: any;
+    Paddle: {
+      Initialize: (config: { 
+        environment: 'production' | 'sandbox'; 
+        token: string 
+      }) => void;
+      Checkout: {
+        open: (options: {
+          items: Array<{ priceId: string; quantity: number }>;
+          customer?: { email?: string };
+          settings?: { successUrl: string };
+        }) => void;
+      };
+      Environment: {
+        set: (environment: 'production' | 'sandbox') => void;
+      };
+      Spinner: {
+        hide: () => void;
+      };
+    };
   }
 }
 
