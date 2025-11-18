@@ -2,8 +2,6 @@ import React, { useRef, forwardRef, useImperativeHandle } from "react";
 import { Group, Rect } from "react-konva";
 import Konva from "konva";
 import EditableTextComponent, { type TextAttributes } from "./editableTextCompoent";
-
-
 interface StickyNoteProps {
   shapeData: {
     id: string;
@@ -28,22 +26,24 @@ interface StickyNoteProps {
   activeTool: string | null;
   onSelect: () => void;
   onUpdate: (newAttrs: Record<string, unknown>) => void;
+  onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onTransformEnd?: (e: Konva.KonvaEventObject<Event>) => void;
 }
-
 const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
-  ({ shapeData, isSelected, activeTool, onSelect, onUpdate }, ref) => {
+  ({ shapeData, isSelected, activeTool, onSelect, onUpdate, onDragStart, onDragMove, onDragEnd, onTransformEnd }, ref) => {
     const groupRef = useRef<Konva.Group>(null);
     
     useImperativeHandle(ref, () => groupRef.current as Konva.Group);
-
-    const { 
+    const {
       id,
-      x, 
-      y, 
-      width = 200, 
-      height = 150, 
-      backgroundColor = "#ffeb3b", 
-      textColor = "#000000", 
+      x,
+      y,
+      width = 200,
+      height = 150,
+      backgroundColor = "#ffeb3b",
+      textColor = "#000000",
       text = "Double click to edit...",
       fontSize = 14,
       fontFamily = "Arial",
@@ -55,14 +55,12 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
       lineHeight = 1.4,
       textTransform = "none"
     } = shapeData;
-
     const handleTextUpdate = (textAttrs: Record<string, unknown>) => {
       onUpdate({
         ...shapeData,
         ...textAttrs
       });
     };
-
     const handlePositionUpdate = (positionAttrs: { x?: number; y?: number }) => {
       onUpdate({
         ...shapeData,
@@ -70,15 +68,23 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
         y: positionAttrs.y !== undefined ? positionAttrs.y : y
       });
     };
-
     const handleGroupDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
       onUpdate({
         ...shapeData,
         x: e.target.x(),
         y: e.target.y()
       });
+      // Call external onDragEnd if provided
+      if (onDragEnd) {
+        onDragEnd(e);
+      }
     };
-
+    const handleGroupTransformEnd = (e: Konva.KonvaEventObject<Event>) => {
+      // Call external onTransformEnd if provided
+      if (onTransformEnd) {
+        onTransformEnd(e);
+      }
+    };
     return (
       <Group
         ref={groupRef}
@@ -86,9 +92,12 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
         y={y}
         draggable={activeTool === "select"}
         onClick={onSelect}
-        onTap={onSelect}
+        onDragStart={onDragStart}
+        onDragMove={onDragMove}
         onDragEnd={handleGroupDragEnd}
-        transformsEnabled={"position"}
+        onTransformEnd={handleGroupTransformEnd}
+        onTap={onSelect}       
+        transformsEnabled={"all"}
       >
         <Rect
           width={width}
@@ -101,7 +110,7 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
           shadowOffsetX={2}
           shadowOffsetY={2}
           cornerRadius={8}
-          transformsEnabled={"position"}
+          transformsEnabled={"all"}
         />
         
         <EditableTextComponent
@@ -126,7 +135,7 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
             if (attrs.x !== undefined || attrs.y !== undefined) {
               handlePositionUpdate(attrs);
             } else {
-             handleTextUpdate(attrs as Record<string, unknown>);
+              handleTextUpdate(attrs as Record<string, unknown>);
             }
           }}
           width={width - 20}
@@ -135,7 +144,5 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
     );
   }
 );
-
 EditableStickyNoteComponent.displayName = "EditableStickyNoteComponent";
-
 export default EditableStickyNoteComponent;

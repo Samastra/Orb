@@ -4,7 +4,6 @@ import React, { useRef, useEffect, useCallback, forwardRef } from "react";
 import { Text as KonvaText, Transformer } from "react-konva";
 import Konva from "konva";
 import { KonvaEventObject } from "konva/lib/Node";
-
 interface TextComponentProps {
   id: string;
   x: number;
@@ -37,8 +36,11 @@ interface TextComponentProps {
   }) => void;
   onStartEditing: () => void;
   onFinishEditing: () => void;
+  onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onTransformEnd?: (e: Konva.KonvaEventObject<Event>) => void;
 }
-
 const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
   (
     {
@@ -59,6 +61,10 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       activeTool,
       onSelect,
       onUpdate,
+      onDragStart,
+      onDragMove,
+      onDragEnd,
+      onTransformEnd,
       onStartEditing,
       onFinishEditing,
     }
@@ -67,7 +73,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
     const trRef = useRef<Konva.Transformer>(null);
     const editorRef = useRef<HTMLDivElement>(null);
     const isNew = useRef(true);
-
     // **FIX: Compute combined fontStyle for Konva (merges weight and style)**
     const konvaFontStyle = (() => {
       const stylePart = fontStyle === "normal" ? "" : fontStyle;
@@ -79,7 +84,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           : fontWeight; // Use numeric like '700' directly
       return `${stylePart} ${weightPart}`.trim() || "normal";
     })();
-
     // **CRITICAL FIX: Force Konva to update when font properties change**
     useEffect(() => {
       if (textRef.current && !isEditing) {
@@ -105,7 +109,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         }
       }
     }, [konvaFontStyle, fontFamily, fontSize, fill, align, isEditing]); // Depend on konvaFontStyle instead of separate fontWeight/fontStyle
-
     // **AUTO-EDIT ON CREATE**
     useEffect(() => {
       if (isNew.current && !isEditing) {
@@ -113,7 +116,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         onStartEditing();
       }
     }, [isEditing, onStartEditing]);
-
     // **TRANSFORMER**
     useEffect(() => {
       if (isSelected && textRef.current && trRef.current && !isEditing) {
@@ -123,7 +125,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         trRef.current.nodes([]);
       }
     }, [isSelected, isEditing]);
-
     // **LIVE WIDTH UPDATE ON TRANSFORM (NO STRETCH!)**
     const handleTransform = useCallback(() => {
       const node = textRef.current;
@@ -153,9 +154,8 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       }
       node.getLayer()?.batchDraw();
     }, []);
-
     // **TRANSFORM END — UPDATE STATE**
-    const handleTransformEnd = useCallback(() => {
+    const handleTransformEndInternal = useCallback((e: Konva.KonvaEventObject<Event>) => {
       const node = textRef.current;
       if (!node) return;
       onUpdate({
@@ -165,17 +165,23 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         fontSize: node.fontSize(),
         rotation: node.rotation(),
       });
-    }, [onUpdate]);
-
+      // Call external onTransformEnd if provided
+      if (onTransformEnd) {
+        onTransformEnd(e);
+      }
+    }, [onUpdate, onTransformEnd]);
     // **DRAG END**
-    const handleDragEnd = useCallback(
+    const handleDragEndInternal = useCallback(
       (e: KonvaEventObject<DragEvent>) => {
         const node = e.target;
         onUpdate({ x: node.x(), y: node.y() });
+        // Call external onDragEnd if provided
+        if (onDragEnd) {
+          onDragEnd(e);
+        }
       },
-      [onUpdate]
+      [onUpdate, onDragEnd]
     );
-
     // **CLICK → SELECT**
     const handleClick = useCallback(
       (e: KonvaEventObject<MouseEvent>) => {
@@ -184,7 +190,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       },
       [activeTool, isEditing, onSelect]
     );
-
     // **DOUBLE-CLICK → EDIT**
     const handleDblClick = useCallback(
       (e: KonvaEventObject<MouseEvent>) => {
@@ -193,7 +198,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       },
       [isEditing, onStartEditing]
     );
-
     // **INLINE EDITOR**
     useEffect(() => {
       if (!isEditing || !textRef.current) return;
@@ -288,7 +292,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       onUpdate,
       onFinishEditing,
     ]);
-
     return (
       <>
         <KonvaText
@@ -307,9 +310,11 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           lineHeight={1.4}
           rotation={rotation}
           draggable={!isEditing}
-          onDragEnd={handleDragEnd}
+          onDragStart={onDragStart}
+          onDragMove={onDragMove}
+          onDragEnd={handleDragEndInternal}
           onTransform={handleTransform}
-          onTransformEnd={handleTransformEnd}
+          onTransformEnd={handleTransformEndInternal}
           onClick={handleClick}
           onTap={handleClick}
           onDblClick={handleDblClick}
@@ -339,6 +344,5 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
     );
   }
 );
-
 TextComponent.displayName = "TextComponent";
 export default TextComponent;

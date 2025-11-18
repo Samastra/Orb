@@ -14,32 +14,70 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { ArrowRight, Sparkles, Zap, Users, Star, Crown, Shield, CheckCircle, Command, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { PaymentModal } from "@/components/payment-modal";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { loadPaddle } from '@/lib/paddle-loader';
 
 export default function Home() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<"lifetime" | "yearly">("lifetime");
   const { isSignedIn } = useAuth();
+  const { user } = useUser();
 
-  const handleGetLifetimeAccess = () => {
-    if (!isSignedIn) {
-      window.location.href = "/sign-up";
-      return;
-    }
+  const handleGetLifetimeAccess = async () => {
+  if (!isSignedIn) {
+    window.location.href = "/sign-up";
+    return;
+  }
+  
+  try {
+    await loadPaddle();
     
-    setSelectedPlan("lifetime");
-    setShowPaymentModal(true);
-  };
+    window.Paddle.Checkout.open({
+      items: [
+        {
+          priceId: 'pro_01kab5k19nxxqbjnr848wd2pa2', // Your lifetime product ID
+          quantity: 1,  
+        }
+      ],
+      customer: {
+        email: user?.primaryEmailAddress?.emailAddress, // This will work now
+      },
+      settings: {
+        successUrl: `${window.location.origin}/payment-success`,
+      }
+    });
+  } catch (error) {
+    console.error('Failed to open checkout:', error);
+  }
+};
 
-  const handleGetYearlyAccess = () => {
-    if (!isSignedIn) {
-      window.location.href = "/sign-up";
-      return;
-    }
+ const handleGetYearlyAccess = async () => {
+  if (!isSignedIn) {
+    window.location.href = "/sign-up";
+    return;
+  }
+  
+  try {
+    await loadPaddle();
     
-    setSelectedPlan("yearly");
-    setShowPaymentModal(true);
-  };
+    window.Paddle.Checkout.open({
+      items: [
+        {
+          priceId: 'pro_01kab5mnpcb64a0a3vzx5gzj4m', // Your yearly product ID
+          quantity: 1,
+        }
+      ],
+      customer: {
+        email: user?.primaryEmailAddress?.emailAddress,
+      },
+      settings: {
+        successUrl: `${window.location.origin}/payment-success`,
+      }
+    });
+  } catch (error) {
+    console.error('Failed to open checkout:', error);
+  }
+};
 
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
