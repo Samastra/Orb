@@ -774,7 +774,18 @@ const StageComponent: React.FC<StageComponentProps> = ({
           {allShapesToRender.map((item) => {
             console.log(`🎯 Rendering shape: ${item.id} (${item.__kind}:${item.type})`);
             
-            const commonProps: any = {
+            const commonProps: {
+              id: string;
+              draggable: boolean;
+              name: string;
+              onClick: (e: Konva.KonvaEventObject<MouseEvent>) => void;
+              onTap: (e: Konva.KonvaEventObject<MouseEvent>) => void;
+              x?: number;
+              y?: number;
+              onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+              onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+              onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+            } = {
               id: item.id,
               draggable: (item.draggable ?? true) && activeTool === "select",
               name: 'selectable-shape',

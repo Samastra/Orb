@@ -1,6 +1,18 @@
 declare global {
   interface Window {
-    Paddle: any;
+    Paddle: {
+      Initialize: (config: { 
+        environment: 'production' | 'sandbox'; 
+        token: string 
+      }) => void;
+      Checkout: {
+        open: (options: {
+          items: Array<{ priceId: string; quantity: number }>;
+          customer?: { email?: string };
+          settings?: { successUrl: string };
+        }) => Promise<void>;
+      };
+    };
   }
 }
 
@@ -11,7 +23,7 @@ export const loadPaddle = async (): Promise<void> => {
       script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
       script.onload = () => {
         window.Paddle.Initialize({
-          environment: 'production',
+          environment: process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT as 'production' | 'sandbox',
           token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
         });
         resolve();
