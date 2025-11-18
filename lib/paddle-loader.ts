@@ -53,3 +53,24 @@ export const loadPaddle = async (): Promise<boolean> => {
 };
 
 export const isPaddleLoaded = () => paddleLoaded;
+
+// Helper function to open checkout with proper success URL
+export const openPaddleCheckout = (priceId: string, email?: string) => {
+  if (!window.Paddle) {
+    console.error('Paddle not loaded');
+    return;
+  }
+  
+  window.Paddle.Checkout.open({
+    items: [
+      {
+        priceId: priceId,
+        quantity: 1,
+      }
+    ],
+    customer: email ? { email } : undefined,
+    settings: {
+      successUrl: 'https://www.orblin.cloud/payment-success',
+    }
+  });
+};

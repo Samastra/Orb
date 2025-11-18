@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import EnterpriseLayout from "@/components/enterprise/layout/EnterpriseLayout"
 import MainDashboard from "@/components/enterprise/dashboard/MainDashboard"
-import { loadPaddle } from '@/lib/paddle-loader'
+import { loadPaddle, openPaddleCheckout } from '@/lib/paddle-loader';
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser()
@@ -18,33 +18,21 @@ export default function DashboardPage() {
     return;
   }
   
-  console.log('🔄 Starting payment process...');
-  
   try {
-    // Load Paddle
     const loaded = await loadPaddle();
     if (!loaded) {
       throw new Error('Failed to load Paddle');
     }
     
-    console.log('✅ Paddle loaded, opening checkout...');
-    
-    // Add a small delay to ensure Paddle is fully initialized
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Open checkout with error handling
-    window.Paddle.Checkout.open({
-      items: [
-        {
-          priceId: 'pro_01kab5k19nxxqbjnr848wd2pa2',
-          quantity: 1,
-        }
-      ]
-    });
+    // Use the new helper function
+    openPaddleCheckout(
+      'pro_01kab5k19nxxqbjnr848wd2pa2',
+      user.primaryEmailAddress?.emailAddress
+    );
     
   } catch (error) {
-    console.error('❌ Payment failed:', error);
-    alert('Unable to open payment. Please try again or contact support.');
+    console.error('Payment failed:', error);
+    alert('Unable to open payment. Please try again.');
   }
 };
 
