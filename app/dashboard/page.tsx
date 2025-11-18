@@ -14,37 +14,39 @@ export default function DashboardPage() {
 
   const handleGetLifetimeAccess = async () => {
   if (!user) {
-    router.push("/sign-in")
-    return
+    router.push("/sign-in");
+    return;
   }
   
+  console.log('🔄 Starting payment process...');
+  
   try {
-    console.log('🔧 Step 1: Starting Paddle checkout...');
-    console.log('🔧 Environment:', process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT);
-    
-    await loadPaddle();
-    console.log('✅ Step 2: Paddle loaded successfully');
-    
-    console.log('🔧 Step 3: Opening checkout with product:', 'pro_01kab5k19nxxqbjnr848wd2pa2');
-    
-    await window.Paddle.Checkout.open({
-  items: [
-    {
-      priceId: 'pro_01kab5k19nxxqbjnr848wd2pa2',
-      quantity: 1,
+    // Load Paddle
+    const loaded = await loadPaddle();
+    if (!loaded) {
+      throw new Error('Failed to load Paddle');
     }
-  ],
-  settings: {
-    successUrl: `${window.location.origin}/payment-success`,
-  }
-});
     
-    console.log('✅ Step 4: Checkout opened successfully');
+    console.log('✅ Paddle loaded, opening checkout...');
+    
+    // Add a small delay to ensure Paddle is fully initialized
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Open checkout with error handling
+    window.Paddle.Checkout.open({
+      items: [
+        {
+          priceId: 'pro_01kab5k19nxxqbjnr848wd2pa2',
+          quantity: 1,
+        }
+      ]
+    });
+    
   } catch (error) {
-    console.error('❌ FAILED at step:', error);
-    console.error('Full error details:', error);
+    console.error('❌ Payment failed:', error);
+    alert('Unable to open payment. Please try again or contact support.');
   }
-}
+};
 
   const handleGetYearlyAccess = async () => {
     if (!user) {

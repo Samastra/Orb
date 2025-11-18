@@ -1,35 +1,37 @@
 declare global {
   interface Window {
-    Paddle: {
-      Initialize: (config: { 
-        environment: 'production' | 'sandbox'; 
-        token: string 
-      }) => void;
-      Checkout: {
-        open: (options: {
-          items: Array<{ priceId: string; quantity: number }>;
-          customer?: { email?: string };
-          settings?: { successUrl: string };
-        }) => Promise<void>;
-      };
-    };
+    Paddle: any;
   }
 }
 
-export const loadPaddle = async (): Promise<void> => {
-  if (typeof window !== 'undefined' && !window.Paddle) {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
-      script.onload = () => {
-        window.Paddle.Initialize({
-          environment: process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT as 'production' | 'sandbox',
-          token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
-        });
-        resolve();
-      };
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
+let paddleLoaded = false;
+
+export const loadPaddle = async (): Promise<boolean> => {
+  if (typeof window === 'undefined') return false;
+  
+  // If already loaded, return true
+  if (window.Paddle) {
+    paddleLoaded = true;
+    return true;
   }
+  
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+    script.onload = () => {
+      window.Paddle.Initialize({
+        environment: 'production',
+        token: 'pdl_live_apikey_01kab6dq8911kgq6wycw9vjwkw_pPTQy0ewZGB6sXZWs6wjm7_AGC'
+      });
+      paddleLoaded = true;
+      resolve(true);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Paddle.js');
+      resolve(false);
+    };
+    document.head.appendChild(script);
+  });
 };
+
+export const isPaddleLoaded = () => paddleLoaded;
