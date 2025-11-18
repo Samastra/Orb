@@ -5,28 +5,67 @@ import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import EnterpriseLayout from "@/components/enterprise/layout/EnterpriseLayout"
 import MainDashboard from "@/components/enterprise/dashboard/MainDashboard"
-import { PaymentModal } from "@/components/payment-modal"
+import { loadPaddle } from '@/lib/paddle-loader'
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser()
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<"lifetime" | "yearly">("lifetime")
 
-  const handleGetLifetimeAccess = () => {
-    setSelectedPlan("lifetime")
-    setShowPaymentModal(true)
+  const handleGetLifetimeAccess = async () => {
+    if (!user) {
+      router.push("/sign-in")
+      return
+    }
+    
+    try {
+      await loadPaddle();
+      
+      window.Paddle.Checkout.open({
+        items: [
+          {
+            priceId: 'pro_01kab5k19nxxqbjnr848wd2pa2', // Your lifetime product ID
+            quantity: 1,
+          }
+        ],
+        customer: {
+          email: user.primaryEmailAddress?.emailAddress,
+        },
+        settings: {
+          successUrl: `${window.location.origin}/payment-success`,
+        }
+      });
+    } catch (error) {
+      console.error('Failed to open checkout:', error);
+    }
   }
 
-  const handleGetYearlyAccess = () => {
-    setSelectedPlan("yearly")
-    setShowPaymentModal(true)
-  }
-
-  const handlePaymentSuccess = () => {
-    setShowPaymentModal(false)
-    console.log("Payment successful!")
+  const handleGetYearlyAccess = async () => {
+    if (!user) {
+      router.push("/sign-in")
+      return
+    }
+    
+    try {
+      await loadPaddle();
+      
+      window.Paddle.Checkout.open({
+        items: [
+          {
+            priceId: 'pro_01kab5mnpcb64a0a3vzx5gzj4m', // Your yearly product ID
+            quantity: 1,
+          }
+        ],
+        customer: {
+          email: user.primaryEmailAddress?.emailAddress,
+        },
+        settings: {
+          successUrl: `${window.location.origin}/payment-success`,
+        }
+      });
+    } catch (error) {
+      console.error('Failed to open checkout:', error);
+    }
   }
 
   useEffect(() => {
@@ -48,27 +87,18 @@ export default function DashboardPage() {
   }
 
   return (
-    <>
-      <PaymentModal 
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onSuccess={handlePaymentSuccess}
-        plan={selectedPlan}
-      />
-      
-      <EnterpriseLayout 
+    <EnterpriseLayout 
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      onUpgradeLifetime={handleGetLifetimeAccess}
+      onUpgradeYearly={handleGetYearlyAccess}
+    >
+      <MainDashboard 
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onUpgradeLifetime={handleGetLifetimeAccess}
         onUpgradeYearly={handleGetYearlyAccess}
-      >
-        <MainDashboard 
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onUpgradeLifetime={handleGetLifetimeAccess}
-          onUpgradeYearly={handleGetYearlyAccess}
-        />
-      </EnterpriseLayout>
-    </>
+      />
+    </EnterpriseLayout>
   )
 }
