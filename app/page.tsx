@@ -15,7 +15,7 @@ import { ArrowRight, Sparkles, Zap, Users, Star, Crown, Shield, CheckCircle, Com
 import Link from "next/link";
 import { PaymentModal } from "@/components/payment-modal";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { loadPaddle } from '@/lib/paddle-loader';
+import { loadPaddle, openPaddleCheckout } from '@/lib/paddle-loader';
 
 export default function Home() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -24,60 +24,46 @@ export default function Home() {
   const { user } = useUser();
 
   const handleGetLifetimeAccess = async () => {
-  if (!isSignedIn) {
-    window.location.href = "/sign-up";
-    return;
-  }
-  
-  try {
-    await loadPaddle();
+    if (!isSignedIn) {
+      window.location.href = "/sign-up";
+      return;
+    }
     
-    window.Paddle.Checkout.open({
-      items: [
-        {
-          priceId: 'pro_01kab5k19nxxqbjnr848wd2pa2', // Your lifetime product ID
-          quantity: 1,  
-        }
-      ],
-      customer: {
-        email: user?.primaryEmailAddress?.emailAddress, // This will work now
-      },
-      settings: {
-        successUrl: `${window.location.origin}/payment-success`,
+    try {
+      const loaded = await loadPaddle();
+      if (!loaded) {
+        throw new Error('Failed to load Paddle');
       }
-    });
-  } catch (error) {
-    console.error('Failed to open checkout:', error);
-  }
-};
+      
+      openPaddleCheckout(
+        'pri_01kabghk4hhgbz2dnj353sv2td', // CORRECT PRICE ID for lifetime
+        user?.primaryEmailAddress?.emailAddress
+      );
+    } catch (error) {
+      console.error('Failed to open checkout:', error);
+    }
+  };
 
- const handleGetYearlyAccess = async () => {
-  if (!isSignedIn) {
-    window.location.href = "/sign-up";
-    return;
-  }
-  
-  try {
-    await loadPaddle();
+  const handleGetYearlyAccess = async () => {
+    if (!isSignedIn) {
+      window.location.href = "/sign-up";
+      return;
+    }
     
-    window.Paddle.Checkout.open({
-      items: [
-        {
-          priceId: 'pro_01kab5mnpcb64a0a3vzx5gzj4m', // Your yearly product ID
-          quantity: 1,
-        }
-      ],
-      customer: {
-        email: user?.primaryEmailAddress?.emailAddress,
-      },
-      settings: {
-        successUrl: `${window.location.origin}/payment-success`,
+    try {
+      const loaded = await loadPaddle();
+      if (!loaded) {
+        throw new Error('Failed to load Paddle');
       }
-    });
-  } catch (error) {
-    console.error('Failed to open checkout:', error);
-  }
-};
+      
+      openPaddleCheckout(
+        'pri_01kabgkj0y7cv0yae5c89730pa', // CORRECT PRICE ID for yearly
+        user?.primaryEmailAddress?.emailAddress
+      );
+    } catch (error) {
+      console.error('Failed to open checkout:', error);
+    }
+  };
 
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
@@ -88,7 +74,7 @@ export default function Home() {
     <main className="min-h-screen relative overflow-hidden">
       <AnimatedBackground />
       
-      {/* Payment Modal */}
+      {/* Payment Modal - You can remove this if not using anymore */}
       <PaymentModal 
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
@@ -407,7 +393,8 @@ export default function Home() {
               featured={true}
               popular={true}
               ctaText="Get Lifetime Access"
-              href="#" // We'll handle this via onClick
+              onCtaClick={handleGetLifetimeAccess}
+              href="#"
               delay={0.1}
             />
 
@@ -429,7 +416,8 @@ export default function Home() {
               ]}
               featured={false}
               ctaText="Start Yearly Plan"
-              href="#" // We'll handle this via onClick
+              onCtaClick={handleGetYearlyAccess}
+              href="#"
               delay={0.3}
             />
           </div>
