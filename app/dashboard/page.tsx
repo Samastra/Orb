@@ -66,6 +66,7 @@ export default function DashboardPage() {
   if (!user) return <div>Redirecting...</div>
 
   return (
+    <>
     <EnterpriseLayout
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
@@ -80,11 +81,12 @@ export default function DashboardPage() {
       />
 
       {/* THIS IS THE REQUIRED CONTAINER FOR INLINE CHECKOUT */}
+      </EnterpriseLayout>
       <div
         id="paddle-checkout-container"
         className="paddle-checkout-container mt-12 max-w-4xl mx-auto px-4"
         style={{ minHeight: '650px' }}
       />
-    </EnterpriseLayout>
+    </>
   )
 }
