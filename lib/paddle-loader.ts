@@ -11,8 +11,10 @@ declare global {
           customer?: { email?: string };
           settings?: {
             successUrl?: string;
-            /** This is the key fix for 2025 browser cookie partitioning **/
-            displayMode?: 'overlay' | 'wide-overlay' | 'inline';
+            displayMode?: 'overlay' | 'inline';  // ← only these two exist (no wide-overlay)
+            frameTarget?: string;                // required for inline
+            frameInitialHeight?: string;         // recommended for inline
+            frameStyle?: string;                 // recommended for inline
           };
         }) => void;
       };
@@ -29,7 +31,6 @@ export const loadPaddle = async (): Promise<boolean> => {
 
   return new Promise<boolean>((resolve) => {
     const script = document.createElement('script');
-    // Optional: bust cache on every load while debugging
     script.src = `https://cdn.paddle.com/paddle/v2/paddle.js?t=${Date.now()}`;
     script.async = true;
 
@@ -39,7 +40,7 @@ export const loadPaddle = async (): Promise<boolean> => {
 
         if (env === 'sandbox') {
           window.Paddle!.Environment.set('sandbox');
-        } // else defaults to production
+        }
 
         window.Paddle!.Initialize({
           token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
@@ -71,13 +72,17 @@ export const openPaddleCheckout = (priceId: string, email?: string) => {
 
   console.log('Opening Paddle checkout for price:', priceId);
 
+  // Switch to inline mode — this completely bypasses the third-party cookie partitioning issue
+  // that causes "Something went wrong" in live overlay mode in 2025 browsers
   window.Paddle.Checkout.open({
     items: [{ priceId, quantity: 1 }],
     ...(email && { customer: { email } }),
     settings: {
       successUrl: 'https://www.orblin.cloud/payment-success',
-      // THIS IS THE LINE THAT FIXES THE COOKIE PARTITIONING ERROR
-      displayMode: 'wide-overlay',
+      displayMode: 'inline',                // ← the fix
+      frameTarget: 'paddle-checkout-container',  // must match the div class/id below
+      frameInitialHeight: '650',            // tall enough for one-page checkout + footer
+      frameStyle: 'width: 100%; max-width: 800px; min-width: 312px; background-color: transparent; border: none; margin: 0 auto;',
     },
   });
 };
