@@ -70,7 +70,7 @@ export const openPaddleCheckout = (priceId: string, email?: string) => {
     items: [{ priceId, quantity: 1 }],
     ...(email && { customer: { email } }),
     settings: {
-      successUrl: 'https://www.orblin.cloud/payment-success',
+      successUrl: 'https://www.orblin.cloud/dashboard',
     },
   });
 };
