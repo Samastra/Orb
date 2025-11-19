@@ -66,11 +66,20 @@ export const openPaddleCheckout = (priceId: string, email?: string) => {
     return;
   }
 
-  window.Paddle.Checkout.open({
-    items: [{ priceId, quantity: 1 }],
-    ...(email && { customer: { email } }),
-    settings: {
-      successUrl: 'https://www.orblin.cloud/dashboard',
-    },
-  });
+  console.log('🔧 Paddle.Checkout exists:', !!window.Paddle.Checkout);
+  console.log('🔧 Opening checkout with:', { priceId, email });
+
+  try {
+    window.Paddle.Checkout.open({
+      items: [{ priceId, quantity: 1 }],
+      ...(email && { customer: { email } }),
+      settings: {
+        successUrl: 'https://www.orblin.cloud/payment-success',
+        displayMode: 'overlay', // Add this
+      },
+    });
+    console.log('✅ Checkout opened successfully');
+  } catch (error) {
+    console.error('❌ Checkout failed:', error);
+  }
 };
