@@ -26,7 +26,7 @@ export default function DashboardPage() {
     
     console.log('🔄 Opening lifetime checkout with PRICE ID');
     openPaddleCheckout(
-      'pri_01kabghk4hhgbz2dnj353sv2td', // ← CORRECT PRICE ID for lifetime
+      'pri_01kaeh8pqxqtdamn0h7z4dnbaa', // ← CORRECT PRICE ID for lifetime
       user.primaryEmailAddress?.emailAddress
     );
     
@@ -49,7 +49,7 @@ const handleGetYearlyAccess = async () => {
     
     console.log('🔄 Opening yearly checkout with PRICE ID');
     openPaddleCheckout(
-      'pri_01kabgkj0y7cv0yae5c89730pa', // ← CORRECT PRICE ID for yearly
+      'pri_01kaehgc2qw3vkd42763qrrewe', // ← CORRECT PRICE ID for yearly
       user.primaryEmailAddress?.emailAddress
     );
     
