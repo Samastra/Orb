@@ -5,7 +5,6 @@ declare global {
     Paddle?:
       | {
           Initialize: (options: { token: string }) => void;
-          Environment: { set: (env: 'sandbox' | 'production') => void };
           Checkout: {
             open: (options: {
               items: Array<{ priceId: string; quantity: number }>;
@@ -32,18 +31,13 @@ export const loadPaddle = async (): Promise<boolean> => {
 
     script.onload = () => {
       try {
-        const env = process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT;
-    
-        if (env === 'sandbox') {
-          window.Paddle!.Environment.set('sandbox');
-        } // else production by default
-    
+        // PRODUCTION ONLY - No sandbox references
         window.Paddle!.Initialize({
-          token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!, // test_… or live_…
+          token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
         });
     
         paddleLoaded = true;
-        console.log('✅ Paddle.js loaded and initialized');
+        console.log('✅ Paddle.js loaded and initialized for PRODUCTION');
         resolve(true);
       } catch (err) {
         console.error('Paddle initialization failed', err);
@@ -75,7 +69,7 @@ export const openPaddleCheckout = (priceId: string, email?: string) => {
       ...(email && { customer: { email } }),
       settings: {
         successUrl: 'https://www.orblin.cloud/payment-success',
-        displayMode: 'overlay', // Add this
+        displayMode: 'overlay',
       },
     });
     console.log('✅ Checkout opened successfully');
