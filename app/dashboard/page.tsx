@@ -24,45 +24,39 @@ export default function DashboardPage() {
       throw new Error('Failed to load Paddle');
     }
     
-    // Use the new helper function
+    console.log('🔄 Opening lifetime checkout with PRICE ID');
     openPaddleCheckout(
-      'pro_01kab5k19nxxqbjnr848wd2pa2',
+      'pri_01kabghk4hhgbz2dnj353sv2td', // ← CORRECT PRICE ID for lifetime
       user.primaryEmailAddress?.emailAddress
     );
     
   } catch (error) {
     console.error('Payment failed:', error);
-    alert('Unable to open payment. Please try again.');
   }
 };
 
-  const handleGetYearlyAccess = async () => {
-    if (!user) {
-      router.push("/sign-in")
-      return
+const handleGetYearlyAccess = async () => {
+  if (!user) {
+    router.push("/sign-in");
+    return;
+  }
+  
+  try {
+    const loaded = await loadPaddle();
+    if (!loaded) {
+      throw new Error('Failed to load Paddle');
     }
     
-    try {
-      await loadPaddle();
-      
-      window.Paddle.Checkout.open({
-        items: [
-          {
-            priceId: 'pro_01kab5mnpcb64a0a3vzx5gzj4m', // Your yearly product ID
-            quantity: 1,
-          }
-        ],
-        customer: {
-          email: user.primaryEmailAddress?.emailAddress,
-        },
-        settings: {
-          successUrl: `${window.location.origin}/payment-success`,
-        }
-      });
-    } catch (error) {
-      console.error('Failed to open checkout:', error);
-    }
+    console.log('🔄 Opening yearly checkout with PRICE ID');
+    openPaddleCheckout(
+      'pri_01kabgkj0y7cv0yae5c89730pa', // ← CORRECT PRICE ID for yearly
+      user.primaryEmailAddress?.emailAddress
+    );
+    
+  } catch (error) {
+    console.error('Payment failed:', error);
   }
+};
 
   useEffect(() => {
     if (isLoaded && !user) {

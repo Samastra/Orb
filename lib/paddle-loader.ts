@@ -61,10 +61,12 @@ export const openPaddleCheckout = (priceId: string, email?: string) => {
     return;
   }
   
+  console.log('🔧 Opening Paddle checkout with PRICE ID:', priceId);
+  
   window.Paddle.Checkout.open({
     items: [
       {
-        priceId: priceId,
+        priceId: priceId, // Now using the correct price IDs
         quantity: 1,
       }
     ],
