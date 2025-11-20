@@ -1,5 +1,5 @@
 // components/StageComponent.tsx
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Konva from "konva";
 import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, RegularPolygon, Image, Path, Group } from "react-konva";
@@ -13,6 +13,7 @@ import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
   ssr: false,
 });
+
 interface StageComponentProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   trRef: React.RefObject<Konva.Transformer | null>;
@@ -57,19 +58,25 @@ interface StageComponentProps {
     onSave: (text: string) => void;
   }) => void;
 }
+
 type CombinedShape =
   | (KonvaShape & { __kind: 'konva' })
   | (ReactShape & { __kind: 'react' })
   | (KonvaShape & { __kind: 'stage' })
   | (ImageShape & { __kind: 'image' })
   | (Connection & { __kind: 'connection' });
+
 // Image Component
 const ImageElement = React.forwardRef<Konva.Image, {
   imageShape: ImageShape;
-  onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onTransformEnd?: (e: Konva.KonvaEventObject<Event>) => void;
 }>(({
   imageShape,
+  onDragStart,
+  onDragMove,
   onDragEnd,
   onTransformEnd
 }, ref) => {
@@ -88,6 +95,7 @@ const ImageElement = React.forwardRef<Konva.Image, {
       console.error('Failed to load image:', imageShape.src);
     };
   }, [imageShape.src]);
+  
   if (!image) {
     return (
       <Rect
@@ -100,12 +108,16 @@ const ImageElement = React.forwardRef<Konva.Image, {
         stroke="#ccc"
         strokeWidth={1}
         draggable={imageShape.draggable}
+        onDragStart={onDragStart}
+        onDragMove={onDragMove}
         onDragEnd={onDragEnd}
         onTransformEnd={onTransformEnd}
         name="selectable-shape"
+        id={imageShape.id}
       />
     );
   }
+  
   return (
     <Image
       ref={internalRef}
@@ -116,6 +128,8 @@ const ImageElement = React.forwardRef<Konva.Image, {
       height={imageShape.height}
       rotation={imageShape.rotation}
       draggable={imageShape.draggable}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       onTransformEnd={onTransformEnd}
       name="selectable-shape"
@@ -124,6 +138,7 @@ const ImageElement = React.forwardRef<Konva.Image, {
   );
 });
 ImageElement.displayName = 'ImageElement';
+
 // Connection Component
 const ConnectionElement = React.forwardRef<Konva.Path, {
   connection: Connection;
@@ -166,12 +181,14 @@ const ConnectionElement = React.forwardRef<Konva.Path, {
       shouldSnapStraight: false
     };
   };
+  
   const buildPathData = (from: {x: number, y: number}, to: {x: number, y: number}, cp1x: number, cp1y: number, cp2x: number, cp2y: number, snapStraight: boolean) => {
     if (snapStraight) {
       return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
     }
     return `M ${from.x} ${from.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${to.x} ${to.y}`;
   };
+  
   const updatePathFromAnchors = () => {
     if (!startAnchorRef.current || !endAnchorRef.current || !pathRef.current) return;
     const fx = startAnchorRef.current.x();
@@ -188,6 +205,7 @@ const ConnectionElement = React.forwardRef<Konva.Path, {
       cp1x, cp1y, cp2x, cp2y
     });
   };
+  
   React.useEffect(() => {
     if (!groupRef.current || !pathRef.current || !startAnchorRef.current || !endAnchorRef.current) return;
     startAnchorRef.current.on('dragmove', updatePathFromAnchors);
@@ -197,6 +215,7 @@ const ConnectionElement = React.forwardRef<Konva.Path, {
       endAnchorRef.current?.off('dragmove', updatePathFromAnchors);
     };
   }, []);
+  
   const pathData = buildPathData(
     connection.from,
     connection.to,
@@ -206,6 +225,7 @@ const ConnectionElement = React.forwardRef<Konva.Path, {
     connection.cp2y,
     Math.abs(connection.to.y - connection.from.y) < 15
   );
+  
   const anchorRadius = 6;
   return (
     <Group
@@ -263,6 +283,7 @@ const ConnectionElement = React.forwardRef<Konva.Path, {
   );
 });
 ConnectionElement.displayName = 'ConnectionElement';
+
 const StageComponent: React.FC<StageComponentProps> = ({
   stageRef,
   trRef,
@@ -300,137 +321,94 @@ const StageComponent: React.FC<StageComponentProps> = ({
   handleStartTextEditing,
 }) => {
   const shapeRefs = useRef<{ [key: string]: React.RefObject<Konva.Node | null> }>({});
-  const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
-  const lastDragTime = useRef<number>(0);
+  const dragStartPos = useRef<Map<string, { x: number; y: number }>>(new Map());
+
   // Disable hit detection during drag for performance
   useEffect(() => {
     Konva.hitOnDragEnabled = false;
   }, []);
-  // ========== FIXED: PROPER MULTI-SELECT DRAGGING ==========
-  const handleShapeDragStart = (item: CombinedShape, e: Konva.KonvaEventObject<DragEvent>) => {
-    const node = e.target;
-    
-    // Store starting positions for all selected shapes
-    if (selectedNodeIds.length > 1 && selectedNodeIds.includes(item.id)) {
-      selectedNodeIds.forEach(id => {
-        const shape = allShapesToRender.find(s => s.id === id);
-        if (shape && shape.__kind !== 'connection') {
-          const positionedShape = shape as CombinedShape & { x: number; y: number };
-          dragStartPositions.current.set(id, { x: positionedShape.x, y: positionedShape.y });
-        }
-      });
-    }
-    
-    node.setAttr('lastX', node.x());
-    node.setAttr('lastY', node.y());
-  };
-  // FIXED: Real-time multi-drag handler with throttling for smoothness
-  const handleDragMove = (item: CombinedShape, e: Konva.KonvaEventObject<DragEvent>) => {
-    const now = performance.now();
-    if (now - lastDragTime.current < 16) return;
-    lastDragTime.current = now;
 
-    if (selectedNodeIds.length <= 1 || !selectedNodeIds.includes(item.id)) return;
-    
+  // ========== FIXED: UNIFIED MULTI-SELECTION DRAG HANDLERS ==========
+  const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
-    const dx = node.x() - node.getAttr('lastX');
-    const dy = node.y() - node.getAttr('lastY');
-    
+    if (!node || selectedNodeIds.length <= 1) return;
+
+    // Store original positions of ALL selected nodes
     selectedNodeIds.forEach(id => {
-      if (id === item.id) return;
-      
+      const ref = shapeRefs.current[id]?.current;
+      if (ref && ref !== node) {
+        dragStartPos.current.set(id, { x: ref.x(), y: ref.y() });
+      }
+    });
+    dragStartPos.current.set(node.id(), { x: node.x(), y: node.y() });
+  }, [selectedNodeIds]);
+
+  const handleDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    if (selectedNodeIds.length <= 1) return;
+    const node = e.target;
+    const dx = node.x() - (dragStartPos.current.get(node.id())?.x || node.x());
+    const dy = node.y() - (dragStartPos.current.get(node.id())?.y || node.y());
+
+    selectedNodeIds.forEach(id => {
+      if (id === node.id()) return;
       const other = shapeRefs.current[id]?.current;
       if (other) {
-        const startPos = dragStartPositions.current.get(id);
-        if (startPos) {
-          const newX = startPos.x + dx;
-          const newY = startPos.y + dy;
-          other.x(newX);
-          other.y(newY);
+        const start = dragStartPos.current.get(id);
+        if (start) {
+          other.x(start.x + dx);
+          other.y(start.y + dy);
         }
       }
     });
-    
-    node.setAttr('lastX', node.x());
-    node.setAttr('lastY', node.y());
-    
+
     if (trRef.current) trRef.current.forceUpdate();
-    node.getLayer()?.batchDraw();
-  };
-  // FIXED: Multi-select drag end - update state for all shapes
-  const handleShapeDragEnd = (item: CombinedShape, e: Konva.KonvaEventObject<DragEvent>) => {
-    try {
-      if (item.__kind === 'connection') {
-        return;
-      }
-      const hasPosition = (shape: CombinedShape): shape is CombinedShape & { x: number; y: number } => {
-        return shape.__kind !== 'connection';
-      };
-      if (!hasPosition(item)) return;
-      const node = e.target;
-      const nx = node.x();
-      const ny = node.y();
-      // Calculate delta from original position
-      const startPos = dragStartPositions.current.get(item.id);
-      const dx = startPos ? nx - startPos.x : nx - item.x;
-      const dy = startPos ? ny - startPos.y : ny - item.y;
-      console.log('🚀 Drag delta:', { dx, dy, selectedCount: selectedNodeIds.length, itemId: item.id });
-      // If this is part of multi-select, update all selected shapes
-      if (selectedNodeIds.length > 1 && selectedNodeIds.includes(item.id)) {
-        console.log('🔄 Multi-drag updating all selected shapes');
-        
-        // Update all selected shapes with the same delta
-        selectedNodeIds.forEach(selectedId => {
-          const selectedItem = allShapesToRender.find(shape => shape.id === selectedId);
-          if (!selectedItem || !hasPosition(selectedItem) || selectedId === item.id) return;
-          
-          const startPos = dragStartPositions.current.get(selectedId);
-          const newX = startPos ? startPos.x + dx : selectedItem.x + dx;
-          const newY = startPos ? startPos.y + dy : selectedItem.y + dy;
-          
-          console.log(`📦 Updating ${selectedId} to (${newX}, ${newY})`);
-          
-          if (selectedItem.__kind === 'konva') {
-            updateShape(selectedId, { x: newX, y: newY });
-          } else if (selectedItem.__kind === 'react') {
-            setReactShapes((prev: ReactShape[]) => prev.map((s: ReactShape) =>
-              s.id === selectedId ? { ...s, x: newX, y: newY } : s
-            ));
-          } else if (selectedItem.__kind === 'image') {
-            setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
-              img.id === selectedId ? { ...img, x: newX, y: newY } : img
-            ));
-          } else if (selectedItem.__kind === 'stage') {
-            setStageFrames((prev: KonvaShape[]) => prev.map((f: KonvaShape) =>
-              f.id === selectedId ? { ...f, x: newX, y: newY } : f
-            ));
-          }
-        });
-      }
-      // Always update the dragged shape itself
-      console.log(`🎯 Updating dragged shape ${item.id} to (${nx}, ${ny})`);
-      if (item.__kind === 'konva') {
-        updateShape(item.id, { x: nx, y: ny });
-      } else if (item.__kind === 'react') {
-        setReactShapes((prev: ReactShape[]) => prev.map((s: ReactShape) =>
-          s.id === item.id ? { ...s, x: nx, y: ny } : s
-        ));
-      } else if (item.__kind === 'image') {
-        setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
-          img.id === item.id ? { ...img, x: nx, y: ny } : img
-        ));
-      } else if (item.__kind === 'stage') {
-        setStageFrames((prev: KonvaShape[]) => prev.map((f: KonvaShape) =>
-          f.id === item.id ? { ...f, x: nx, y: ny } : f
-        ));
-      }
-      // Clear drag positions
-      dragStartPositions.current.clear();
-    } catch (error) {
-      console.error('Error handling shape drag end:', error);
-      dragStartPositions.current.clear();
+  }, [selectedNodeIds, trRef]);
+
+  const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    if (selectedNodeIds.length <= 1) {
+      // Single drag — let individual components handle it
+      return;
     }
+
+    const node = e.target;
+    const finalX = node.x();
+    const finalY = node.y();
+    const start = dragStartPos.current.get(node.id());
+    if (!start) return;
+    const dx = finalX - start.x;
+    const dy = finalY - start.y;
+
+    selectedNodeIds.forEach(id => {
+      const startPos = dragStartPos.current.get(id);
+      if (!startPos) return;
+
+      const shape = [...shapes, ...reactShapes, ...images, ...stageFrames].find(s => s.id === id);
+      if (!shape) return;
+
+      const newX = startPos.x + dx;
+      const newY = startPos.y + dy;
+
+      if ('__kind' in shape && shape.__kind === 'react') {
+        setReactShapes(prev => prev.map(s => s.id === id ? { ...s, x: newX, y: newY } : s));
+      } else if ('type' in shape && (shape as any).type === 'image') {
+        setImages(prev => prev.map(i => i.id === id ? { ...i, x: newX, y: newY } : i));
+      } else if ('type' in shape && (shape as any).type === 'stage') {
+        setStageFrames(prev => prev.map(f => f.id === id ? { ...f, x: newX, y: newY } : f));
+      } else {
+        updateShape(id, { x: newX, y: newY });
+      }
+    });
+
+    dragStartPos.current.clear();
+  }, [selectedNodeIds, shapes, reactShapes, images, stageFrames, setReactShapes, setImages, setStageFrames, updateShape]);
+
+  // Common drag props for multi-selection
+  const commonDragProps = {
+    onDragStart: handleDragStart,
+    onDragMove: handleDragMove,
+    onDragEnd: handleDragEnd,
   };
+
   // ========== EXISTING HANDLE SHAPE TRANSFORM END ==========
   const handleShapeTransformEnd = (item: CombinedShape, e: Konva.KonvaEventObject<Event>) => {
     try {
@@ -441,6 +419,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
         return shape.__kind !== 'connection';
       };
       if (!hasPosition(item)) return;
+      
       if (item.__kind === 'react') {
         const newX = node.x();
         const newY = node.y();
@@ -465,6 +444,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
         setReactShapes(prev => prev.map(s => s.id === item.id ? { ...s, ...updates } : s));
         return;
       }
+      
       if (item.__kind === 'image') {
         const imageNode = node as Konva.Image;
         const newWidth = Math.max(1, imageNode.width() * imageNode.scaleX());
@@ -486,6 +466,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
         ));
         return;
       }
+      
       if (item.__kind === 'stage') {
         const stageNode = node as Konva.Rect;
         const newWidth = Math.max(1, stageNode.width() * stageNode.scaleX());
@@ -501,6 +482,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
         });
         return;
       }
+      
       if (item.__kind === 'konva') {
         const k = item as KonvaShape;
         switch (k.type) {
@@ -574,6 +556,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
       console.error('Error in handleShapeTransformEnd:', error);
     }
   };
+
   useEffect(() => {
     const allIds = [
       ...stageFrames.map(s => s.id),
@@ -587,12 +570,28 @@ const StageComponent: React.FC<StageComponentProps> = ({
     allIds.forEach(id => {
       if (!map[id]) map[id] = React.createRef<Konva.Node | null>();
     });
-       
+      
     Object.keys(map).forEach(k => {
       if (!allIds.includes(k)) delete map[k];
     });
     shapeRefs.current = map;
   }, [stageFrames, shapes, reactShapes, images, connections]);
+
+  // ========== FIXED: TRANSFORMER SYNC ==========
+  useEffect(() => {
+    if (!trRef.current || selectedNodeIds.length === 0) {
+      trRef.current?.nodes([]);
+      return;
+    }
+
+    const nodes = selectedNodeIds
+      .map(id => shapeRefs.current[id]?.current)
+      .filter((n): n is Konva.Node => !!n && n.getClassName() !== 'Path'); // exclude connections
+
+    trRef.current.nodes(nodes);
+    trRef.current.getLayer()?.batchDraw();
+  }, [selectedNodeIds, trRef]);
+
   const allShapesToRender = React.useMemo(() => {
     console.log('🔄 StageComponent re-rendering with shapes:', {
       stageFrames: stageFrames.length,
@@ -611,51 +610,18 @@ const StageComponent: React.FC<StageComponentProps> = ({
       ...reactShapes.map(s => ({ ...s, __kind: 'react' as const })),
     ];
   }, [stageFrames, shapes, reactShapes, images, connections]);
-  useEffect(() => {
-    if (!trRef.current) {
-      return;
-    }
-    if (selectedNodeIds.length === 0) {
-      trRef.current.nodes([]);
-      trRef.current.getLayer()?.batchDraw();
-      return;
-    }
-    const selectedRefs = selectedNodeIds
-      .map(id => shapeRefs.current[id]?.current)
-      .filter((node): node is Konva.Node => node !== null && node !== undefined);
-    console.log('🔧 Transformer selected refs:', selectedRefs.map(r => ({
-      id: r.id(),
-      type: r.attrs.type,
-      name: r.name()
-    })));
-    const transformableNodes = selectedRefs.filter(node => {
-      const shapeType = node.attrs.type;
-      return shapeType !== 'connection';
-    });
-    if (transformableNodes.length > 0) {
-      try {
-        trRef.current.nodes(transformableNodes);
-        trRef.current.getLayer()?.batchDraw();
-        console.log('✅ Transformer nodes set:', transformableNodes.length);
-      } catch (err) {
-        console.error('Error setting transformer nodes:', err);
-        trRef.current.nodes([]);
-        trRef.current.getLayer()?.batchDraw();
-      }
-    } else {
-      trRef.current.nodes([]);
-      trRef.current.getLayer()?.batchDraw();
-    }
-  }, [selectedNodeIds, allShapesToRender, trRef]);
+
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const stage = e.target.getStage();
     if (!stage) return;
+    
     console.log('🖱️ Stage click - target:', {
       name: e.target.name(),
       id: e.target.id(),
       className: e.target.className,
       attrs: e.target.attrs
     });
+    
     if (e.target === stage) {
       setSelectedNodeIds([]);
       return;
@@ -680,6 +646,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
       console.log('❌ Not a selectable shape:', e.target.name());
     }
   };
+
   const handleShapeClick = (item: CombinedShape, e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     if (activeTool === "select") {
@@ -699,6 +666,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
       }
     }
   };
+
   const handleConnectionClick = (connection: Connection, e: Konva.KonvaEventObject<MouseEvent>) => {
     e.cancelBubble = true;
     if (activeTool === "select") {
@@ -718,6 +686,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
       }
     }
   };
+
   const handleImageDragEnd = (imageShape: ImageShape, e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target as Konva.Image;
     const wasResized = node.width() !== imageShape.width || node.height() !== imageShape.height;
@@ -742,6 +711,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
       ));
     }
   };
+
   return (
     <div className="absolute inset-0 z-0">
       <Stage
@@ -782,9 +752,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
               onTap: (e: Konva.KonvaEventObject<MouseEvent>) => void;
               x?: number;
               y?: number;
-              onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
-              onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
-              onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
             } = {
               id: item.id,
               draggable: (item.draggable ?? true) && activeTool === "select",
@@ -792,19 +759,14 @@ const StageComponent: React.FC<StageComponentProps> = ({
               onClick: (e: Konva.KonvaEventObject<MouseEvent>) => handleShapeClick(item, e),
               onTap: (e: Konva.KonvaEventObject<MouseEvent>) => handleShapeClick(item, e),
             };
-            // Add drag handlers only for shapes that support them
+
+            // Add position and drag handlers only for shapes that support them
             if (item.__kind !== 'connection') {
               const positionedItem = item as CombinedShape & { x: number; y: number };
               commonProps.x = positionedItem.x;
               commonProps.y = positionedItem.y;
-              
-              // Add drag handlers for Konva shapes, images, and stage frames
-              if (item.__kind === 'konva' || item.__kind === 'image' || item.__kind === 'stage') {
-                commonProps.onDragStart = (e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragStart(item, e);
-                commonProps.onDragMove = (e: Konva.KonvaEventObject<DragEvent>) => handleDragMove(item, e);
-                commonProps.onDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragEnd(item, e);
-              }
             }
+
             if (item.__kind === 'stage') {
               const stageItem = item as KonvaShape;
               return (
@@ -812,6 +774,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                   key={item.id}
                   ref={shapeRefs.current[item.id] as React.RefObject<Konva.Rect>}
                   {...commonProps}
+                  {...commonDragProps}
                   width={stageItem.width ?? 800}
                   height={stageItem.height ?? 600}
                   fill={stageItem.fill || "#ffffff"}
@@ -829,7 +792,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
                   key={item.id}
                   ref={shapeRefs.current[item.id] as React.RefObject<Konva.Image>}
                   imageShape={imageItem}
-                  onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => handleImageDragEnd(imageItem, e)}
+                  onDragStart={commonDragProps.onDragStart}
+                  onDragMove={commonDragProps.onDragMove}
+                  onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => {
+                    commonDragProps.onDragEnd?.(e);
+                    handleImageDragEnd(imageItem, e);
+                  }}
                   onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
                 />
               );
@@ -840,7 +808,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                   key={item.id}
                   ref={shapeRefs.current[item.id] as React.RefObject<Konva.Path>}
                   connection={connectionItem}
-                  onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragEnd(item, e)}
+                  onDragEnd={commonDragProps.onDragEnd}
                   onClick={(e: Konva.KonvaEventObject<MouseEvent>) => handleConnectionClick(connectionItem, e)}
                   updateConnection={updateConnection}
                   onDelete={onDelete}
@@ -855,6 +823,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                       key={item.id}
                       ref={shapeRefs.current[item.id] as React.RefObject<Konva.Rect>}
                       {...commonProps}
+                      {...commonDragProps}
                       width={konvaItem.width ?? 100}
                       height={konvaItem.height ?? 100}
                       fill={konvaItem.fill}
@@ -870,6 +839,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                       key={item.id}
                       ref={shapeRefs.current[item.id] as React.RefObject<Konva.Circle>}
                       {...commonProps}
+                      {...commonDragProps}
                       radius={konvaItem.radius ?? 50}
                       fill={konvaItem.fill}
                       stroke={konvaItem.stroke}
@@ -883,6 +853,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                       key={item.id}
                       ref={shapeRefs.current[item.id] as React.RefObject<Konva.Ellipse>}
                       {...commonProps}
+                      {...commonDragProps}
                       radiusX={konvaItem.radiusX ?? 80}
                       radiusY={konvaItem.radiusY ?? 50}
                       fill={konvaItem.fill}
@@ -897,6 +868,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                       key={item.id}
                       ref={shapeRefs.current[item.id] as React.RefObject<Konva.RegularPolygon>}
                       {...commonProps}
+                      {...commonDragProps}
                       sides={3}
                       radius={konvaItem.radius ?? 50}
                       fill={konvaItem.fill}
@@ -911,6 +883,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                       key={item.id}
                       ref={shapeRefs.current[item.id] as React.RefObject<Konva.Arrow>}
                       {...commonProps}
+                      {...commonDragProps}
                       points={(konvaItem.points as number[]) ?? [0, 0, 100, 0]}
                       stroke={konvaItem.fill ?? konvaItem.stroke}
                       fill={konvaItem.fill}
@@ -963,9 +936,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     onFinishEditing={() => {
                       setActiveTool("select");
                     }}
-                    onDragStart={(e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragStart(item, e)}
-                    onDragMove={(e: Konva.KonvaEventObject<DragEvent>) => handleDragMove(item, e)}
-                    onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragEnd(item, e)}
+                    onDragStart={commonDragProps.onDragStart}
+                    onDragMove={commonDragProps.onDragMove}
+                    onDragEnd={commonDragProps.onDragEnd}
                     onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
                   />
                 );
@@ -987,9 +960,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
                         shape.id === item.id ? { ...shape, ...newAttrs } : shape
                       ));
                     }}
-                    onDragStart={(e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragStart(item, e)}
-                    onDragMove={(e: Konva.KonvaEventObject<DragEvent>) => handleDragMove(item, e)}
-                    onDragEnd={(e: Konva.KonvaEventObject<DragEvent>) => handleShapeDragEnd(item, e)}
+                    onDragStart={commonDragProps.onDragStart}
+                    onDragMove={commonDragProps.onDragMove}
+                    onDragEnd={commonDragProps.onDragEnd}
                     onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
                   />
                 );
@@ -1073,4 +1046,5 @@ const StageComponent: React.FC<StageComponentProps> = ({
     </div>
   );
 };
-export default StageComponent;                                                     
+
+export default StageComponent;
