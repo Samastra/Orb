@@ -11,70 +11,40 @@ declare global {
           settings?: { successUrl?: string; displayMode?: 'overlay' | 'inline' };
         }) => void;
       };
-      Spinner: { show: () => void; hide: () => void };
     };
   }
 }
 
 let paddleLoaded = false;
 
-// Validate environment on module load
-const PADDLE_TOKEN = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
-if (!PADDLE_TOKEN) {
-  console.error('❌ PADDLE CRITICAL ERROR: NEXT_PUBLIC_PADDLE_CLIENT_TOKEN is missing from environment variables');
-} else {
-  console.log('✅ Paddle token found:', PADDLE_TOKEN.substring(0, 10) + '...');
-}
-
 export const loadPaddle = async (): Promise<boolean> => {
   if (typeof window === 'undefined') return false;
   
-  // Check if already loaded
-  if (window.Paddle && paddleLoaded) {
-    console.log('✅ Paddle already loaded');
-    return true;
+  // Clear any existing Paddle instance
+  if (window.Paddle) {
+    delete window.Paddle;
   }
+  paddleLoaded = false;
 
-  // Validate token exists
-  if (!PADDLE_TOKEN) {
-    console.error('❌ Cannot load Paddle: Missing token');
-    return false;
-  }
-
+  const PADDLE_TOKEN = 'live_1eb16e45439c74060060a87a068'; // Hardcode for now to test
+  
   return new Promise<boolean>((resolve) => {
-    // Check if Paddle is already available (might be loaded by another script)
-    if (window.Paddle) {
-      console.log('🔄 Paddle found on window, initializing...');
-      try {
-        window.Paddle.Initialize({ token: PADDLE_TOKEN });
-        paddleLoaded = true;
-        console.log('✅ Paddle initialized successfully');
-        resolve(true);
-      } catch (err) {
-        console.error('❌ Paddle initialization failed:', err);
-        resolve(false);
-      }
-      return;
-    }
+    console.log('🔄 Loading Paddle with token:', PADDLE_TOKEN);
 
-    console.log('🔄 Loading Paddle script...');
     const script = document.createElement('script');
     script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
     script.async = true;
 
     script.onload = () => {
-      console.log('✅ Paddle script loaded, initializing...');
-      
-      // Small delay to ensure Paddle is ready
       setTimeout(() => {
         try {
           if (!window.Paddle) {
-            throw new Error('Paddle not available on window after script load');
+            throw new Error('Paddle not available after script load');
           }
 
           window.Paddle.Initialize({ token: PADDLE_TOKEN });
           paddleLoaded = true;
-          console.log('✅ Paddle initialized successfully in production');
+          console.log('✅ Paddle initialized with correct token');
           resolve(true);
         } catch (err) {
           console.error('❌ Paddle initialization failed:', err);
@@ -88,6 +58,10 @@ export const loadPaddle = async (): Promise<boolean> => {
       resolve(false);
     };
 
+    // Remove any existing Paddle scripts first
+    const existingScripts = document.querySelectorAll('script[src*="paddle.com"]');
+    existingScripts.forEach(script => script.remove());
+
     document.head.appendChild(script);
   });
 };
@@ -97,13 +71,6 @@ export const openPaddleCheckout = (priceId: string, email?: string) => {
 
   if (!window.Paddle) {
     console.error('❌ Paddle is not loaded yet');
-    // Try to load it dynamically
-    loadPaddle().then(loaded => {
-      if (loaded) {
-        console.log('🔄 Paddle loaded dynamically, retrying checkout...');
-        openPaddleCheckout(priceId, email);
-      }
-    });
     return;
   }
 
