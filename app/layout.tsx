@@ -6,7 +6,7 @@ import { RecommendationsProvider } from '@/context/RecommendationsContext';
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Orb - AI Brainstorming",
+  title: "Orblin - AI Brainstorming",
   description: "A Community driven brainstorming platform powered by AI",
 };
 
