@@ -390,9 +390,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
 
       if ('__kind' in shape && shape.__kind === 'react') {
         setReactShapes(prev => prev.map(s => s.id === id ? { ...s, x: newX, y: newY } : s));
-      } else if ('type' in shape && (shape as any).type === 'image') {
+      } else if ('type' in shape && (shape as KonvaShape | ImageShape).type === 'image') {
         setImages(prev => prev.map(i => i.id === id ? { ...i, x: newX, y: newY } : i));
-      } else if ('type' in shape && (shape as any).type === 'stage') {
+      } else if ('type' in shape && (shape as KonvaShape).type === 'stage') {
         setStageFrames(prev => prev.map(f => f.id === id ? { ...f, x: newX, y: newY } : f));
       } else {
         updateShape(id, { x: newX, y: newY });
