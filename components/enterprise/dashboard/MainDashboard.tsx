@@ -11,7 +11,8 @@ import {
   Users,
   Zap,
   Activity,
-  Crown
+  Crown,
+  CheckCircle
 } from "lucide-react"
 import { 
   getUserBoardsWithDetails, 
@@ -53,12 +54,32 @@ interface Board {
   created_at: string
 }
 
+interface UserSubscription {
+  plan_type: string;
+  payment_status: string;
+  upgraded_at: string | null;
+}
+
 interface MainDashboardProps {
   searchQuery?: string
   onSearchChange?: (query: string) => void
   onUpgradeLifetime?: () => void
   onUpgradeYearly?: () => void
 }
+
+// Function to check user subscription status
+const checkUserSubscription = async (clerkUserId: string): Promise<UserSubscription | null> => {
+  try {
+    const response = await fetch(`/api/user/subscription?clerk_user_id=${clerkUserId}`);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch (error) {
+    console.error("Error checking user subscription:", error);
+    return null;
+  }
+};
 
 export default function MainDashboard({ 
   searchQuery = "", 
@@ -71,12 +92,32 @@ export default function MainDashboard({
   const [boards, setBoards] = useState<Board[]>([])
   const [filteredBoards, setFilteredBoards] = useState<Board[]>([])
   const [loading, setLoading] = useState(true)
+  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
   const [stats, setStats] = useState({
     totalBoards: 0,
     teamMembers: 0,
     activeProjects: 0,
     publicBoards: 0
   })
+
+  // Fetch user subscription status
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (isLoaded && user?.id) {
+        try {
+          const subscription = await checkUserSubscription(user.id);
+          setUserSubscription(subscription);
+        } catch (error) {
+          console.error("Failed to fetch subscription:", error);
+        } finally {
+          setSubscriptionLoading(false);
+        }
+      }
+    };
+
+    fetchSubscription();
+  }, [isLoaded, user]);
 
   // Fetch real data
   useEffect(() => {
@@ -216,19 +257,25 @@ export default function MainDashboard({
     setFilteredBoards(filtered)
   }
 
-        const handleFavorite = (boardId: string, newFavoriteState: boolean) => {
-        // Update local state immediately for better UX
-        setBoards(prev => prev.map(board => 
-          board.id === boardId 
-            ? { ...board, isFavorite: newFavoriteState }
-            : board
-        ))
-        setFilteredBoards(prev => prev.map(board => 
-          board.id === boardId 
-            ? { ...board, isFavorite: newFavoriteState }
-            : board
-        ))
-      }
+  const handleFavorite = (boardId: string, newFavoriteState: boolean) => {
+    // Update local state immediately for better UX
+    setBoards(prev => prev.map(board => 
+      board.id === boardId 
+        ? { ...board, isFavorite: newFavoriteState }
+        : board
+    ))
+    setFilteredBoards(prev => prev.map(board => 
+      board.id === boardId 
+        ? { ...board, isFavorite: newFavoriteState }
+        : board
+    ))
+  }
+
+  // Check if user has paid (premium or lifetime)
+  const hasPaid = userSubscription && 
+    (userSubscription.payment_status === 'paid' || 
+     userSubscription.plan_type === 'premium' || 
+     userSubscription.plan_type === 'lifetime');
 
   if (!isLoaded || loading) {
     return <DashboardSkeleton />
@@ -270,35 +317,67 @@ export default function MainDashboard({
         />
       </div>
 
-      {/* Upgrade Banner */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Crown className="w-5 h-5 text-yellow-300" />
-              <h3 className="font-bold text-lg">Unlock Full Access</h3>
+      {/* Upgrade Banner - Only show if user hasn't paid */}
+      {!hasPaid && !subscriptionLoading && (
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Crown className="w-5 h-5 text-yellow-300" />
+                <h3 className="font-bold text-lg">Unlock Full Access</h3>
+              </div>
+              <p className="text-blue-100 max-w-2xl">
+                Get lifetime access to all Orblin features. Never pay again for unlimited boards, AI features, and premium collaboration tools.
+              </p>
             </div>
-            <p className="text-blue-100 max-w-2xl">
-              Get lifetime access to all Orblin features. Never pay again for unlimited boards, AI features, and premium collaboration tools.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button 
-              onClick={onUpgradeLifetime}
-              className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-gray-100 font-semibold transition-colors flex items-center gap-2 justify-center"
-            >
-              <Zap className="w-4 h-4" />
-              Lifetime - $99
-            </button>
-            <button 
-              onClick={onUpgradeYearly}
-              className="px-4 py-2 bg-blue-500/20 text-white border border-blue-400 rounded-lg hover:bg-blue-500/30 font-medium transition-colors"
-            >
-              Yearly - $60
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button 
+                onClick={onUpgradeLifetime}
+                className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-gray-100 font-semibold transition-colors flex items-center gap-2 justify-center"
+              >
+                <Zap className="w-4 h-4" />
+                Lifetime - $99
+              </button>
+              <button 
+                onClick={onUpgradeYearly}
+                className="px-4 py-2 bg-blue-500/20 text-white border border-blue-400 rounded-lg hover:bg-blue-500/30 font-medium transition-colors"
+              >
+                Yearly - $60
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Premium User Banner - Show if user has paid */}
+      {hasPaid && !subscriptionLoading && (
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-6 text-white">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-yellow-300" />
+                <h3 className="font-bold text-lg">
+                  {userSubscription?.plan_type === 'lifetime' ? 'Lifetime Access' : 'Premium Member'}
+                </h3>
+              </div>
+              <p className="text-green-100 max-w-2xl">
+                {userSubscription?.plan_type === 'lifetime' 
+                  ? 'You have lifetime access to all Orblin features! Thank you for your support.' 
+                  : 'You are enjoying all premium features. Thank you for upgrading!'}
+              </p>
+              {userSubscription?.upgraded_at && (
+                <p className="text-green-200 text-sm">
+                  Member since {new Date(userSubscription.upgraded_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" />
+              <span className="font-semibold">Active</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -309,6 +388,7 @@ export default function MainDashboard({
               ? "Create your first board to get started" 
               : `Managing ${stats.totalBoards} boards, ${stats.publicBoards} public`
             }
+            {hasPaid && " • Premium Member"}
           </p>
         </div>
         

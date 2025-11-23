@@ -9,7 +9,8 @@ import {
   User,
   Settings,
   LogOut,
-  Crown // Added Crown icon
+  Crown,
+  CheckCircle // Added CheckCircle icon
 } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import Link from "next/link"
@@ -20,16 +21,36 @@ interface DashboardHeaderProps {
   onPanelToggle: () => void
   searchQuery: string
   onSearchChange: (query: string) => void
-  onUpgradeLifetime?: () => void // Added upgrade props
+  onUpgradeLifetime?: () => void
   onUpgradeYearly?: () => void
 }
+
+interface UserSubscription {
+  plan_type: string;
+  payment_status: string;
+  upgraded_at: string | null;
+}
+
+// Function to check user subscription status
+const checkUserSubscription = async (clerkUserId: string): Promise<UserSubscription | null> => {
+  try {
+    const response = await fetch(`/api/user/subscription?clerk_user_id=${clerkUserId}`);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch (error) {
+    console.error("Error checking user subscription:", error);
+    return null;
+  }
+};
 
 export default function DashboardHeader({ 
   onMenuToggle, 
   onPanelToggle, 
   searchQuery, 
   onSearchChange,
-  onUpgradeLifetime = () => {}, // Added with default functions
+  onUpgradeLifetime = () => {},
   onUpgradeYearly = () => {}
 }: DashboardHeaderProps) {
   const { user } = useUser()
@@ -37,6 +58,27 @@ export default function DashboardHeader({
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState<{ id: string; title: string; message: string; time: string }[]>([])
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
+
+  // Check user subscription status
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (user?.id) {
+        try {
+          const subscription = await checkUserSubscription(user.id);
+          setUserSubscription(subscription);
+        } catch (error) {
+          console.error("Failed to fetch subscription:", error);
+        } finally {
+          setSubscriptionLoading(false);
+        }
+      }
+    };
+
+    fetchSubscription();
+  }, [user]);
+
   // In a real app, you'd fetch notifications from your database
   useEffect(() => {
     // For now, we'll set empty notifications for new users
@@ -46,6 +88,12 @@ export default function DashboardHeader({
   const userInitials = user?.fullName 
     ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase()
     : user?.username?.[0]?.toUpperCase() || 'U'
+
+  // Check if user has paid
+  const hasPaid = userSubscription && 
+    (userSubscription.payment_status === 'paid' || 
+     userSubscription.plan_type === 'premium' || 
+     userSubscription.plan_type === 'lifetime');
 
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
@@ -98,14 +146,24 @@ export default function DashboardHeader({
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
             
-            {/* Upgrade Button - Added this section */}
-            <button 
-              onClick={onUpgradeLifetime}
-              className="hidden md:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium text-sm"
-            >
-              <Crown className="w-4 h-4" />
-              Upgrade
-            </button>
+            {/* Upgrade Button - Only show if user hasn't paid */}
+            {!hasPaid && !subscriptionLoading && (
+              <button 
+                onClick={onUpgradeLifetime}
+                className="hidden md:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors font-medium text-sm"
+              >
+                <Crown className="w-4 h-4" />
+                Upgrade
+              </button>
+            )}
+
+            {/* Premium Badge - Show if user has paid */}
+            {hasPaid && !subscriptionLoading && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg font-medium text-sm">
+                <CheckCircle className="w-4 h-4" />
+                {userSubscription?.plan_type === 'lifetime' ? 'Lifetime' : 'Premium'}
+              </div>
+            )}
 
             {/* Notifications */}
             <div className="relative">
@@ -187,6 +245,14 @@ export default function DashboardHeader({
                   <div className="px-4 py-3 border-b border-gray-200">
                     <p className="font-semibold text-gray-900">{user?.fullName || "User"}</p>
                     <p className="text-sm text-gray-500">{user?.primaryEmailAddress?.emailAddress}</p>
+                    {hasPaid && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <CheckCircle className="w-3 h-3 text-green-600" />
+                        <span className="text-xs text-green-600 font-medium">
+                          {userSubscription?.plan_type === 'lifetime' ? 'Lifetime Member' : 'Premium Member'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="py-2">
