@@ -8,7 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/terms',
   '/privacy', 
   '/refunds',
-  '/boards/new',          // ← Allow creating new boards without auth
+  '/boards/new',  
   '/boards',
   '/boards/(.*)',         // ← Allow accessing any board without auth
   // Add other public routes as needed

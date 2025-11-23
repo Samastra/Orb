@@ -29,6 +29,8 @@ interface SearchResults {
   videos: Resource[];
   images: Resource[];
   websites: Resource[];
+  query?: string;
+  timestamp?: string;
 }
 
 interface Board {
@@ -74,7 +76,7 @@ const ResourceList = ({
   onPlayVideo,
   boardElements,
 }: ResourceListProps) => {
-  const { recommendations } = useRecommendations();
+  const { recommendations, setRecommendations, hasCachedRecommendations } = useRecommendations();
   const { user } = useUser();
   const router = useRouter();
   const [searchLoading, setSearchLoading] = useState(false);
@@ -116,57 +118,75 @@ const ResourceList = ({
     fetchBoards();
   }, [user?.id]);
 
-  // Replace the debounce function:
-      const debounce = (func: (value: string) => void, delay: number) => {
-        let timeoutId: NodeJS.Timeout;
-        return (value: string) => {
-          clearTimeout(timeoutId);
-          timeoutId = setTimeout(() => func(value), delay);
-        };
-      };
+  const debounce = (func: (value: string) => void, delay: number) => {
+    let timeoutId: NodeJS.Timeout;
+    return (value: string) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func(value), delay);
+    };
+  };
 
- const fetchResources = useCallback(async (query: string, isRefresh = false) => {
-  if (!query.trim() && !isRefresh) {
-    setManualSearchResults(null);
-    return;
-  }
-
-  try {
-    const url = `/api/recommendations/search?query=${encodeURIComponent(
-      query
-    )}&refresh=${isRefresh ? "true" : "false"}&refreshCount=${refreshCount}&page=${page}`;
-    const response = await fetch(url);
-    if (response.ok) {
-      const data = (await response.json()) as SearchResults;
-      setManualSearchResults((prev) => ({
-        ...prev,
-        ...data,
-      }));
-      setHasMore(data.images.length > 0 || data.books.length > 0 || data.videos.length > 0 || data.websites.length > 0);
-    } else {
-      console.error("API response not OK:", response.status);
-      setManualSearchResults(emptyResults);
-    }
-  } catch (error) {
-    console.error("Failed to fetch resources:", error);
-    setManualSearchResults(emptyResults);
-  }
-}, [refreshCount, page]); // Add dependencies here
-
-const handleSearch = useCallback(
-  debounce((value: string) => {
-    setSearchQuery(value);
-    if (value.trim()) {
-      setSearchLoading(true);
-      setRefreshCount(0);
-      fetchResources(value).finally(() => setSearchLoading(false));
-    } else {
+  const fetchResources = useCallback(async (query: string, isRefresh = false) => {
+    if (!query.trim() && !isRefresh) {
       setManualSearchResults(null);
+      return;
+    }
+
+    // Check if we have cached results for this query
+    if (!isRefresh && hasCachedRecommendations && recommendations.query === query) {
+      console.log('📁 Using cached recommendations');
+      setManualSearchResults(recommendations);
+      return;
+    }
+
+    try {
+      setSearchLoading(true);
+      const url = `/api/recommendations/search?query=${encodeURIComponent(
+        query
+      )}&refresh=${isRefresh ? "true" : "false"}&refreshCount=${refreshCount}&page=${page}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = (await response.json()) as SearchResults;
+        // Save to cache via context
+        setRecommendations({
+          ...data,
+          query: query // Store the query for cache matching
+        });
+        setManualSearchResults(data);
+        setHasMore(data.images.length > 0 || data.books.length > 0 || data.videos.length > 0 || data.websites.length > 0);
+      } else {
+        console.error("API response not OK:", response.status);
+        setManualSearchResults(emptyResults);
+      }
+    } catch (error) {
+      console.error("Failed to fetch resources:", error);
+      setManualSearchResults(emptyResults);
+    } finally {
       setSearchLoading(false);
     }
-  }, 800),
-  [fetchResources] // Now depends on the stable fetchResources
-);
+  }, [refreshCount, page, hasCachedRecommendations, recommendations, setRecommendations]);
+
+  const handleSearch = useCallback(
+    debounce((value: string) => {
+      setSearchQuery(value);
+      if (value.trim()) {
+        // Check cache first before making API call
+        if (hasCachedRecommendations && recommendations.query === value) {
+          console.log('📁 Using cached results for search');
+          setManualSearchResults(recommendations);
+          setSearchLoading(false);
+        } else {
+          setSearchLoading(true);
+          setRefreshCount(0);
+          fetchResources(value).finally(() => setSearchLoading(false));
+        }
+      } else {
+        setManualSearchResults(null);
+        setSearchLoading(false);
+      }
+    }, 800),
+    [fetchResources, hasCachedRecommendations, recommendations]
+  );
 
   const handleRefresh = () => {
     const currentQuery =
@@ -176,27 +196,27 @@ const handleSearch = useCallback(
         : "");
     if (currentQuery) {
       setRefreshCount((prev) => prev + 1);
+      // Force fresh API call by not using cache
       fetchResources(currentQuery, true);
     }
   };
 
-  // Replace the getResourceUrl function:
-        const getResourceUrl = (resource: Resource): string | undefined => {
-          switch (resource.type) {
-            case "video":
-              return resource.videoId ? `https://youtube.com/watch?v=${resource.videoId}` : resource.url;
-            case "website":
-              return resource.url || ((resource.sourceData as { content_urls?: { desktop?: { page?: string } } })?.content_urls?.desktop?.page);
-            case "book":
-              return resource.url || ((resource.sourceData as { volumeInfo?: { infoLink?: string } })?.volumeInfo?.infoLink);
-            case "photo":
-              return resource.url || ((resource.sourceData as { url?: string })?.url);
-            case "vector":
-              return resource.url || ((resource.sourceData as { url?: string })?.url);
-            default:
-              return resource.url;
-          }
-        };
+  const getResourceUrl = (resource: Resource): string | undefined => {
+    switch (resource.type) {
+      case "video":
+        return resource.videoId ? `https://youtube.com/watch?v=${resource.videoId}` : resource.url;
+      case "website":
+        return resource.url || ((resource.sourceData as { content_urls?: { desktop?: { page?: string } } })?.content_urls?.desktop?.page);
+      case "book":
+        return resource.url || ((resource.sourceData as { volumeInfo?: { infoLink?: string } })?.volumeInfo?.infoLink);
+      case "photo":
+        return resource.url || ((resource.sourceData as { url?: string })?.url);
+      case "vector":
+        return resource.url || ((resource.sourceData as { url?: string })?.url);
+      default:
+        return resource.url;
+    }
+  };
 
   const getEmptyStateMessage = () => {
     if (searchLoading) return "Loading resources...";
@@ -214,10 +234,11 @@ const handleSearch = useCallback(
       : allImages.filter((image) => image.type === imageTypeFilter);
   };
 
-   const displayResources = useMemo(
+  const displayResources = useMemo(
     () => manualSearchResults || recommendations,
     [manualSearchResults, recommendations]
   );
+
   const currentResources = useMemo(() => {
     if (!displayResources) return [];
     switch (activeTab) {
@@ -233,6 +254,17 @@ const handleSearch = useCallback(
         return [];
     }
   }, [activeTab, displayResources, imageTypeFilter]);
+
+  const renderCacheIndicator = () => {
+    if (hasCachedRecommendations && manualSearchResults && !searchLoading) {
+      return (
+        <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+          📁 Using cached results
+        </span>
+      );
+    }
+    return null;
+  };
 
   const renderSimilarBoards = () => {
     if (boards.length === 0) {
@@ -323,16 +355,16 @@ const handleSearch = useCallback(
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 masonry">
           {currentResources.map((resource: Resource) => (
             <ResourceCard
-          key={resource.id}
-          heading={resource.heading}
-          body={resource.body}
-          image={resource.image}
-          alt={resource.alt}
-          type={resource.type as "video" | "website" | "book" | "photo" | "vector"} // Add type assertion
-          url={getResourceUrl(resource)}
-          onAddToBoard={onAddToBoard}
-          onPlayVideo={onPlayVideo}
-        />
+              key={resource.id}
+              heading={resource.heading}
+              body={resource.body}
+              image={resource.image}
+              alt={resource.alt}
+              type={resource.type as "video" | "website" | "book" | "photo" | "vector"}
+              url={getResourceUrl(resource)}
+              onAddToBoard={onAddToBoard}
+              onPlayVideo={onPlayVideo}
+            />
           ))}
           {hasMore && (
             <button
@@ -395,10 +427,10 @@ const handleSearch = useCallback(
               className="w-full h-10 pl-10 pr-4 rounded-xl border border-gray-300 bg-white/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300"
               value={searchQuery}
               onChange={(e) => {
-              const value = e.target.value;
-              setSearchQuery(value); // Update input immediately for better UX
-              handleSearch(value);
-            }}
+                const value = e.target.value;
+                setSearchQuery(value);
+                handleSearch(value);
+              }}
               disabled={searchLoading}
             />
           </div>
@@ -432,16 +464,16 @@ const handleSearch = useCallback(
           </button>
         </div>
 
-        <div className="mt-3 text-sm text-gray-600 flex items-center gap-2">
+        <div className="mt-3 text-sm text-gray-600 flex items-center gap-2 flex-wrap">
           {manualSearchResults && (
             <span>
               Showing results for: <span className="font-medium">&quot;{searchQuery}&quot;</span>
             </span>
           )}
+          {renderCacheIndicator()}
           {searchLoading && (
             <span className="flex items-center gap-1 text-blue-600">
-              <RefreshCw className="w-3 h-3 animate-spin" /> loading new
-              results...
+              <RefreshCw className="w-3 h-3 animate-spin" /> loading new results...
             </span>
           )}
           {boardTitle &&

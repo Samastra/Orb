@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
             content: `Answer concisely in well-formatted markdown (use ## for headers, * for bullet points, ** for bold). Example: ## Response\n* **Item**: Description.\n${query.trim()}`,
           },
         ],
-        max_tokens: 200,
+        
         temperature: 0.7,
         response_format: { type: "text" },
       }),
