@@ -55,14 +55,26 @@ export async function GET(request: NextRequest) {
       fetch(urls[3]),
     ]);
 
-    // Process responses with better error handling
+    // FIXED: Properly handle PromiseSettledResult
     const processResponse = async (response: PromiseSettledResult<Response>, type: string) => {
-      if (response.status === 'fulfilled' && response.value.ok) {
-        const data = await response.value.json();
-        console.log(`✅ ${type} success:`, data.length, 'items');
-        return Array.isArray(data) ? data : [];
+      if (response.status === 'fulfilled') {
+        // The fetch promise succeeded
+        if (response.value.ok) {
+          try {
+            const data = await response.value.json();
+            console.log(`✅ ${type} success:`, Array.isArray(data) ? data.length : 'invalid', 'items');
+            return Array.isArray(data) ? data : [];
+          } catch (parseError) {
+            console.error(`❌ ${type} JSON parse error:`, parseError);
+            return [];
+          }
+        } else {
+          console.error(`❌ ${type} HTTP error:`, response.value.status, response.value.statusText);
+          return [];
+        }
       } else {
-        console.log(`❌ ${type} failed:`, response.status);
+        // The fetch promise was rejected
+        console.error(`❌ ${type} promise rejected:`, response.reason);
         return [];
       }
     };
