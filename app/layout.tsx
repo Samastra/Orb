@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google" 
 import { ClerkProvider } from "@clerk/nextjs";
 import { RecommendationsProvider } from '@/context/RecommendationsContext';
+import { Analytics } from '@vercel/analytics/react';
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,9 +20,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <ClerkProvider>
       <html lang="en">
+        <head>
+          <link rel="icon" href="/favicon.ico.png" />
+        </head>
         <body className={inter.className}>
           <RecommendationsProvider>
             {children}
+            <Analytics />
           </RecommendationsProvider>
         </body>
       </html>
