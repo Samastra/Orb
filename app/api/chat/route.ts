@@ -1,18 +1,24 @@
+// app/api/chat/route.ts - MAIN CHAT ENDPOINT
 import { NextRequest, NextResponse } from "next/server";
 
-// Define proper TypeScript interfaces
-interface GroqResponse {
+// Define proper TypeScript interfaces for DeepSeek
+interface DeepSeekResponse {
   choices?: Array<{
     message?: {
       content?: string;
     };
   }>;
+  usage?: {
+    total_tokens: number;
+  };
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.GROQ_API_KEY) {
-    console.error("GROQ_API_KEY is missing in .env.local");
-    return NextResponse.json({ error: "Server configuration error: API key missing" }, { status: 500 });
+  if (!process.env.DEEPSEEK_API_KEY) {
+    console.error("DEEPSEEK_API_KEY is missing in .env.local");
+    return NextResponse.json({ 
+      error: "Server configuration error: DeepSeek API key missing" 
+    }, { status: 500 });
   }
 
   try {
@@ -23,39 +29,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid or empty query" }, { status: 400 });
     }
 
-    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const deepseekResponse = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "deepseek-chat",
         messages: [
           {
             role: "user",
             content: `Answer concisely in well-formatted markdown (use ## for headers, * for bullet points, ** for bold). Example: ## Response\n* **Item**: Description.\n${query.trim()}`,
           },
         ],
-        
         temperature: 0.7,
-        response_format: { type: "text" },
+        stream: false,
+        max_tokens: 2048,
       }),
     });
 
-    if (!groqResponse.ok) {
-      const errorText = await groqResponse.text();
-      console.error(`Groq API error: ${groqResponse.status} ${groqResponse.statusText} - ${errorText}`);
-      throw new Error(`Groq API error: ${groqResponse.status}`);
+    if (!deepseekResponse.ok) {
+      const errorText = await deepseekResponse.text();
+      console.error(`DeepSeek API error: ${deepseekResponse.status} ${deepseekResponse.statusText} - ${errorText}`);
+      
+      if (deepseekResponse.status === 401) {
+        throw new Error("Invalid DeepSeek API key");
+      } else if (deepseekResponse.status === 429) {
+        throw new Error("Rate limit exceeded - try again later");
+      } else {
+        throw new Error(`DeepSeek API error: ${deepseekResponse.status}`);
+      }
     }
 
-    // FIX 1: Replace 'any' with proper interface
-    const data: GroqResponse = await groqResponse.json();
-    const aiResponse: string = data.choices?.[0]?.message?.content?.trim() || "Sorry, something went wrong with the AI response.";
+    const data: DeepSeekResponse = await deepseekResponse.json();
+    
+    const aiResponse: string = data.choices?.[0]?.message?.content?.trim() 
+      || "Sorry, I couldn't generate a response. Please try again.";
 
-    return NextResponse.json({ response: aiResponse });
-  } catch (error: unknown) { // FIX 2: Replace 'any' with 'unknown'
+    return NextResponse.json({ 
+      response: aiResponse,
+      tokens: data.usage?.total_tokens
+    });
+    
+  } catch (error: unknown) {
     console.error("Unexpected error in /api/chat:", error instanceof Error ? error.message : error);
-    return NextResponse.json({ error: "Failed to connect to AI service" }, { status: 500 });
+    
+    return NextResponse.json({ 
+      error: error instanceof Error ? error.message : "Failed to connect to AI service" 
+    }, { status: 500 });
   }
 }
