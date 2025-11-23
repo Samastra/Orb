@@ -3,6 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+// Add CORS headers helper
+const addCorsHeaders = (response: NextResponse) => {
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  return response;
+};
+
 export async function GET(request: NextRequest) {
   console.log('🔍 Search route called!');
   
@@ -16,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   if (!query) {
     console.log('❌ No query provided');
-    return NextResponse.json({ error: 'Query is required' }, { status: 400 });
+    return addCorsHeaders(NextResponse.json({ error: 'Query is required' }, { status: 400 }));
   }
 
   try {
@@ -42,7 +50,7 @@ export async function GET(request: NextRequest) {
     const urls = [
       `${baseUrl}/api/recommendations/books?query=${encodeURIComponent(enhancedQuery)}`,
       `${baseUrl}/api/recommendations/videos?query=${encodeURIComponent(enhancedQuery)}`,
-      `${baseUrl}/api/recommendations/images?query=${encodeURIComponent(enhancedQuery)}`,
+      `${baseUrl}/api/recommignations/images?query=${encodeURIComponent(enhancedQuery)}`,
       `${baseUrl}/api/recommendations/websites?query=${encodeURIComponent(enhancedQuery)}`,
     ];
 
@@ -55,10 +63,9 @@ export async function GET(request: NextRequest) {
       fetch(urls[3]),
     ]);
 
-    // FIXED: Properly handle PromiseSettledResult
+    // Process responses with better error handling
     const processResponse = async (response: PromiseSettledResult<Response>, type: string) => {
       if (response.status === 'fulfilled') {
-        // The fetch promise succeeded
         if (response.value.ok) {
           try {
             const data = await response.value.json();
@@ -73,7 +80,6 @@ export async function GET(request: NextRequest) {
           return [];
         }
       } else {
-        // The fetch promise was rejected
         console.error(`❌ ${type} promise rejected:`, response.reason);
         return [];
       }
@@ -88,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`📊 Final results: ${books.length} books, ${videos.length} videos, ${images.length} images, ${websites.length} websites`);
 
-    return NextResponse.json({
+    const responseData = {
       query: enhancedQuery,
       books,
       videos, 
@@ -96,16 +102,23 @@ export async function GET(request: NextRequest) {
       websites,
       timestamp: new Date().toISOString(),
       refreshed: refresh === 'true'
-    });
+    };
+
+    return addCorsHeaders(NextResponse.json(responseData));
 
   } catch (error) {
     console.error('💥 Search orchestration error:', error);
-    return NextResponse.json({ 
+    return addCorsHeaders(NextResponse.json({ 
       error: 'Failed to fetch recommendations',
       books: [],
       videos: [],
       images: [],
       websites: []
-    }, { status: 500 });
+    }, { status: 500 }));
   }
+}
+
+// Also handle OPTIONS requests for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return addCorsHeaders(new NextResponse(null, { status: 200 }));
 }
