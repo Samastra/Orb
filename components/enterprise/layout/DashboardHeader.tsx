@@ -10,7 +10,8 @@ import {
   Settings,
   LogOut,
   Crown,
-  CheckCircle // Added CheckCircle icon
+  CheckCircle,
+  Compass // Added Compass icon for discovery
 } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import Link from "next/link"
@@ -111,11 +112,20 @@ export default function DashboardHeader({
 
           {/* Quick Actions */}
           <div className="hidden md:flex items-center gap-2">
+            {/* ADDED: Discover Public Boards Link */}
+            <Link href="/boards">
+              <button className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <Compass className="w-4 h-4" />
+                Discover
+              </button>
+            </Link>
+            
             <Link href="/boards/new">
               <button className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                 + New Board
               </button>
             </Link>
+            
             <button 
               className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               title="Import feature coming soon"
@@ -256,17 +266,24 @@ export default function DashboardHeader({
                   </div>
                   
                   <div className="py-2">
+                    {/* ADDED: Public Boards link in user menu too */}
+                    <Link href="/boards">
+                      <button className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        <Compass className="w-4 h-4" />
+                        <span>Public Boards</span>
+                      </button>
+                    </Link>
                     
-                     <button 
-                          onClick={() => {
-                            setIsProfileModalOpen(true)
-                            setUserMenuOpen(false)
-                          }}
-                          className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                          <User className="w-4 h-4" />
-                          <span>Profile</span>
-                        </button>
+                    <button 
+                      onClick={() => {
+                        setIsProfileModalOpen(true)
+                        setUserMenuOpen(false)
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <User className="w-4 h-4" />
+                      <span>Profile</span>
+                    </button>
                   
                     <Link href="/settings">
                       <button className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
@@ -303,6 +320,16 @@ export default function DashboardHeader({
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
+      </div>
+
+      {/* ADDED: Mobile Discover Link */}
+      <div className="lg:hidden mt-3">
+        <Link href="/boards">
+          <button className="flex items-center gap-2 w-full justify-center px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <Compass className="w-4 h-4" />
+            Discover Public Boards
+          </button>
+        </Link>
       </div>
 
       <ProfileModal 
