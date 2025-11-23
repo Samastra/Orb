@@ -1,4 +1,4 @@
-// app/api/recommendations/search/route.ts - DEBUG VERSION
+// app/api/recommendations/search/route.ts - FIXED DEBUG VERSION
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -16,15 +16,14 @@ export async function GET(request: NextRequest) {
   try {
     const baseUrl = request.nextUrl.origin;
     console.log('🌐 DEBUG: Base URL:', baseUrl);
-
-    // Test with SIMPLE query first
-    const simpleQuery = "test";
+    console.log('🎯 DEBUG: Actual query:', query);
     
+    // USE THE ACTUAL QUERY, NOT HARDCODED!
     const urls = [
-      `${baseUrl}/api/recommendations/books?query=${encodeURIComponent(simpleQuery)}`,
-      `${baseUrl}/api/recommendations/videos?query=${encodeURIComponent(simpleQuery)}`,
-      `${baseUrl}/api/recommendations/images?query=${encodeURIComponent(simpleQuery)}`,
-      `${baseUrl}/api/recommendations/websites?query=${encodeURIComponent(simpleQuery)}`,
+      `${baseUrl}/api/recommendations/books?query=${encodeURIComponent(query)}`,
+      `${baseUrl}/api/recommendations/videos?query=${encodeURIComponent(query)}`,
+      `${baseUrl}/api/recommendations/images?query=${encodeURIComponent(query)}`,
+      `${baseUrl}/api/recommendations/websites?query=${encodeURIComponent(query)}`,
     ];
 
     console.log('📡 DEBUG: URLs to fetch:', urls);
@@ -37,28 +36,28 @@ export async function GET(request: NextRequest) {
     const booksTest = await fetch(urls[0]);
     console.log('📚 Books status:', booksTest.status, booksTest.ok);
     const booksData = await booksTest.json();
-    console.log('📚 Books data:', booksData);
+    console.log('📚 Books data length:', booksData.length);
     
     // Test Videos API  
     console.log('🎬 Testing Videos API...');
     const videosTest = await fetch(urls[1]);
     console.log('🎬 Videos status:', videosTest.status, videosTest.ok);
     const videosData = await videosTest.json();
-    console.log('🎬 Videos data:', videosData);
+    console.log('🎬 Videos data length:', videosData.length);
     
     // Test Images API
     console.log('🖼️ Testing Images API...');
     const imagesTest = await fetch(urls[2]);
     console.log('🖼️ Images status:', imagesTest.status, imagesTest.ok);
     const imagesData = await imagesTest.json();
-    console.log('🖼️ Images data:', imagesData);
+    console.log('🖼️ Images data length:', imagesData.length);
     
     // Test Websites API
     console.log('🌐 Testing Websites API...');
     const websitesTest = await fetch(urls[3]);
     console.log('🌐 Websites status:', websitesTest.status, websitesTest.ok);
     const websitesData = await websitesTest.json();
-    console.log('🌐 Websites data:', websitesData);
+    console.log('🌐 Websites data length:', websitesData.length);
 
     // Now try the Promise.all approach
     console.log('🔄 DEBUG: Now testing Promise.allSettled...');
@@ -94,15 +93,15 @@ export async function GET(request: NextRequest) {
       ? await websitesResponse.value.json() 
       : [];
 
-    console.log('🎯 DEBUG: Final processed data:', {
-      booksLength: books.length,
-      videosLength: videos.length, 
-      imagesLength: images.length,
-      websitesLength: websites.length
+    console.log('🎯 DEBUG: Final processed data lengths:', {
+      books: books.length,
+      videos: videos.length, 
+      images: images.length,
+      websites: websites.length
     });
 
     return NextResponse.json({
-      query: simpleQuery,
+      query: query, // ← USE ACTUAL QUERY!
       books,
       videos,
       images, 
