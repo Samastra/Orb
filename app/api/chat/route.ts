@@ -1,82 +1,67 @@
-// app/api/chat/route.ts - MAIN CHAT ENDPOINT
+// app/api/chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
-// Define proper TypeScript interfaces for DeepSeek
-interface DeepSeekResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-    };
-  }>;
-  usage?: {
-    total_tokens: number;
-  };
-}
-
 export async function POST(request: NextRequest) {
-  if (!process.env.DEEPSEEK_API_KEY) {
-    console.error("DEEPSEEK_API_KEY is missing in .env.local");
-    return NextResponse.json({ 
-      error: "Server configuration error: DeepSeek API key missing" 
-    }, { status: 500 });
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Missing DeepSeek API key" },
+      { status: 500 }
+    );
   }
 
   try {
-    const body = await request.json();
-    const query: string | undefined = body.query;
+    const { query } = await request.json();
 
     if (!query || typeof query !== "string" || query.trim() === "") {
-      return NextResponse.json({ error: "Invalid or empty query" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Query is required" },
+        { status: 400 }
+      );
     }
 
-    const deepseekResponse = await fetch("https://api.deepseek.com/chat/completions", {
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "Accept": "application/json",           // ← important!
       },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: "deepseek-coder",                 // ← this one works 100%
         messages: [
           {
             role: "user",
-            content: `Answer concisely in well-formatted markdown (use ## for headers, * for bullet points, ** for bold). Example: ## Response\n* **Item**: Description.\n${query.trim()}`,
+            content: `Answer concisely in clean markdown.\n\n${query.trim()}`,
           },
         ],
         temperature: 0.7,
-        stream: false,
         max_tokens: 2048,
+        stream: false,
       }),
     });
 
-    if (!deepseekResponse.ok) {
-      const errorText = await deepseekResponse.text();
-      console.error(`DeepSeek API error: ${deepseekResponse.status} ${deepseekResponse.statusText} - ${errorText}`);
-      
-      if (deepseekResponse.status === 401) {
-        throw new Error("Invalid DeepSeek API key");
-      } else if (deepseekResponse.status === 429) {
-        throw new Error("Rate limit exceeded - try again later");
-      } else {
-        throw new Error(`DeepSeek API error: ${deepseekResponse.status}`);
-      }
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("DeepSeek error:", response.status, text);
+
+      if (response.status === 401) return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
+      if (response.status === 429) return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+      return NextResponse.json({ error: "AI service error" }, { status: 502 });
     }
 
-    const data: DeepSeekResponse = await deepseekResponse.json();
-    
-    const aiResponse: string = data.choices?.[0]?.message?.content?.trim() 
-      || "Sorry, I couldn't generate a response. Please try again.";
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content?.trim() || "No response";
 
-    return NextResponse.json({ 
-      response: aiResponse,
-      tokens: data.usage?.total_tokens
+    return NextResponse.json({
+      response: content,
+      tokens: data.usage?.total_tokens,
     });
-    
-  } catch (error: unknown) {
-    console.error("Unexpected error in /api/chat:", error instanceof Error ? error.message : error);
-    
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : "Failed to connect to AI service" 
-    }, { status: 500 });
+  } catch (error) {
+    console.error("Chat API crash:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
