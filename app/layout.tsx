@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <ClerkProvider>
       <html lang="en">
         <head>
-          <link rel="icon" href="/favicon.ico.png" />
+          <link rel="icon" type="image/png" href="/favicon.png" />
         </head>
         <body className={inter.className}>
           <RecommendationsProvider>
