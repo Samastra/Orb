@@ -1,10 +1,11 @@
-// app/api/recommendations/search/route.ts - FIXED DEBUG VERSION
+// app/api/recommendations/search/route.ts - PRODUCTION DEBUG
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
-  console.log('🔍 DEBUG: Search route called!');
+  console.log('🚀 PRODUCTION: Search route called');
   
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('query');
@@ -15,10 +16,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const baseUrl = request.nextUrl.origin;
-    console.log('🌐 DEBUG: Base URL:', baseUrl);
-    console.log('🎯 DEBUG: Actual query:', query);
+    console.log('🌐 PRODUCTION: Base URL:', baseUrl);
     
-    // USE THE ACTUAL QUERY, NOT HARDCODED!
     const urls = [
       `${baseUrl}/api/recommendations/books?query=${encodeURIComponent(query)}`,
       `${baseUrl}/api/recommendations/videos?query=${encodeURIComponent(query)}`,
@@ -26,95 +25,54 @@ export async function GET(request: NextRequest) {
       `${baseUrl}/api/recommendations/websites?query=${encodeURIComponent(query)}`,
     ];
 
-    console.log('📡 DEBUG: URLs to fetch:', urls);
+    console.log('📡 PRODUCTION: Making parallel API calls...');
 
-    // DEBUG: Test each API individually first
-    console.log('🧪 DEBUG: Testing APIs individually...');
+    // PRODUCTION FIX: Call APIs sequentially instead of parallel
+    console.log('🔄 PRODUCTION: Calling APIs sequentially...');
     
-    // Test Books API
-    console.log('📚 Testing Books API...');
-    const booksTest = await fetch(urls[0]);
-    console.log('📚 Books status:', booksTest.status, booksTest.ok);
-    const booksData = await booksTest.json();
-    console.log('📚 Books data length:', booksData.length);
+    const booksResponse = await fetch(urls[0]);
+    console.log('📚 PRODUCTION: Books status:', booksResponse.status, booksResponse.ok);
+    const books = booksResponse.ok ? await booksResponse.json() : [];
     
-    // Test Videos API  
-    console.log('🎬 Testing Videos API...');
-    const videosTest = await fetch(urls[1]);
-    console.log('🎬 Videos status:', videosTest.status, videosTest.ok);
-    const videosData = await videosTest.json();
-    console.log('🎬 Videos data length:', videosData.length);
+    const videosResponse = await fetch(urls[1]);
+    console.log('🎬 PRODUCTION: Videos status:', videosResponse.status, videosResponse.ok);
+    const videos = videosResponse.ok ? await videosResponse.json() : [];
     
-    // Test Images API
-    console.log('🖼️ Testing Images API...');
-    const imagesTest = await fetch(urls[2]);
-    console.log('🖼️ Images status:', imagesTest.status, imagesTest.ok);
-    const imagesData = await imagesTest.json();
-    console.log('🖼️ Images data length:', imagesData.length);
+    const imagesResponse = await fetch(urls[2]);
+    console.log('🖼️ PRODUCTION: Images status:', imagesResponse.status, imagesResponse.ok);
+    const images = imagesResponse.ok ? await imagesResponse.json() : [];
     
-    // Test Websites API
-    console.log('🌐 Testing Websites API...');
-    const websitesTest = await fetch(urls[3]);
-    console.log('🌐 Websites status:', websitesTest.status, websitesTest.ok);
-    const websitesData = await websitesTest.json();
-    console.log('🌐 Websites data length:', websitesData.length);
+    const websitesResponse = await fetch(urls[3]);
+    console.log('🌐 PRODUCTION: Websites status:', websitesResponse.status, websitesResponse.ok);
+    const websites = websitesResponse.ok ? await websitesResponse.json() : [];
 
-    // Now try the Promise.all approach
-    console.log('🔄 DEBUG: Now testing Promise.allSettled...');
-    
-    const [booksResponse, videosResponse, imagesResponse, websitesResponse] = await Promise.allSettled([
-      fetch(urls[0]),
-      fetch(urls[1]),
-      fetch(urls[2]),
-      fetch(urls[3]),
-    ]);
-
-    console.log('📦 DEBUG: Promise.allSettled results:', {
-      books: booksResponse.status,
-      videos: videosResponse.status,
-      images: imagesResponse.status, 
-      websites: websitesResponse.status
-    });
-
-    // Simple processing - no fancy function
-    const books = booksResponse.status === 'fulfilled' && booksResponse.value.ok 
-      ? await booksResponse.value.json() 
-      : [];
-
-    const videos = videosResponse.status === 'fulfilled' && videosResponse.value.ok 
-      ? await videosResponse.value.json() 
-      : [];
-
-    const images = imagesResponse.status === 'fulfilled' && imagesResponse.value.ok 
-      ? await imagesResponse.value.json() 
-      : [];
-
-    const websites = websitesResponse.status === 'fulfilled' && websitesResponse.value.ok 
-      ? await websitesResponse.value.json() 
-      : [];
-
-    console.log('🎯 DEBUG: Final processed data lengths:', {
+    console.log('📊 PRODUCTION: Final results:', {
       books: books.length,
-      videos: videos.length, 
+      videos: videos.length,
       images: images.length,
       websites: websites.length
     });
 
     return NextResponse.json({
-      query: query, // ← USE ACTUAL QUERY!
+      query,
       books,
-      videos,
-      images, 
+      videos, 
+      images,
       websites,
       timestamp: new Date().toISOString(),
-      debug: true
+      production: true
     });
 
   } catch (error) {
-    console.error('💥 DEBUG: Search error:', error);
+    console.error('💥 PRODUCTION: Search error:', error);
+    // Check Vercel logs for this error message!
     return NextResponse.json({ 
-      error: 'Search failed',
-      debugError: error instanceof Error ? error.message : String(error)
+      error: 'Production search failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      books: [],
+      videos: [],
+      images: [],
+      websites: []
     }, { status: 500 });
   }
 }
