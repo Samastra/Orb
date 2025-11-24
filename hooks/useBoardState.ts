@@ -229,6 +229,8 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
           ...baseShape,
           points: [0, 0, 100, 0],
           fill: "black",
+          stroke: "black",
+          strokeWidth: 2,
         };
         break;
       default:
