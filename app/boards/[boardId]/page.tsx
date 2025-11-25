@@ -400,110 +400,52 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
   }, [params.boardId, showSetupDialog, setShowSetupDialog, setBoardInfo]);
 
   // Load saved elements (only on initial mount or boardId change)
-  useEffect(() => {
-    if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
+  // In boards/[boardId]/page.tsx — REPLACE the big loading useEffect
+useEffect(() => {
+  if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
 
-    const loadSavedElements = async () => {
-      try {
-        console.log("📥 Loading saved board elements for board:", currentBoardId);
-        const elements = await loadBoardElements(currentBoardId);
-        console.log("✅ Loaded board elements:", {
-          reactShapes: elements.reactShapes?.length,
-          konvaShapes: elements.konvaShapes?.length,
-          stageFrames: elements.stageFrames?.length,
-          images: elements.images?.length,
-          connections: elements.connections?.length,
-          lines: elements.lines?.length,
-          stageState: elements.stageState,
-        });
+  const loadSavedElements = async () => {
+    try {
+      console.log("Loading saved board elements for board:", currentBoardId);
+      const elements = await loadBoardElements(currentBoardId);
 
-        // Merge new elements
-        if (elements.reactShapes && elements.reactShapes.length > 0) {
-          setReactShapes((prev) => {
-            const merged = [...prev];
-            elements.reactShapes.forEach((newShape) => {
-              if (!prev.some((s) => s.id === newShape.id)) {
-                merged.push(newShape);
-              }
-            });
-            return merged;
-          });
-        }
-        if (elements.konvaShapes && elements.konvaShapes.length > 0) {
-          setKonvaShapes((prev) => {
-            const merged = [...prev];
-            elements.konvaShapes.forEach((newShape) => {
-              if (!prev.some((s) => s.id === newShape.id)) {
-                merged.push(newShape);
-              }
-            });
-            return merged;
-          });
-        }
-        if (elements.stageFrames && elements.stageFrames.length > 0) {
-          setStageFrames((prev) => {
-            const merged = [...prev];
-            elements.stageFrames.forEach((newFrame) => {
-              if (!prev.some((s) => s.id === newFrame.id)) {
-                merged.push(newFrame);
-              }
-            });
-            return merged;
-          });
-        }
-        if (elements.images && elements.images.length > 0) {
-          setImages((prev) => {
-            const merged = [...prev];
-            elements.images.forEach((newImage) => {
-              if (!prev.some((s) => s.id === newImage.id)) {
-                merged.push(newImage);
-              }
-            });
-            return merged;
-          });
-        }
-        if (elements.connections && elements.connections.length > 0) {
-          setConnections((prev) => {
-            const merged = [...prev];
-            elements.connections.forEach((newConn) => {
-              if (!prev.some((s) => s.id === newConn.id)) {
-                merged.push(newConn);
-              }
-            });
-            return merged;
-          });
-        }
-        if (elements.lines && elements.lines.length > 0) {
-          setLines((prev) => {
-            const merged = [...prev];
-            elements.lines.forEach((newLine) => {
-              if (!prev.some((s) => areEqual(s, newLine))) {
-                merged.push(newLine);
-              }
-            });
-            return merged;
-          });
-        }
-
-        if (elements.stageState) {
-          const s = elements.stageState;
-          if (s.scale !== scale) {
-            console.log("🔄 Updating scale:", { old: scale, new: s.scale });
-            boardState.setScale(s.scale ?? 1);
-          }
-          if (s.position.x !== position.x || s.position.y !== position.y) {
-            console.log("🔄 Updating position:", { old: position, new: s.position });
-            boardState.setPosition(s.position ?? { x: 0, y: 0 });
-          }
-        }
-
-        setHasLoaded(true); // Mark as loaded
-      } catch (error) {
-        console.error("❌ Error loading board elements:", error);
+      // CRITICAL: Restore stage transform FIRST, before anything renders
+      if (elements.stageState) {
+        const s = elements.stageState;
+        // Set scale and position immediately (synchronously if possible)
+        boardState.setScale(s.scale ?? 1);
+        boardState.setPosition(s.position ?? { x: 0, y: 0 });
       }
-    };
-    loadSavedElements();
-  }, [currentBoardId, isTemporaryBoard, hasLoaded, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setLines, boardState, scale, position]);
+
+      // Now load shapes — they will render with correct stage already at correct zoom/pan
+      if (elements.reactShapes?.length > 0) {
+        setReactShapes(elements.reactShapes);
+      }
+      if (elements.konvaShapes?.length > 0) {
+        setKonvaShapes(elements.konvaShapes);
+      }
+      if (elements.stageFrames?.length > 0) {
+        setStageFrames(elements.stageFrames);
+      }
+      if (elements.images?.length > 0) {
+        setImages(elements.images);
+      }
+      if (elements.connections?.length > 0) {
+        setConnections(elements.connections);
+      }
+      if (elements.lines?.length > 0) {
+        setLines(elements.lines);
+      }
+
+      setHasLoaded(true);
+      console.log("Board fully restored with correct zoom/pan");
+    } catch (error) {
+      console.error("Error loading board elements:", error);
+    }
+  };
+
+  loadSavedElements();
+}, [currentBoardId, isTemporaryBoard, hasLoaded]);
 
   // Cleanup
   useEffect(() => {
