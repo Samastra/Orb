@@ -438,9 +438,11 @@ useEffect(() => {
       }
 
       setHasLoaded(true);
+      setTimeout(() => autoFitContent(), 100);
       console.log("Board fully restored with correct zoom/pan");
     } catch (error) {
       console.error("Error loading board elements:", error);
+      
     }
   };
 
@@ -794,6 +796,58 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
     setTimeout(handleInteractionEnd, 100);
   }, [calculateViewportCenter, addImage, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
 
+  const autoFitContent = useCallback(() => {
+  if (!stageRef.current) return;
+
+  const stage = stageRef.current;
+  const allFrames = [...stageFrames, ...konvaShapes.filter(s => s.type === 'stage')];
+
+  // If no frames yet, just zoom out a bit for comfort
+  if (allFrames.length === 0) {
+    boardState.setScale(0.7);
+    return;
+  }
+
+  // Find bounding box of all stage frames
+  let minX = Infinity, minY = Infinity;
+  let maxX = -Infinity, maxY = -Infinity;
+
+  allFrames.forEach(frame => {
+
+    if (frame.width === undefined || frame.height === undefined) return;
+
+    minX = Math.min(minX, frame.x);
+    minY = Math.min(minY, frame.y);
+    maxX = Math.max(maxX, frame.x + frame.width);
+    maxY = Math.max(maxY, frame.y + frame.height);
+  });
+
+  const contentWidth = maxX - minX;
+  const contentHeight = maxY - minY;
+
+  const padding = 200; // pixels of breathing room on each side
+  const availableWidth = stage.width() - 2 * padding;
+  const availableHeight = stage.height() - 2 * padding;
+
+  const scaleX = availableWidth / contentWidth;
+  const scaleY = availableHeight / contentHeight;
+  const newScale = Math.min(scaleX, scaleY, 0.9); // never zoom in past 90%
+
+  const finalScale = Math.max(newScale, 0.3); // don’t go too tiny
+
+  // Center the content
+  const centerX = minX + contentWidth / 2;
+  const centerY = minY + contentHeight / 2;
+
+  const newPosX = stage.width() / 2 - centerX * finalScale;
+  const newPosY = stage.height() / 2 - centerY * finalScale;
+
+  boardState.setScale(finalScale);
+  boardState.setPosition({ x: newPosX, y: newPosY });
+
+  console.log("Auto-fit applied:", { finalScale: finalScale.toFixed(2), frames: allFrames.length });
+}, [stageRef, stageFrames, konvaShapes, boardState]);
+
   // Stage dimensions
   const handleApplyStage = useCallback(() => {
     console.log('🎯 Creating stage frame:', tempDimensions);
@@ -826,10 +880,17 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
       }
       setTempDimensions(defaultStageDimensions);
       setTimeout(handleInteractionEnd, 100);
+
+      setTimeout(() => autoFitContent(), 150);
     } else {
       console.log('❌ Invalid stage dimensions');
     }
-  }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction, calculateViewportCenter, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
+  }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction,autoFitContent, calculateViewportCenter, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
+
+
+
+  // Inside BoardPage component, after your other useCallbacks
+
 
   // Keyboard shortcuts - UPDATED FOR MULTI-SELECT
 

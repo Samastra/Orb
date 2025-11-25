@@ -26,5 +26,5 @@ export const shapeOptions = [
   { value: "arrow", label: "Arrow", icon: "/image/line.svg" },
 ];
 
-export const defaultStageDimensions = { width: 100, height: 25 };
+export const defaultStageDimensions = { width: 1280, height: 720 };
 export const defaultBoardInfo = { title: "Untitled Board", category: "" };
