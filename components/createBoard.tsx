@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react' // ADD useEffect
 import {
   Dialog,
   DialogClose,
@@ -21,6 +21,7 @@ interface CreateBoardProps {
   onOpenChange: (open: boolean) => void;
   boardId: string;
   onBoardUpdate?: (updates: { title: string; category: string }) => void; 
+  initialData?: { title: string; category: string }; // ADD THIS PROP
 }
 
 const Category = [
@@ -40,12 +41,20 @@ const Visibility = [
   { value: "private", label: "Private" }
 ]   
 
-const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate }: CreateBoardProps) => {
-  const [title, setTitle] = useState("")
-  const [category, setCategory] = useState("")
+const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate, initialData }: CreateBoardProps) => {
+  const [title, setTitle] = useState(initialData?.title || "") // INITIALIZE WITH initialData
+  const [category, setCategory] = useState(initialData?.category || "") // INITIALIZE WITH initialData
   const [visibility, setVisibility] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { setRecommendations } = useRecommendations()
+
+  // ADD THIS useEffect TO UPDATE FORM WHEN initialData CHANGES
+  useEffect(() => {
+    if (open && initialData) {
+      setTitle(initialData.title || "")
+      setCategory(initialData.category || "")
+    }
+  }, [open, initialData])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,8 +102,8 @@ const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate }: CreateBoard
 
   const handleClose = () => {
     // Reset form when closing
-    setTitle("")
-    setCategory("")
+    setTitle(initialData?.title || "") // RESET TO initialData INSTEAD OF EMPTY
+    setCategory(initialData?.category || "") // RESET TO initialData INSTEAD OF EMPTY
     setVisibility("")
     onOpenChange(false)
   }
@@ -105,10 +114,10 @@ const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate }: CreateBoard
         <form onSubmit={handleSubmit}>
           <DialogHeader className="bg-white/80 backdrop-blur-sm p-6 border-b border-gray-200/80">
             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-              Create Board
+              {initialData ? "Edit Board" : "Create Board"} {/* DYNAMIC TITLE */}
             </DialogTitle>
             <DialogDescription className="text-gray-600 mt-2">
-              Give your board a name and customize its settings to get started.
+              {initialData ? "Update your board details." : "Give your board a name and customize its settings to get started."}
             </DialogDescription>
           </DialogHeader>
           
@@ -160,10 +169,10 @@ const CreateBoard = ({ open, onOpenChange, boardId, onBoardUpdate }: CreateBoard
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Creating...
+                  {initialData ? "Updating..." : "Creating..."} {/* DYNAMIC TEXT */}
                 </div>
               ) : (
-                "Create Board"
+                initialData ? "Update Board" : "Create Board" // DYNAMIC TEXT
               )}
             </Button>
           </DialogFooter>

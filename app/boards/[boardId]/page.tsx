@@ -24,6 +24,9 @@ import { useKonvaTools } from "@/hooks/useKonvaTools";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import FormattingToolbar from "@/components/FormattingToolbar";
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useWebsitePlayer } from '@/hooks/useWebsitePlayer';
+import WebsitePlayerModal from '@/components/WebsitePlayerModal';
+
 // Utils
 import { fetchBoard } from "@/lib/actions/board-actions";
 // import { useWindowSize } from "@/hooks/useWindowSize";
@@ -143,6 +146,14 @@ const BoardPage = () => {
     updateConnection,
     removeConnection,
   } = boardState;
+
+  const {
+  websiteUrl,
+  websiteTitle,
+  isWebsiteOpen,
+  openWebsite,
+  closeWebsite
+} = useWebsitePlayer();
 
     const [editingText, setEditingText] = useState<{
   isEditing: boolean;
@@ -274,6 +285,51 @@ const handleFinishTextEditing = useCallback(() => {
   setHasChanges(true);
 }, [setIsInteracting]);
 
+
+  // Add this function near your other handlers (around line 200-250)
+const copyCleanText = async () => {
+  try {
+    // Get all text content from the whiteboard
+    const allTextElements = [
+      ...reactShapes.filter(shape => shape.type === 'text'),
+      ...konvaShapes.filter(shape => shape.type === 'text'),
+      // Add other text sources as needed
+    ];
+
+    // Extract and clean text
+    const allText = allTextElements
+      .map(element => {
+        let text = '';
+        if ('text' in element) {
+          text = element.text as string;
+        }
+        // Clean the text - remove HTML tags and unwanted content
+        return text
+          .replace(/<[^>]*>/g, '') // Remove HTML tags
+          .replace(/Tip:.*$/g, '') // Remove "Tip: Copy text normally..." lines
+          .replace(/\n\s*\n/g, '\n') // Remove extra blank lines
+          .trim();
+      })
+      .filter(text => text.length > 0) // Remove empty strings
+      .join('\n\n'); // Separate different text elements with blank lines
+
+    if (allText.length === 0) {
+      alert('No text found on the whiteboard to copy.');
+      return;
+    }
+
+    // Copy to clipboard
+    await navigator.clipboard.writeText(allText);
+    
+    // Optional: Show success feedback
+    console.log('✅ Clean text copied to clipboard:', allText);
+    alert('Clean text copied to clipboard!');
+    
+  } catch (error) {
+    console.error('❌ Failed to copy text:', error);
+    alert('Failed to copy text. Please try again.');
+  }
+};
 
   const handleInteractionEnd = useCallback(() => {
   console.log("🖱️ Interaction ended (scaling/dragging/adding)");
@@ -857,23 +913,33 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
     <>
       <div className="relative w-screen h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
         <BoardHeader
-          boardInfo={boardInfo}
-          isTemporaryBoard={isTemporaryBoard}
-          currentBoardId={currentBoardId}
-          showSaveModal={showSaveModal}
-          setShowSaveModal={setShowSaveModal}
-          handleCloseWithoutSave={handleCloseWithoutSave}
-          onAddImageFromRecommendations={handleAddImageFromRecommendations}
-          stageRef={stageRef}
-          onPlayVideo={openVideo}
-          boardElements={{
-            reactShapes,
-            konvaShapes,
-            stageFrames,
-            images,
-            connections
-          }}
-        />
+  boardInfo={boardInfo}
+  isTemporaryBoard={isTemporaryBoard}
+  currentBoardId={currentBoardId}
+  showSaveModal={showSaveModal}
+  setShowSaveModal={setShowSaveModal}
+  handleCloseWithoutSave={handleCloseWithoutSave}
+  onAddImageFromRecommendations={handleAddImageFromRecommendations}
+  stageRef={stageRef}
+  onPlayVideo={openVideo}
+  onOpenWebsite={openWebsite}
+  boardElements={{
+    reactShapes,
+    konvaShapes,
+    stageFrames,
+    images,
+    connections
+  }}
+  // ADD THIS PROP:
+  onBoardUpdate={(updates) => {
+    console.log("🔄 Board title updated from header:", updates);
+    setBoardInfo({
+      title: updates.title,
+      category: updates.category
+    });
+  }}
+  onCopyCleanText={copyCleanText}
+/>
         <Toolbar
           activeTool={activeTool}
           drawingMode={drawingMode}
@@ -1004,6 +1070,13 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
         title={videoTitle}
         isOpen={isVideoOpen}
         onClose={closeVideo}
+      />
+
+      <WebsitePlayerModal
+        url={websiteUrl || ''}
+        title={websiteTitle}
+        isOpen={isWebsiteOpen}
+        onClose={closeWebsite}
       />
 
          {/* {editingText && (

@@ -17,6 +17,7 @@ import ResourceList from "@/components/ResourceList";
 import SaveBoardModal from "@/components/save-modal-board";
 import ChatModal from "@/components/ChatModal";
 import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal";
+import CreateBoard from "@/components/createBoard"; // USE EXISTING COMPONENT
 import { useUser } from "@clerk/nextjs";
 import { 
   Mic, 
@@ -32,7 +33,8 @@ import {
   Sparkles,
   FileImage,
   FileText,
-  Image
+  Image,
+  Edit3
 } from "lucide-react";
 import type { ReactShape, ImageShape, Connection } from "@/types/board-types";
 import type { KonvaShape } from "@/hooks/useShapes";
@@ -58,6 +60,9 @@ interface BoardHeaderProps {
     images: ImageShape[];
     connections: Connection[];
   };
+  onBoardUpdate?: (updates: { title: string; category: string }) => void;
+  onOpenWebsite?: (url: string, title: string) => void;
+  onCopyCleanText?: () => Promise<void>;
 }
 
 const BoardHeader: React.FC<BoardHeaderProps> = ({
@@ -70,41 +75,45 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   handleCloseWithoutSave,
   onAddImageFromRecommendations,
   onPlayVideo, 
-  boardElements
+  boardElements,
+  onOpenWebsite,
+  onBoardUpdate,
+  onCopyCleanText
 }) => {
   const { user } = useUser();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDownloadSubmenuOpen, setIsDownloadSubmenuOpen] = useState(false);
+  const [isEditBoardModalOpen, setIsEditBoardModalOpen] = useState(false); // CHANGED TO USE CREATEBOARD
 
   const handleDownload = async (format: 'png' | 'jpeg' | 'pdf'): Promise<void> => {
-  setIsMenuOpen(false);
-  setIsDownloadSubmenuOpen(false);
-  
-  try {
-    const stage = stageRef?.current;
+    setIsMenuOpen(false);
+    setIsDownloadSubmenuOpen(false);
     
-    if (!stage) {
-      console.error('Stage not found');
-      return;
-    }
+    try {
+      const stage = stageRef?.current;
+      
+      if (!stage) {
+        console.error('Stage not found');
+        return;
+      }
 
-    switch (format) {
-      case 'png':
-        downloadAsImage(stage, 'png');
-        break;
-      case 'jpeg':
-        downloadAsImage(stage, 'jpeg');
-        break;
-      case 'pdf':
-        downloadAsPDF(stage);
-        break;
+      switch (format) {
+        case 'png':
+          downloadAsImage(stage, 'png');
+          break;
+        case 'jpeg':
+          downloadAsImage(stage, 'jpeg');
+          break;
+        case 'pdf':
+          downloadAsPDF(stage);
+          break;
+      }
+    } catch (error) {
+      console.error('Download failed:', error);
     }
-  } catch (error) {
-    console.error('Download failed:', error);
-  }
-};
+  };
 
   return (
     <>
@@ -193,10 +202,19 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                 Orblin
               </div>
               <div className="w-px h-6 bg-gray-300/80"></div>
-              <div className="flex items-center gap-2">
-                <p className="text-gray-700 font-medium">
-                  {boardInfo.title}
-                </p>
+              <div className="flex items-center gap-2 group">
+                {/* EDITABLE TITLE SECTION - UPDATED TO USE CREATEBOARD */}
+                <button
+                  onClick={() => setIsEditBoardModalOpen(true)}
+                  className="flex items-center gap-2 hover:bg-gray-100/80 rounded-lg px-2 py-1 transition-all duration-300 group"
+                  title="Edit board title"
+                >
+                  <p className="text-gray-700 font-medium">
+                    {boardInfo.title}
+                  </p>
+                  <Edit3 className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </button>
+                
                 {boardInfo.category && (
                   <>
                     <span className="text-gray-400">•</span>
@@ -208,7 +226,20 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
               </div>
             </div>
           </div>
+          
           <div className="flex items-center gap-3">
+
+                {onCopyCleanText && (
+              <button 
+                onClick={onCopyCleanText}
+                className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group"
+                title="Copy all text as clean text"
+              >
+                <FileText className="w-4 h-4 text-gray-600 group-hover:text-green-600" />
+              </button>
+            )}
+
+
             <button 
               className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group"
               title="stream feature - Coming soon"
@@ -234,6 +265,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                   boardCategory={boardInfo.category}
                   onAddToBoard={onAddImageFromRecommendations}
                   onPlayVideo={onPlayVideo}
+                  onOpenWebsite={onOpenWebsite} 
                 />
               </SheetContent>
             </Sheet>
@@ -316,6 +348,24 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
         onClose={() => setIsShareModalOpen(false)}
         boardId={currentBoardId}
         boardTitle={boardInfo.title}
+      />
+
+      {/* USE THE EXISTING CREATEBOARD MODAL FOR EDITING */}
+      <CreateBoard 
+        open={isEditBoardModalOpen}
+        onOpenChange={setIsEditBoardModalOpen}
+        boardId={currentBoardId}
+        initialData={{
+          title: boardInfo.title,
+          category: boardInfo.category
+        }}
+        onBoardUpdate={(updates) => {
+          console.log("🔄 Board info updated from edit modal:", updates);
+          if (onBoardUpdate) {
+            onBoardUpdate(updates);
+          }
+          setIsEditBoardModalOpen(false);
+        }}
       />
     </>
   );

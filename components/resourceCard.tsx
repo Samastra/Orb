@@ -20,6 +20,7 @@ type ResourceCardProps = {
   type: "book" | "video" | "photo" | "vector" | "website";
   onAddToBoard?: (imageUrl: string, altText: string) => void;
   onPlayVideo?: (videoId: string, title: string) => void;
+  onOpenWebsite?: (url: string, title: string) => void;
 };
 
 const ResourceCard = ({
@@ -31,38 +32,47 @@ const ResourceCard = ({
   type,
   onAddToBoard,
   onPlayVideo,
+  onOpenWebsite,
+  
 }: ResourceCardProps) => {
   const [imageError, setImageError] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  e.preventDefault();
+  e.stopPropagation();
 
-    if ((type === "photo" || type === "vector") && image && onAddToBoard) {
-      console.log("🎯 Adding image to board:", image);
-      onAddToBoard(image, alt);
-      return;
-    }
+  if ((type === "photo" || type === "vector") && image && onAddToBoard) {
+    console.log("🎯 Adding image to board:", image);
+    onAddToBoard(image, alt);
+    return;
+  }
 
-    if (type === "video" && onPlayVideo && url) {
-      const extractYouTubeId = (url: string): string | null => {
-        const regExp =
-          /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-        const match = url.match(regExp);
-        return match && match[7].length === 11 ? match[7] : null;
-      };
-      const videoId = extractYouTubeId(url);
-      if (videoId) {
-        console.log("🎬 Playing video in modal:", videoId);
-        onPlayVideo(videoId, heading);
-      }
-      return;
+  if (type === "video" && onPlayVideo && url) {
+    const extractYouTubeId = (url: string): string | null => {
+      const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+      const match = url.match(regExp);
+      return match && match[7].length === 11 ? match[7] : null;
+    };
+    const videoId = extractYouTubeId(url);
+    if (videoId) {
+      console.log("🎬 Playing video in modal:", videoId);
+      onPlayVideo(videoId, heading);
     }
+    return;
+  }
 
-    if (url && type !== "video") {
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
-  };
+  // NEW: Handle website modal opening
+  if (type === "website" && onOpenWebsite && url) {
+    console.log("🌐 Opening website in modal:", url);
+    onOpenWebsite(url, heading);
+    return;
+  }
+
+  // Fallback: open in new tab for other types
+  if (url && type !== "video" && type !== "website") {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+};
 
   const getTypeIcon = () => {
     switch (type) {

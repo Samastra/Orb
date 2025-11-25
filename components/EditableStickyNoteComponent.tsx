@@ -1,7 +1,6 @@
-import React, { useRef, forwardRef, useImperativeHandle, useState } from "react";
-import { Group, Rect } from "react-konva";
+import React, { useRef, forwardRef, useState } from "react";
+import { Group, Rect, Text } from "react-konva";
 import Konva from "konva";
-import TextComponent from "./TextComponent"; // Updated import
 
 interface StickyNoteProps {
   shapeData: {
@@ -15,13 +14,6 @@ interface StickyNoteProps {
     text?: string;
     fontSize?: number;
     fontFamily?: string;
-    fontWeight?: string;
-    fontStyle?: string;
-    textDecoration?: string;
-    align?: string;
-    letterSpacing?: number;
-    lineHeight?: number;
-    textTransform?: string;
   };
   isSelected: boolean;
   activeTool: string | null;
@@ -30,18 +22,14 @@ interface StickyNoteProps {
   onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
-  onTransformEnd?: (e: Konva.KonvaEventObject<Event>) => void;
 }
 
-const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
-  ({ shapeData, isSelected, activeTool, onSelect, onUpdate, onDragStart, onDragMove, onDragEnd, onTransformEnd }, ref) => {
+const StickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
+  ({ shapeData, isSelected, activeTool, onSelect, onUpdate, onDragStart, onDragMove, onDragEnd }, ref) => {
     const groupRef = useRef<Konva.Group>(null);
-    const [isTextEditing, setIsTextEditing] = useState(false);
-    
-    useImperativeHandle(ref, () => groupRef.current as Konva.Group);
+    const [isEditing, setIsEditing] = useState(false);
     
     const {
-      id,
       x,
       y,
       width = 200,
@@ -51,120 +39,120 @@ const EditableStickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
       text = "Double click to edit...",
       fontSize = 14,
       fontFamily = "Arial",
-      fontWeight = "normal",
-      fontStyle = "normal",
-      textDecoration = "none",
-      align = "left",
-      letterSpacing = 0,
-      lineHeight = 1.4,
-      textTransform = "none"
     } = shapeData;
 
-    const handleTextUpdate = (textAttrs: Record<string, unknown>) => {
-      onUpdate({
-        ...shapeData,
-        ...textAttrs
-      });
-    };
-
-    const handlePositionUpdate = (positionAttrs: { x?: number; y?: number }) => {
-      onUpdate({
-        ...shapeData,
-        x: positionAttrs.x !== undefined ? positionAttrs.x : x,
-        y: positionAttrs.y !== undefined ? positionAttrs.y : y
-      });
-    };
-
-    const handleGroupDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-      onUpdate({
-        ...shapeData,
-        x: e.target.x(),
-        y: e.target.y()
-      });
-      // Call external onDragEnd if provided
-      if (onDragEnd) {
-        onDragEnd(e);
+    const handleDoubleClick = () => {
+      if (activeTool === "select") {
+        setIsEditing(true);
+        
+        // Create a textarea for editing
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.top = '0';
+        textarea.style.left = '0';
+        textarea.style.fontSize = `${fontSize}px`;
+        textarea.style.fontFamily = fontFamily;
+        textarea.style.color = textColor;
+        textarea.style.background = 'transparent';
+        textarea.style.border = 'none';
+        textarea.style.outline = 'none';
+        textarea.style.zIndex = '9999';
+        textarea.style.width = `${width - 20}px`;
+        textarea.style.height = `${height - 20}px`;
+        textarea.style.padding = '10px';
+        textarea.style.background = backgroundColor;
+        
+        document.body.appendChild(textarea);
+        
+        // Position the textarea over the sticky note
+        const stage = groupRef.current?.getStage();
+        if (stage) {
+          const absPos = groupRef.current?.getAbsolutePosition();
+          if (absPos) {
+            textarea.style.left = `${absPos.x + 10}px`;
+            textarea.style.top = `${absPos.y + 10}px`;
+          }
+        }
+        
+        textarea.focus();
+        textarea.select();
+        
+        const handleBlur = () => {
+          // Update the text
+          onUpdate({
+            ...shapeData,
+            text: textarea.value
+          });
+          
+          // Clean up
+          document.body.removeChild(textarea);
+          setIsEditing(false);
+          textarea.removeEventListener('blur', handleBlur);
+        };
+        
+        textarea.addEventListener('blur', handleBlur);
+        
+        // Also handle Enter key to finish editing
+        const handleKeyDown = (e: KeyboardEvent) => {
+          if (e.key === 'Enter' && e.ctrlKey) {
+            handleBlur();
+          }
+        };
+        
+        textarea.addEventListener('keydown', handleKeyDown);
       }
-    };
-
-    const handleGroupTransformEnd = (e: Konva.KonvaEventObject<Event>) => {
-      // Call external onTransformEnd if provided
-      if (onTransformEnd) {
-        onTransformEnd(e);
-      }
-    };
-
-    const handleStartEditing = () => {
-      setIsTextEditing(true);
-    };
-
-    const handleFinishEditing = () => {
-      setIsTextEditing(false);
     };
 
     return (
       <Group
-        ref={groupRef}
+        ref={(node) => {
+          groupRef.current = node;
+          if (typeof ref === 'function') {
+            ref(node);
+          } else if (ref) {
+            ref.current = node;
+          }
+        }}
         x={x}
         y={y}
-        draggable={activeTool === "select" && !isTextEditing}
+        draggable={activeTool === "select" && !isEditing}
         onClick={onSelect}
+        onDblClick={handleDoubleClick}
+        onDblTap={handleDoubleClick}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
-        onDragEnd={handleGroupDragEnd}
-        onTransformEnd={handleGroupTransformEnd}
-        onTap={onSelect}       
-        transformsEnabled={"all"}
+        onDragEnd={onDragEnd}
       >
         <Rect
           width={width}
           height={height}
           fill={backgroundColor}
-          stroke="#d4b500"
-          strokeWidth={1}
-          shadowBlur={isSelected ? 10 : 5}
+          stroke={isSelected ? "#007AFF" : "#d4b500"}
+          strokeWidth={isSelected ? 3 : 1}
+          shadowBlur={5}
           shadowColor="rgba(0,0,0,0.2)"
           shadowOffsetX={2}
           shadowOffsetY={2}
           cornerRadius={8}
-          transformsEnabled={"all"}
         />
         
-        <TextComponent
-          id={id}
+        <Text
           x={10}
           y={10}
           text={text}
           fontSize={fontSize}
           fill={textColor}
           fontFamily={fontFamily}
-          fontWeight={fontWeight}
-          fontStyle={fontStyle}
-          align={align as "left" | "center" | "right"}
           width={width - 20}
-          rotation={0}
-          isSelected={isSelected}
-          isEditing={isTextEditing}
-          activeTool={activeTool}
-          onSelect={onSelect}
-          onUpdate={(attrs) => {
-            if (attrs.x !== undefined || attrs.y !== undefined) {
-              handlePositionUpdate(attrs);
-            } else {
-              handleTextUpdate(attrs);
-            }
-          }}
-          onStartEditing={handleStartEditing}
-          onFinishEditing={handleFinishEditing}
-          onDragStart={onDragStart}
-          onDragMove={onDragMove}
-          onDragEnd={onDragEnd}
-          onTransformEnd={onTransformEnd}
+          height={height - 20}
+          wrap="word"
+          listening={false} // Text doesn't intercept clicks
         />
       </Group>
     );
   }
 );
 
-EditableStickyNoteComponent.displayName = "EditableStickyNoteComponent";
-export default EditableStickyNoteComponent;
+StickyNoteComponent.displayName = "StickyNoteComponent";
+export default StickyNoteComponent;

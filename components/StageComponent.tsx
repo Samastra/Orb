@@ -963,7 +963,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     onDragStart={commonDragProps.onDragStart}
                     onDragMove={commonDragProps.onDragMove}
                     onDragEnd={commonDragProps.onDragEnd}
-                    onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
+                   
                   />
                 );
               } else {
@@ -993,7 +993,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
             ref={trRef}
             enabledAnchors={[
               "top-left", "top-right",
-              "bottom-left", "bottom-right"
+              "bottom-left", "bottom-right","top-center", "bottom-center",
+              "middle-left", "middle-right"
             ]}
             boundBoxFunc={(oldBox, newBox) => {
               if (selectedNodeIds.length > 1) {

@@ -14,7 +14,7 @@ interface UserData {
   username?: string;
   fullName?: string;
   imageUrl?: string;
-  email?: string;
+  email?: string; 
 }
 
 export const fetchBoard = async (boardId: string) => {

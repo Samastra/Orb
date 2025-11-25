@@ -12,6 +12,7 @@ import { getUserBoards } from "@/lib/actions/board-actions";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 
+
 interface Resource {
   id: string;
   heading: string;
@@ -47,6 +48,7 @@ interface ResourceListProps {
   boardCategory?: string;
   onAddToBoard?: (imageUrl: string, altText: string) => void;
   onPlayVideo?: (videoId: string, title: string) => void;
+  onOpenWebsite?: (url: string, title: string) => void;
   boardElements?: {
     reactShapes: unknown[];
     konvaShapes: unknown[]; 
@@ -74,6 +76,7 @@ const ResourceList = ({
   boardCategory,
   onAddToBoard,
   onPlayVideo,
+  onOpenWebsite,
   boardElements,
 }: ResourceListProps) => {
   const { recommendations, setRecommendations, hasCachedRecommendations } = useRecommendations();
@@ -89,6 +92,7 @@ const ResourceList = ({
   const [boards, setBoards] = useState<Board[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  
 
   useEffect(() => {
     const fetchBoards = async () => {
@@ -364,6 +368,7 @@ const ResourceList = ({
               url={getResourceUrl(resource)}
               onAddToBoard={onAddToBoard}
               onPlayVideo={onPlayVideo}
+              onOpenWebsite={onOpenWebsite}
             />
           ))}
           {hasMore && (
@@ -390,6 +395,7 @@ const ResourceList = ({
           url={getResourceUrl(resource)}
           onAddToBoard={onAddToBoard}
           onPlayVideo={onPlayVideo}
+          onOpenWebsite={onOpenWebsite} // ✅ FIXED: Added this line
         />
       </div>
     ));
@@ -575,7 +581,8 @@ const ResourceList = ({
           </div>
         </Tabs>
       </div>
-    </div>
+      
+       </div>
   );
 };
 
