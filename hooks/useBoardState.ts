@@ -64,13 +64,7 @@ export const useBoardState = () => {
   // UPDATED: Connections state with proper typing
   const [connections, setConnections] = useState<Connection[]>([]);
 
-    const [scale, setScale] = useState(() => {
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem("lastScale");
-    return saved ? parseFloat(saved) : 1;
-  }
-  return 1;
-});
+
   // NEW: Add connection function
   const addConnection = useCallback((connectionData: Omit<Connection, 'id' | 'type'>, addAction: (action: Action) => void) => {
     const connectionId = `connection-${Date.now()}`;
