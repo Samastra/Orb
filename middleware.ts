@@ -8,11 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/terms',
   '/privacy', 
   '/refunds',
-  '/api/recommendations/search',
-  '/api/recommendations/books',
-  '/api/recommendations/videos', 
-  '/api/recommendations/images',
-  '/api/recommendations/websites',
+  "/api/chat",
   '/boards/new',
   '/boards',
   '/boards/(.*)',         // ← Allow accessing any board without auth

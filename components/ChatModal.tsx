@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Copy } from "lucide-react";
+import { MessageSquare, Copy, AlertCircle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 interface ChatModalProps {
@@ -17,7 +17,7 @@ interface ChatModalProps {
 }
 
 interface Message {
-  role: "user" | "ai";
+  role: "user" | "ai" | "error";
   content: string;
 }
 
@@ -39,11 +39,31 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: input }),
       });
+      
       const data = await response.json();
-      const aiMessage: Message = { role: "ai", content: data.response || "Sorry, something went wrong." };
+      
+      if (!response.ok) {
+        // Handle API errors (401, 429, 500, etc.)
+        const errorMessage: Message = { 
+          role: "error", 
+          content: `Error ${response.status}: ${data.error || "Unknown error"}` 
+        };
+        setMessages([...messages, userMessage, errorMessage]);
+        return;
+      }
+      
+      const aiMessage: Message = { 
+        role: "ai", 
+        content: data.response || "Sorry, I couldn't generate a response." 
+      };
       setMessages([...messages, userMessage, aiMessage]);
+      
     } catch (error) {
-      const errorMessage: Message = { role: "ai", content: "Error: Could not connect to AI service." };
+      console.error("Network error:", error);
+      const errorMessage: Message = { 
+        role: "error", 
+        content: "Network error: Could not connect to AI service. Check your internet connection." 
+      };
       setMessages([...messages, userMessage, errorMessage]);
     } finally {
       setIsLoading(false);
@@ -76,9 +96,17 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose }) => {
                 className={`max-w-[80%] p-3 rounded-lg ${
                   msg.role === "user"
                     ? "bg-blue-600 text-white"
+                    : msg.role === "error"
+                    ? "bg-red-100 text-red-700 border border-red-300"
                     : "bg-gray-100 text-gray-700"
                 }`}
               >
+                {msg.role === "error" && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="font-medium">Error</span>
+                  </div>
+                )}
                 {msg.role === "user" ? (
                   msg.content
                 ) : (
@@ -108,16 +136,19 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, onClose }) => {
             </div>
           ))}
           {isLoading && (
-            <div className="text-gray-500 text-sm text-center">Loading...</div>
+            <div className="flex justify-center">
+              <div className="text-gray-500 text-sm">Orb is thinking...</div>
+            </div>
           )}
         </div>
-        <DialogFooter>
+        <DialogFooter className="flex gap-2">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your question..."
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            className="border-gray-300 focus:border-blue-500"
+            className="flex-1 border-gray-300 focus:border-blue-500"
+            disabled={isLoading}
           />
           <Button
             onClick={handleSend}
