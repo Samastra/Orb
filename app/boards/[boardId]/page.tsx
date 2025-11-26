@@ -378,6 +378,39 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
   console.log('✅ Text created and set to editing mode');
 }, [setReactShapes, setSelectedNodeIds, setActiveTool]);
 
+    // AUTO-SAVE ON ANY POSITION CHANGE — NEVER MISS A DRAG AGAIN
+useEffect(() => {
+  if (!currentBoardId || isTemporaryBoard || !user) return;
+
+  const timeout = setTimeout(() => {
+    triggerSave({
+      reactShapes,
+      konvaShapes,
+      stageFrames,
+      images,
+      connections,
+      lines,
+      scale,
+      position,
+    });
+  }, 2000); // 2 seconds after last move
+
+  return () => clearTimeout(timeout);
+}, [
+  reactShapes,
+  konvaShapes,
+  stageFrames,
+  images,
+  connections,
+  lines,
+  scale,
+  position,
+  currentBoardId,
+  isTemporaryBoard,
+  user,
+  triggerSave,
+]);
+
   // Fetch board data and initialize boardInfo
   useEffect(() => {
     const loadBoardData = async () => {
@@ -405,32 +438,31 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
 useEffect(() => {
   if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
 
-  const loadSavedElements = async () => {
+  const load = async () => {
     try {
       const elements = await loadBoardElements(currentBoardId);
 
-      // 1. Restore camera FIRST
-      if (elements.stageState?.scale && elements.stageState?.position) {
-        boardState.setScale(elements.stageState.scale);
-        boardState.setPosition(elements.stageState.position);
+      // Restore camera first
+      if (elements.stageState) {
+        boardState.setScale(elements.stageState.scale ?? 1);
+        boardState.setPosition(elements.stageState.position ?? { x: 0, y: 0 });
       }
 
-      // 2. Load shapes with null-safety — THIS IS THE CRITICAL FIX
-      setReactShapes(prev => elements.reactShapes ?? prev);
-      setKonvaShapes(prev => elements.konvaShapes ?? prev);
-      setStageFrames(prev => elements.stageFrames ?? prev);
-      setImages(prev => elements.images ?? prev);
-      setConnections(prev => elements.connections ?? prev);
-      setLines(prev => elements.lines ?? prev);
+      // Merge safely — preserve what we have if DB is missing data
+      setReactShapes(elements.reactShapes ?? []);
+      setKonvaShapes(elements.konvaShapes ?? []);
+      setStageFrames(elements.stageFrames ?? []);
+      setImages(elements.images ?? []);
+      setConnections(elements.connections ?? []);
+      setLines(elements.lines ?? []);
 
       setHasLoaded(true);
-      console.log("Board loaded perfectly — positions preserved");
-    } catch (error) {
-      console.error("Failed to load board", error);
+    } catch (e) {
+      console.error("Load failed", e);
     }
   };
 
-  loadSavedElements();
+  load();
 }, [currentBoardId, isTemporaryBoard, hasLoaded]);
 
   // Cleanup
