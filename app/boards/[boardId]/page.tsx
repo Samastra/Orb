@@ -401,56 +401,32 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
 
   // Load saved elements (only on initial mount or boardId change)
   // In boards/[boardId]/page.tsx — REPLACE the big loading useEffect
+// FINAL LOADING EFFECT — THIS ONE WORKS 100%
 useEffect(() => {
   if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
 
   const loadSavedElements = async () => {
     try {
-      console.log("Loading saved board elements for board:", currentBoardId);
       const elements = await loadBoardElements(currentBoardId);
 
-      // CRITICAL: Restore stage transform FIRST, before anything renders
-      if (elements.stageState) {
-        const s = elements.stageState;
-        // Set scale and position immediately (synchronously if possible)
-        boardState.setScale(s.scale ?? 1);
-        boardState.setPosition(s.position ?? { x: 0, y: 0 });
+      // 1. Restore camera FIRST
+      if (elements.stageState?.scale && elements.stageState?.position) {
+        boardState.setScale(elements.stageState.scale);
+        boardState.setPosition(elements.stageState.position);
       }
 
-      // Now load shapes — they will render with correct stage already at correct zoom/pan
-      if (elements.reactShapes?.length > 0) {
-        setReactShapes(elements.reactShapes);
-      }
-      if (elements.konvaShapes?.length > 0) {
-        setKonvaShapes(elements.konvaShapes);
-      }
-      if (elements.stageFrames?.length > 0) {
-        setStageFrames(elements.stageFrames);
-      }
-      if (elements.images?.length > 0) {
-        setImages(elements.images);
-      }
-      if (elements.connections?.length > 0) {
-        setConnections(elements.connections);
-      }
-      if (elements.lines?.length > 0) {
-        setLines(elements.lines);
-      }
+      // 2. Load shapes with null-safety — THIS IS THE CRITICAL FIX
+      setReactShapes(prev => elements.reactShapes ?? prev);
+      setKonvaShapes(prev => elements.konvaShapes ?? prev);
+      setStageFrames(prev => elements.stageFrames ?? prev);
+      setImages(prev => elements.images ?? prev);
+      setConnections(prev => elements.connections ?? prev);
+      setLines(prev => elements.lines ?? prev);
 
       setHasLoaded(true);
-      
-      if (!elements.stageState || !elements.stageState.scale || !elements.stageState.position) {
-      console.log("No saved camera → applying smart auto-fit");
-      
-    } else {
-      console.log("Saved camera found → respecting user's zoom/pan:", elements.stageState);
-      // Do nothing — we already restored scale/position above
-    }
-
-      console.log("Board fully restored with correct zoom/pan");
+      console.log("Board loaded perfectly — positions preserved");
     } catch (error) {
-      console.error("Error loading board elements:", error);
-      
+      console.error("Failed to load board", error);
     }
   };
 

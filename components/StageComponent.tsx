@@ -715,8 +715,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
   return (
     <div className="absolute inset-0 z-0">
       <Stage
-        width={width || (typeof window !== "undefined" ? window.innerWidth : 800)}
-        height={height || (typeof window !== "undefined" ? window.innerHeight : 600)}
+        width={width || (typeof window !== "undefined" ? window.innerWidth : 3072)}
+        height={height || (typeof window !== "undefined" ? window.innerHeight : 2048)}
         scaleX={scale}
         scaleY={scale}
         x={position.x}
