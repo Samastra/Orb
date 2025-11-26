@@ -9,22 +9,31 @@ import { Connection } from "@/hooks/useBoardState";
 type Line = { tool: "brush" | "eraser"; points: number[] };
 
 // Utility for deep equality comparison
-const areEqual = (obj1: any, obj2: any): boolean => {
+const areEqual = (obj1: unknown, obj2: unknown): boolean => {
   if (obj1 === obj2) return true;
   if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 == null || obj2 == null) {
     return obj1 === obj2;
   }
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
+  
+  const obj1Record = obj1 as Record<string, unknown>;
+  const obj2Record = obj2 as Record<string, unknown>;
+  
+  const keys1 = Object.keys(obj1Record);
+  const keys2 = Object.keys(obj2Record);
   if (keys1.length !== keys2.length) return false;
+  
   for (const key of keys1) {
     if (!keys2.includes(key)) return false;
-    if (Array.isArray(obj1[key]) && Array.isArray(obj2[key])) {
-      if (obj1[key].length !== obj2[key].length) return false;
-      for (let i = 0; i < obj1[key].length; i++) {
-        if (!areEqual(obj1[key][i], obj2[key][i])) return false;
+    
+    const val1 = obj1Record[key];
+    const val2 = obj2Record[key];
+    
+    if (Array.isArray(val1) && Array.isArray(val2)) {
+      if (val1.length !== val2.length) return false;
+      for (let i = 0; i < val1.length; i++) {
+        if (!areEqual(val1[i], val2[i])) return false;
       }
-    } else if (!areEqual(obj1[key], obj2[key])) {
+    } else if (!areEqual(val1, val2)) {
       return false;
     }
   }

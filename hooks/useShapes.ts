@@ -14,7 +14,6 @@ export interface KonvaShape {
   points?: number[];
   fill: string;
   draggable: boolean;
-  // REMOVED: zIndex?: number; - We're using array order now
   stroke?: string;
   strokeWidth?: number;
   cornerRadius?: number;

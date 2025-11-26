@@ -50,27 +50,37 @@ function isPointNearLine(
   return false;
 }
 // Normalize Connection to ensure all required properties
-const normalizeConnection = (connection: Connection): Connection => ({
+// In useKonvaTools.ts, update the normalizeConnection function:
+
+// Normalize Connection to ensure all required properties
+const normalizeConnection = (connection: Partial<Connection> & { id: string }): Connection => ({
   id: connection.id,
   type: "connection",
   from: {
-    x: connection.from.x ?? 0,
-    y: connection.from.y ?? 0,
-    nodeId: connection.from.nodeId ?? null,
+    x: connection.from?.x ?? 0,
+    y: connection.from?.y ?? 0,
+    nodeId: connection.from?.nodeId ?? null,
   },
   to: {
-    x: connection.to.x ?? 0,
-    y: connection.to.y ?? 0,
-    nodeId: connection.to.nodeId ?? null,
+    x: connection.to?.x ?? 0,
+    y: connection.to?.y ?? 0,
+    nodeId: connection.to?.nodeId ?? null,
   },
-  cp1x: connection.cp1x ?? connection.from.x,
-  cp1y: connection.cp1y ?? connection.from.y,
-  cp2x: connection.cp2x ?? connection.to.x,
-  cp2y: connection.cp2y ?? connection.to.y,
+  cp1x: connection.cp1x ?? connection.from?.x ?? 0,
+  cp1y: connection.cp1y ?? connection.from?.y ?? 0,
+  cp2x: connection.cp2x ?? connection.to?.x ?? 0,
+  cp2y: connection.cp2y ?? connection.to?.y ?? 0,
   stroke: connection.stroke ?? "#333",
   strokeWidth: connection.strokeWidth ?? 2,
   draggable: connection.draggable ?? false,
+  // x and y are optional, so we don't need to provide them
+  x: connection.x,
+  y: connection.y,
+  rotation: connection.rotation,
 });
+
+
+
 export const useKonvaTools = (
   stageRef: React.RefObject<Konva.Stage | null>,
   activeTool: Tool | null,
@@ -433,6 +443,8 @@ const handleSelectionEnd = useCallback(
     tempGroupRef.current = group;
     startAnchorRef.current = startAnchor;
     endAnchorRef.current = endAnchor;
+
+
     const connectionData: Connection = normalizeConnection({
       id: group.id(),
       type: "connection",
@@ -445,6 +457,9 @@ const handleSelectionEnd = useCallback(
       stroke: "#333",
       strokeWidth: 2,
       draggable: false,
+      // Add x and y if they're required, or remove if they're optional
+      x: (startAnchor.x() + endAnchor.x()) / 2,
+      y: (startAnchor.y() + endAnchor.y()) / 2,
     });
     console.log("✅ Connection added to state:", connectionData);
     setConnections(prev => [...prev, connectionData]);
@@ -453,6 +468,8 @@ const handleSelectionEnd = useCallback(
     setSelectedNodeIds([group.id()]); // FIXED: Use setSelectedNodeIds with array
     console.log('✅ Connection created and set to editing mode');
   }, [stageRef, scale, position, setConnectionStart, setIsConnecting, setTempConnection, setSelectedNodeIds, computeSmartControlPoints, buildPathData, setConnections, addAction, updateConnection]);
+ 
+ 
   const cleanupConnection = useCallback(() => {
     tempGroupRef.current = null;
     startAnchorRef.current = null;

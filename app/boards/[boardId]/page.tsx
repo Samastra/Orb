@@ -6,8 +6,9 @@ import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useParams } from "next/navigation";
-import { ReactShape, Tool } from "@/types/board-types";
+import { ReactShape, Tool,ImageShape } from "@/types/board-types";
 import { defaultStageDimensions } from "@/constants/tool-constants";
+import { Connection } from "@/hooks/useBoardState";
 // Components
 import Toolbar from "@/components/Toolbar";
 import BoardHeader from "@/components/BoardHeader";
@@ -18,6 +19,7 @@ import VideoPlayerModal from '@/components/VideoPlayerModal';
 import TextCreateTool from "@/components/TextCreateTool";
 // import QuillTextEditor from "@/components/QuillTextEditor";
 // Hooks
+import {KonvaShape} from "@/hooks/useShapes";
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { useBoardState } from "@/hooks/useBoardState";
 import { useKonvaTools } from "@/hooks/useKonvaTools";
@@ -252,31 +254,7 @@ const handleFinishTextEditing = useCallback(() => {
           }
         }, 10000);
 
-  // Periodic auto-save (every 5 minutes)
-  useEffect(() => {
-    if (!currentBoardId || isTemporaryBoard || !user) return;
-
-    const interval = setInterval(() => {
-      if (hasChanges) {
-        console.log("⏲️ Periodic auto-save triggered (5min)");
-        triggerSave({
-          reactShapes,
-          konvaShapes,
-          stageFrames,
-          images,
-          connections,
-          lines,
-          scale,
-          position,
-        });
-        setHasChanges(false); // Reset after saving
-      } else {
-        console.log("⏲️ No changes detected, skipping periodic auto-save");
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => clearInterval(interval); // Cleanup
-  }, [currentBoardId, isTemporaryBoard, user, hasChanges, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position]);
+ 
 
   // Track interactions for scaling, dragging, and adding elements
   const handleInteractionStart = useCallback(() => {
@@ -285,6 +263,102 @@ const handleFinishTextEditing = useCallback(() => {
   setHasChanges(true);
 }, [setIsInteracting]);
 
+  
+
+    // Unified shape updater — replaces debouncedUpdateShape completely
+// Unified shape updater — type-safe version
+// Unified shape updater — simplified type-safe version
+const updateAnyShape = useCallback((
+  id: string,
+  updates: Partial<ReactShape | KonvaShape | ImageShape | Connection>
+) => {
+  let updated = false;
+
+  // Create a safe updates object with only properties that exist in updates
+  const safeUpdates: Record<string, unknown> = {};
+  
+  // Only include properties that actually exist in the updates object
+  if ('x' in updates && updates.x !== undefined) safeUpdates.x = updates.x;
+  if ('y' in updates && updates.y !== undefined) safeUpdates.y = updates.y;
+  if ('rotation' in updates && updates.rotation !== undefined) safeUpdates.rotation = updates.rotation;
+  if ('fill' in updates && updates.fill !== undefined) safeUpdates.fill = updates.fill;
+  if ('stroke' in updates && updates.stroke !== undefined) safeUpdates.stroke = updates.stroke;
+  if ('strokeWidth' in updates && updates.strokeWidth !== undefined) safeUpdates.strokeWidth = updates.strokeWidth;
+  if ('width' in updates && updates.width !== undefined) safeUpdates.width = updates.width;
+  if ('height' in updates && updates.height !== undefined) safeUpdates.height = updates.height;
+  if ('fontSize' in updates && updates.fontSize !== undefined) safeUpdates.fontSize = updates.fontSize;
+  if ('fontFamily' in updates && updates.fontFamily !== undefined) safeUpdates.fontFamily = updates.fontFamily;
+
+  // React-managed shapes (text, sticky notes)
+  if (reactShapes.some(s => s.id === id)) {
+    setReactShapes(prev => prev.map(s => 
+      s.id === id ? { ...s, ...safeUpdates } : s
+    ));
+    updated = true;
+  }
+
+  // Konva-managed shapes (rect, circle, triangle, etc.)
+  if (konvaShapes.some(s => s.id === id)) {
+    setKonvaShapes(prev => prev.map(s => 
+      s.id === id ? { ...s, ...safeUpdates } : s
+    ));
+    updated = true;
+  }
+
+  // Images
+  if (images.some(i => i.id === id)) {
+    setImages(prev => prev.map(i => 
+      i.id === id ? { ...i, ...safeUpdates } : i
+    ));
+    updated = true;
+  }
+
+  // Stage frames
+  if (stageFrames.some(f => f.id === id)) {
+    setStageFrames(prev => prev.map(f => 
+      f.id === id ? { ...f, ...safeUpdates } : f
+    ));
+    updated = true;
+  }
+
+  // Connections (stroke, etc.)
+  if (connections.some(c => c.id === id)) {
+    // For connections, we need to handle connection-specific properties
+    const connectionUpdates: Partial<Connection> = { ...safeUpdates };
+    
+    // Add connection-specific properties if they exist
+    if ('from' in updates) connectionUpdates.from = updates.from as Connection['from'];
+    if ('to' in updates) connectionUpdates.to = updates.to as Connection['to'];
+    if ('cp1x' in updates) connectionUpdates.cp1x = updates.cp1x as number;
+    if ('cp1y' in updates) connectionUpdates.cp1y = updates.cp1y as number;
+    if ('cp2x' in updates) connectionUpdates.cp2x = updates.cp2x as number;
+    if ('cp2y' in updates) connectionUpdates.cp2y = updates.cp2y as number;
+    
+    updateConnection(id, connectionUpdates);
+    updated = true;
+  }
+
+  if (updated) {
+    setHasChanges(true);
+  }
+}, [
+  reactShapes,
+  konvaShapes,
+  images,
+  stageFrames,
+  connections,
+  setReactShapes,
+  setKonvaShapes,
+  setImages,
+  setStageFrames,
+  updateConnection,
+]);
+
+
+    const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<ShapeAttributes>) => {
+  if (!id) return;
+  updateAnyShape(id, attrs);
+}, [updateAnyShape]);
 
   // Add this function near your other handlers (around line 200-250)
 const copyCleanText = async () => {
@@ -379,37 +453,7 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
 }, [setReactShapes, setSelectedNodeIds, setActiveTool]);
 
     // AUTO-SAVE ON ANY POSITION CHANGE — NEVER MISS A DRAG AGAIN
-useEffect(() => {
-  if (!currentBoardId || isTemporaryBoard || !user) return;
 
-  const timeout = setTimeout(() => {
-    triggerSave({
-      reactShapes,
-      konvaShapes,
-      stageFrames,
-      images,
-      connections,
-      lines,
-      scale,
-      position,
-    });
-  }, 2000); // 2 seconds after last move
-
-  return () => clearTimeout(timeout);
-}, [
-  reactShapes,
-  konvaShapes,
-  stageFrames,
-  images,
-  connections,
-  lines,
-  scale,
-  position,
-  currentBoardId,
-  isTemporaryBoard,
-  user,
-  triggerSave,
-]);
 
   // Fetch board data and initialize boardInfo
   useEffect(() => {
@@ -466,18 +510,6 @@ useLayoutEffect(() => {
 
 
   // Force-save drags (1s debounce)
-useEffect(() => {
-  if (!currentBoardId || isTemporaryBoard || !user) return;
-
-  const timer = setTimeout(() => {
-    triggerSave({
-      reactShapes, konvaShapes, stageFrames, images, connections, lines,
-      scale, position,
-    });
-  }, 1000);
-
-  return () => clearTimeout(timer);
-}, [reactShapes, konvaShapes, stageFrames, images, connections, lines]);  // Watch position changes
 
   // Cleanup
   useEffect(() => {
@@ -547,102 +579,19 @@ useEffect(() => {
   }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd, boardState]);
 
   // Replace the useDebounce call:
-const debouncedUpdateShape = useDebounce((args: unknown) => {
-  if (Array.isArray(args) && args.length === 2) {
-    const [shapeId, updates] = args as [string, Partial<ShapeAttributes>];
-    console.log('🔄 Debounced update for:', { shapeId, updates });
-    
-    const isReactShape = reactShapes.some((s) => s.id === shapeId);
-    const isKonvaShape = konvaShapes.some((s) => s.id === shapeId);
-    const isConnection = connections.some((c) => c.id === shapeId);
-    
-    if (isReactShape) {
-      setReactShapes(prev => 
-        prev.map(shape => 
-          shape.id === shapeId ? { ...shape, ...updates } : shape
-        )
-      );
-    } else if (isKonvaShape) {
-      const drawLayer = stageRef.current?.findOne(".draw-layer") as Konva.Layer;
-      if (drawLayer) {
-        const node = drawLayer.findOne(`#${shapeId}`) as Konva.Shape | Konva.Group;
-        if (node) {
-          const prevAttrs = { ...node.attrs };
-          node.setAttrs(updates);
-          drawLayer.batchDraw();
-          
-          setKonvaShapes(prev =>
-            prev.map(shape =>
-              shape.id === shapeId ? { ...shape, ...updates } : shape
-            )
-          );
-          
-          undoRedoAddAction({
-            type: "update",
-            id: shapeId,
-            prevAttrs,
-            newAttrs: { ...node.attrs }
-          });
-        }
-      }
-    } else if (isConnection) {
-      updateConnection(shapeId, updates);
-    }
 
-    setHasChanges(true);
-  }
-}, 50);
 
   // Handler for StageComponent (no immediate save)
-  const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<ShapeAttributes>) => {
-  console.log("🔄 Stage shape update triggered:", { id, attrs });
 
-  if (!id) return;
-
-  const isReactShape = reactShapes.some((s) => s.id === id);
-  const isKonvaShape = konvaShapes.some((s) => s.id === id);
-  const isConnection = connections.some((c) => c.id === id);
-
-  if (isReactShape) {
-    setReactShapes((prev) =>
-      prev.map((shape) => (shape.id === id ? { ...shape, ...attrs } : shape))
-    );
-  } else if (isKonvaShape) {
-    debouncedUpdateShape([id, attrs]);
-  } else if (isConnection) {
-    updateConnection(id, attrs);
-  }
-
-  setHasChanges(true);
-}, [debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, setReactShapes]);
 
   // Formatting toolbar update (no immediate save) - UPDATED FOR MULTI-SELECT
   const handleFormattingToolbarUpdate = useCallback((updates: FormattingUpdates) => {
-  console.log("🔄 Formatting toolbar update:", { selectedNodeIds, updates });
-
   if (!selectedNodeIds || selectedNodeIds.length === 0) return;
 
-  // Apply updates to all selected shapes
-  selectedNodeIds.forEach(selectedNodeId => {
-    const isReactShape = reactShapes.some((s) => s.id === selectedNodeId);
-    const isKonvaShape = konvaShapes.some((s) => s.id === selectedNodeId);
-    const isConnection = connections.some((c) => c.id === selectedNodeId);
-
-    if (isReactShape) {
-      setReactShapes((prev) =>
-        prev.map((shape) =>
-          shape.id === selectedNodeId ? { ...shape, ...updates } : shape
-        )
-      );
-    } else if (isKonvaShape) {
-      debouncedUpdateShape([selectedNodeId, updates]);
-    } else if (isConnection) {
-      updateConnection(selectedNodeId, updates);
-    }
-  });
-
-  setHasChanges(true);
-}, [selectedNodeIds, debouncedUpdateShape, reactShapes, konvaShapes, connections, updateConnection, setReactShapes]);
+      selectedNodeIds.forEach(id => {
+        updateAnyShape(id, updates);
+      });
+    }, [selectedNodeIds, updateAnyShape]);
 
   // Shape creation with immediate save
   const handleAddShape = useCallback((type: Tool) => {

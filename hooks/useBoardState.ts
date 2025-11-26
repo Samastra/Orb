@@ -16,12 +16,12 @@ const reorderArray = <T,>(arr: T[], from: number, to: number): T[] => {
 };
 
 // NEW: Connection type definition
+// In useBoardState.ts, update Connection to extend BaseShape:
 export type Connection = {
   id: string;
   type: 'connection';
   from: { x: number; y: number; nodeId?: string | null };
   to: { x: number; y: number; nodeId?: string | null };
-  // cubic bezier control points
   cp1x: number;
   cp1y: number;
   cp2x: number;
@@ -29,7 +29,12 @@ export type Connection = {
   stroke?: string;
   strokeWidth?: number;
   draggable: boolean;
+  // Make x and y optional since connections don't really have a position
+  x?: number;
+  y?: number;
+  rotation?: number;
 };
+
 
 export const useBoardState = () => {
   const params = useParams();

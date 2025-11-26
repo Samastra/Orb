@@ -50,11 +50,8 @@ export type Tool =
   | "image";
 
 // ---------- Shape Types ----------
-export interface ImageShape {
-  id: string;
+export interface ImageShape extends BaseShape {
   type: 'image';
-  x: number;
-  y: number;
   width: number;
   height: number;
   src: string;
@@ -65,11 +62,20 @@ export interface ImageShape {
   aspectRatio?: number;
 }
 
-export type ReactShape = {
+// In board-types.ts, update the ReactShape interface to fix type compatibility:
+
+
+// Add to board-types.ts
+export interface BaseShape {
   id: string;
-  type: string;
   x: number;
   y: number;
+  rotation?: number;
+  draggable?: boolean;
+}
+
+export type ReactShape = BaseShape & {
+  type: 'text' | 'stickyNote';
   text?: string;
   fontSize?: number;
   fill?: string;
@@ -79,10 +85,8 @@ export type ReactShape = {
   fontStyle?: string;
   textDecoration?: string;
   align?: string;
-  draggable?: boolean;
   width?: number;
   height?: number;
-  rotation?: number;
   backgroundColor?: string;
   textColor?: string;
   letterSpacing?: number;
@@ -96,7 +100,6 @@ export type ReactShape = {
   };
   zIndex?: number;
 };
-
 // ---------- Board State Types ----------
 export type BoardState = {
   scale: number;

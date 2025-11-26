@@ -323,6 +323,28 @@ const StageComponent: React.FC<StageComponentProps> = ({
   const shapeRefs = useRef<{ [key: string]: React.RefObject<Konva.Node | null> }>({});
   const dragStartPos = useRef<Map<string, { x: number; y: number }>>(new Map());
 
+  // Ensure Konva nodes match loaded state (fixes "wrong position on reload")
+useEffect(() => {
+  if (!stageRef.current) return;
+
+  const stage = stageRef.current;
+  requestAnimationFrame(() => {
+    const allShapes = [...shapes, ...reactShapes, ...images, ...stageFrames];
+    stage.find('[id]').forEach(node => {
+      const id = node.id();
+      const saved = allShapes.find(s => s.id === id);
+      if (saved && 'x' in saved && 'y' in saved) {
+        node.x(saved.x);
+        node.y(saved.y);
+      }
+      if (saved && 'rotation' in saved) {
+        node.rotation(saved.rotation || 0);
+      }
+    });
+    stage.batchDraw();
+  });
+}, [shapes, reactShapes, images, stageFrames, stageRef]);
+
   // Disable hit detection during drag for performance
   useEffect(() => {
     Konva.hitOnDragEnabled = false;
@@ -364,43 +386,44 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (trRef.current) trRef.current.forceUpdate();
   }, [selectedNodeIds, trRef]);
 
-  const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-    if (selectedNodeIds.length <= 1) {
-      // Single drag — let individual components handle it
-      return;
+ // ========== FIXED: MULTI-SELECT DRAG END — SINGLE SOURCE OF TRUTH ==========
+// In StageComponent.tsx, replace the handleDragEnd function:
+
+const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+  if (selectedNodeIds.length <= 1) return;
+
+  const node = e.target;
+  const finalX = node.x();
+  const finalY = node.y();
+  const start = dragStartPos.current.get(node.id());
+  if (!start) return;
+
+  const dx = finalX - start.x;
+  const dy = finalY - start.y;
+
+  selectedNodeIds.forEach(id => {
+    const startPos = dragStartPos.current.get(id);
+    if (!startPos) return;
+
+    const newX = startPos.x + dx;
+    const newY = startPos.y + dy;
+
+    if (reactShapes.some(s => s.id === id)) {
+      setReactShapes(prev => prev.map(s => s.id === id ? { ...s, x: newX, y: newY } : s));
     }
+    else if (shapes.some(s => s.id === id)) { // FIXED: Changed from konvaShapes to shapes
+      setShapes(prev => prev.map(s => s.id === id ? { ...s, x: newX, y: newY } : s));
+    }
+    else if (images.some(i => i.id === id)) {
+      setImages(prev => prev.map(i => i.id === id ? { ...i, x: newX, y: newY } : i));
+    }
+    else if (stageFrames.some(f => f.id === id)) {
+      setStageFrames(prev => prev.map(f => f.id === id ? { ...f, x: newX, y: newY } : f));
+    }
+  });
 
-    const node = e.target;
-    const finalX = node.x();
-    const finalY = node.y();
-    const start = dragStartPos.current.get(node.id());
-    if (!start) return;
-    const dx = finalX - start.x;
-    const dy = finalY - start.y;
-
-    selectedNodeIds.forEach(id => {
-      const startPos = dragStartPos.current.get(id);
-      if (!startPos) return;
-
-      const shape = [...shapes, ...reactShapes, ...images, ...stageFrames].find(s => s.id === id);
-      if (!shape) return;
-
-      const newX = startPos.x + dx;
-      const newY = startPos.y + dy;
-
-      if ('__kind' in shape && shape.__kind === 'react') {
-        setReactShapes(prev => prev.map(s => s.id === id ? { ...s, x: newX, y: newY } : s));
-      } else if ('type' in shape && (shape as KonvaShape | ImageShape).type === 'image') {
-        setImages(prev => prev.map(i => i.id === id ? { ...i, x: newX, y: newY } : i));
-      } else if ('type' in shape && (shape as KonvaShape).type === 'stage') {
-        setStageFrames(prev => prev.map(f => f.id === id ? { ...f, x: newX, y: newY } : f));
-      } else {
-        updateShape(id, { x: newX, y: newY });
-      }
-    });
-
-    dragStartPos.current.clear();
-  }, [selectedNodeIds, shapes, reactShapes, images, stageFrames, setReactShapes, setImages, setStageFrames, updateShape]);
+  dragStartPos.current.clear();
+}, [selectedNodeIds, reactShapes, shapes, images, stageFrames, setReactShapes, setShapes, setImages, setStageFrames]);
 
   // Common drag props for multi-selection
   const commonDragProps = {
