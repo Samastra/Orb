@@ -441,7 +441,7 @@ useEffect(() => {
       
       if (!elements.stageState || !elements.stageState.scale || !elements.stageState.position) {
       console.log("No saved camera → applying smart auto-fit");
-      setTimeout(() => autoFitContent(), 100);
+      
     } else {
       console.log("Saved camera found → respecting user's zoom/pan:", elements.stageState);
       // Do nothing — we already restored scale/position above
@@ -891,7 +891,7 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
 
 
         if (stageFrames.length === 0) {  // ← this will be 0 before addStageFrame runs
-        setTimeout(() => autoFitContent(), 200);
+    
       }
           
     } else {
