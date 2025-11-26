@@ -438,7 +438,15 @@ useEffect(() => {
       }
 
       setHasLoaded(true);
+      
+      if (!elements.stageState || !elements.stageState.scale || !elements.stageState.position) {
+      console.log("No saved camera → applying smart auto-fit");
       setTimeout(() => autoFitContent(), 100);
+    } else {
+      console.log("Saved camera found → respecting user's zoom/pan:", elements.stageState);
+      // Do nothing — we already restored scale/position above
+    }
+
       console.log("Board fully restored with correct zoom/pan");
     } catch (error) {
       console.error("Error loading board elements:", error);
@@ -881,7 +889,11 @@ const debouncedUpdateShape = useDebounce((args: unknown) => {
       setTempDimensions(defaultStageDimensions);
       setTimeout(handleInteractionEnd, 100);
 
-      setTimeout(() => autoFitContent(), 150);
+
+        if (stageFrames.length === 0) {  // ← this will be 0 before addStageFrame runs
+        setTimeout(() => autoFitContent(), 200);
+      }
+          
     } else {
       console.log('❌ Invalid stage dimensions');
     }
