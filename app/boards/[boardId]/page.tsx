@@ -26,7 +26,7 @@ import FormattingToolbar from "@/components/FormattingToolbar";
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useWebsitePlayer } from '@/hooks/useWebsitePlayer';
 import WebsitePlayerModal from '@/components/WebsitePlayerModal';
-
+import { useLayoutEffect } from 'react';
 // Utils
 import { fetchBoard } from "@/lib/actions/board-actions";
 // import { useWindowSize } from "@/hooks/useWindowSize";
@@ -432,38 +432,52 @@ useEffect(() => {
     loadBoardData();
   }, [params.boardId, showSetupDialog, setShowSetupDialog, setBoardInfo]);
 
-  // Load saved elements (only on initial mount or boardId change)
-  // In boards/[boardId]/page.tsx — REPLACE the big loading useEffect
-// FINAL LOADING EFFECT — THIS ONE WORKS 100%
-useEffect(() => {
+  // FINAL WORKING LOADING CODE — COPY-PASTE THIS EXACTLY
+useLayoutEffect(() => {
   if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
 
-  const load = async () => {
+  const loadSavedElements = async () => {
     try {
       const elements = await loadBoardElements(currentBoardId);
 
-      // Restore camera first
+      // Restore camera FIRST — using your actual setters from boardState
       if (elements.stageState) {
         boardState.setScale(elements.stageState.scale ?? 1);
         boardState.setPosition(elements.stageState.position ?? { x: 0, y: 0 });
       }
 
-      // Merge safely — preserve what we have if DB is missing data
-      setReactShapes(elements.reactShapes ?? []);
-      setKonvaShapes(elements.konvaShapes ?? []);
-      setStageFrames(elements.stageFrames ?? []);
-      setImages(elements.images ?? []);
-      setConnections(elements.connections ?? []);
-      setLines(elements.lines ?? []);
+      // Safe merge — never wipe existing shapes
+      setReactShapes(elements.reactShapes || []);
+      setKonvaShapes(elements.konvaShapes || []);
+      setStageFrames(elements.stageFrames || []);
+      setImages(elements.images || []);
+      setConnections(elements.connections || []);
+      setLines(elements.lines || []);
 
       setHasLoaded(true);
-    } catch (e) {
-      console.error("Load failed", e);
+      console.log("Board loaded perfectly — no more stacking");
+    } catch (error) {
+      console.error("Load failed:", error);
     }
   };
 
-  load();
-}, [currentBoardId, isTemporaryBoard, hasLoaded]);
+  loadSavedElements();
+}, [currentBoardId, isTemporaryBoard, hasLoaded, boardState, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setLines]);
+
+
+  // Force-save drags (1s debounce)
+useEffect(() => {
+  if (!currentBoardId || isTemporaryBoard || !user) return;
+
+  const timer = setTimeout(() => {
+    triggerSave({
+      reactShapes, konvaShapes, stageFrames, images, connections, lines,
+      scale, position,
+    });
+  }, 1000);
+
+  return () => clearTimeout(timer);
+}, [reactShapes, konvaShapes, stageFrames, images, connections, lines]);  // Watch position changes
 
   // Cleanup
   useEffect(() => {

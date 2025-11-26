@@ -57,12 +57,12 @@ export const useAutoSave = (boardId: string, isTemporary: boolean, userId?: stri
 
       // Normalize data for comparison
       const normalizedData = {
-        reactShapes: data.reactShapes,
-        konvaShapes: data.konvaShapes,
-        stageFrames: data.stageFrames,
-        images: data.images,
-        connections: data.connections,
-        lines: data.lines,
+        reactShapes: data.reactShapes || [],
+        konvaShapes: data.konvaShapes || [],
+        stageFrames: data.stageFrames || [],
+        images: data.images || [],
+        connections: data.connections || [],
+        lines: data.lines || [],
         scale: data.scale || 1,
         position: data.position || { x: 0, y: 0 },
       };
