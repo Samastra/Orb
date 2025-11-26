@@ -477,39 +477,90 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
   }, [params.boardId, showSetupDialog, setShowSetupDialog, setBoardInfo]);
 
   // FINAL WORKING LOADING CODE — COPY-PASTE THIS EXACTLY
+// In page.tsx - REPLACE the entire useLayoutEffect loading code with this:
 useLayoutEffect(() => {
   if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
 
   const loadSavedElements = async () => {
     try {
+      console.log("🔄 LOADING BOARD ELEMENTS...");
+      
       const elements = await loadBoardElements(currentBoardId);
+      
+      console.log("📥 LOADED FROM DB:", {
+        scale: elements.stageState?.scale,
+        position: elements.stageState?.position,
+        shapes: {
+          react: elements.reactShapes?.length,
+          konva: elements.konvaShapes?.length,
+          frames: elements.stageFrames?.length,
+          images: elements.images?.length,
+          connections: elements.connections?.length
+        }
+      });
 
-      // Restore camera FIRST — using your actual setters from boardState
-      if (elements.stageState) {
-        boardState.setScale(elements.stageState.scale ?? 1);
-        boardState.setPosition(elements.stageState.position ?? { x: 0, y: 0 });
+      // CRITICAL FIX: Apply camera state to the actual Konva stage FIRST
+      if (elements.stageState && stageRef.current) {
+        console.log("🎯 APPLYING CAMERA TO STAGE:", elements.stageState);
+        
+        // Update React state
+        boardState.setScale(elements.stageState.scale);
+        boardState.setPosition(elements.stageState.position);
+        
+        // CRITICAL: Directly update the Konva stage instance
+        const stage = stageRef.current;
+        stage.scale({ x: elements.stageState.scale, y: elements.stageState.scale });
+        stage.position(elements.stageState.position);
+        stage.batchDraw(); // Force immediate redraw
+        
+        console.log("✅ CAMERA APPLIED TO STAGE");
       }
 
-      // Safe merge — never wipe existing shapes
-      setReactShapes(elements.reactShapes || []);
-      setKonvaShapes(elements.konvaShapes || []);
-      setStageFrames(elements.stageFrames || []);
-      setImages(elements.images || []);
-      setConnections(elements.connections || []);
-      setLines(elements.lines || []);
+      // CRITICAL FIX: Wait for camera to be applied, THEN load shapes
+      setTimeout(() => {
+        console.log("📝 LOADING SHAPES AFTER CAMERA...");
+        
+        // Clear existing state first to prevent conflicts
+        setReactShapes([]);
+        setKonvaShapes([]);
+        setStageFrames([]);
+        setImages([]);
+        setConnections([]);
+        setLines([]);
+        
+        // Then set the loaded shapes
+        setReactShapes(elements.reactShapes || []);
+        setKonvaShapes(elements.konvaShapes || []);
+        setStageFrames(elements.stageFrames || []);
+        setImages(elements.images || []);
+        setConnections(elements.connections || []);
+        setLines(elements.lines || []);
+        
+        setHasLoaded(true);
+        console.log("✅ BOARD FULLY LOADED");
+      }, 50); // Small delay to ensure camera is applied
 
-      setHasLoaded(true);
-      console.log("Board loaded perfectly — no more stacking");
     } catch (error) {
-      console.error("Load failed:", error);
+      console.error("❌ LOAD FAILED:", error);
+      setHasLoaded(true);
     }
   };
 
   loadSavedElements();
-}, [currentBoardId, isTemporaryBoard, hasLoaded, boardState, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setLines]);
+}, [currentBoardId, isTemporaryBoard, hasLoaded, boardState, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setLines]); // Force-save drags (1s debounce)
 
+  // In page.tsx - Add this right after the loading useLayoutEffect
+useEffect(() => {
+  // Force stage to update when camera changes
+  if (stageRef.current) {
+    const stage = stageRef.current;
+    stage.scale({ x: scale, y: scale });
+    stage.position(position);
+    stage.batchDraw();
+    console.log("🔄 STAGE UPDATED WITH CAMERA:", { scale, position });
+  }
+}, [scale, position]);
 
-  // Force-save drags (1s debounce)
 
   // Cleanup
   useEffect(() => {
@@ -1011,6 +1062,7 @@ useLayoutEffect(() => {
           position={position}
           activeTool={activeTool}
           lines={lines}
+          hasLoaded={hasLoaded}
           shapes={konvaShapes}
           reactShapes={reactShapes}
           stageFrames={stageFrames}

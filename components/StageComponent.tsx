@@ -30,6 +30,7 @@ interface StageComponentProps {
   stageInstance: Konva.Stage | null;
   width?: number;
   height?: number;
+  hasLoaded?: boolean;
   handleWheel: (e: Konva.KonvaEventObject<WheelEvent>) => void;
   handleMouseDown: (e: Konva.KonvaEventObject<MouseEvent>) => void;
   handleMouseUp: (e: Konva.KonvaEventObject<MouseEvent>) => void;
@@ -65,6 +66,10 @@ type CombinedShape =
   | (KonvaShape & { __kind: 'stage' })
   | (ImageShape & { __kind: 'image' })
   | (Connection & { __kind: 'connection' });
+
+
+
+  
 
 // Image Component
 const ImageElement = React.forwardRef<Konva.Image, {
@@ -307,6 +312,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   handleTouchStart,
   handleTouchEnd,
   handleTouchMove,
+  hasLoaded,
   setSelectedNodeIds,
   setReactShapes,
   setShapes,
@@ -579,6 +585,67 @@ const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
       console.error('Error in handleShapeTransformEnd:', error);
     }
   };
+
+
+  // In StageComponent.tsx - Add this useEffect with the other useEffects
+useEffect(() => {
+  if (!stageRef.current || !hasLoaded) return;
+
+  const stage = stageRef.current;
+  
+  // Wait for the next frame to ensure all shapes are rendered
+  requestAnimationFrame(() => {
+    console.log("🔄 Syncing Konva nodes with loaded state");
+    
+    const allShapes = [...shapes, ...reactShapes, ...images, ...stageFrames];
+    let updatedCount = 0;
+    
+    stage.find('[id]').forEach(node => {
+      const id = node.id();
+      const saved = allShapes.find(s => s.id === id);
+      
+      if (saved) {
+        // Only update if positions are different to avoid unnecessary changes
+        if ('x' in saved && 'y' in saved) {
+          const currentX = node.x();
+          const currentY = node.y();
+          const savedX = saved.x;
+          const savedY = saved.y;
+          
+          if (currentX !== savedX || currentY !== savedY) {
+            node.x(savedX);
+            node.y(savedY);
+            updatedCount++;
+          }
+        }
+        
+        if ('rotation' in saved && saved.rotation !== undefined) {
+          const currentRotation = node.rotation();
+          if (currentRotation !== saved.rotation) {
+            node.rotation(saved.rotation);
+            updatedCount++;
+          }
+        }
+      }
+    });
+    
+    if (updatedCount > 0) {
+      console.log(`✅ Updated ${updatedCount} node positions`);
+      stage.batchDraw();
+    }
+  });
+}, [shapes, reactShapes, images, stageFrames, stageRef, hasLoaded]);
+
+  
+  useEffect(() => {
+      if (!stageRef.current) return;
+      
+      const stage = stageRef.current;
+      stage.scale({ x: scale, y: scale });
+      stage.position(position);
+      stage.batchDraw();
+    }, [scale, position]);
+
 
   useEffect(() => {
     const allIds = [
