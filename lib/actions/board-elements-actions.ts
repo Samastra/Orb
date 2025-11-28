@@ -19,8 +19,8 @@ const normalizeKonvaShape = (shape: KonvaShape): KonvaShape => {
   const baseShape: KonvaShape = {
     id: shape.id,
     type: shape.type,
-    x: shape.x ?? 0,
-    y: shape.y ?? 0,
+    x: shape.x,
+    y: shape.y,
     fill: shape.fill ?? "#ffffff",
     stroke: shape.stroke ?? "#000000",
     strokeWidth: shape.strokeWidth ?? 0,
