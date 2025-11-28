@@ -950,33 +950,35 @@ useEffect(() => {
     <>
       <div className="relative w-screen h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
         <BoardHeader
-  boardInfo={boardInfo}
-  isTemporaryBoard={isTemporaryBoard}
-  currentBoardId={currentBoardId}
-  showSaveModal={showSaveModal}
-  setShowSaveModal={setShowSaveModal}
-  handleCloseWithoutSave={handleCloseWithoutSave}
-  onAddImageFromRecommendations={handleAddImageFromRecommendations}
-  stageRef={stageRef}
-  onPlayVideo={openVideo}
-  onOpenWebsite={openWebsite}
-  boardElements={{
-    reactShapes,
-    konvaShapes,
-    stageFrames,
-    images,
-    connections
-  }}
-  // ADD THIS PROP:
-  onBoardUpdate={(updates) => {
-    console.log("🔄 Board title updated from header:", updates);
-    setBoardInfo({
-      title: updates.title,
-      category: updates.category
-    });
-  }}
-  onCopyCleanText={copyCleanText}
-/>
+            boardInfo={boardInfo}
+            isTemporaryBoard={isTemporaryBoard}
+            currentBoardId={currentBoardId}
+            showSaveModal={showSaveModal}
+            setShowSaveModal={setShowSaveModal}
+            handleCloseWithoutSave={handleCloseWithoutSave}
+            onAddImageFromRecommendations={handleAddImageFromRecommendations}
+            stageRef={stageRef}
+            onPlayVideo={openVideo}
+            onOpenWebsite={openWebsite}
+            boardElements={{
+              reactShapes,
+              konvaShapes,
+              stageFrames,
+              images,
+              connections,
+              stageState: { scale, position }
+            }}
+            onBoardUpdate={(updates) => {
+              console.log("🔄 Board title updated from header:", updates);
+              setBoardInfo({
+                title: updates.title,
+                category: updates.category
+              });
+            }}
+            onCopyCleanText={copyCleanText}
+            scale={scale}        // ← Add this
+            position={position}  // ← Add this
+          />
         <Toolbar
           activeTool={activeTool}
           drawingMode={drawingMode}

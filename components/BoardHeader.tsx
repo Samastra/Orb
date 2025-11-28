@@ -59,10 +59,13 @@ interface BoardHeaderProps {
     stageFrames: KonvaShape[];
     images: ImageShape[];
     connections: Connection[];
+    stageState: { scale: number; position: { x: number; y: number } }; // ← Add stageState here
   };
   onBoardUpdate?: (updates: { title: string; category: string }) => void;
   onOpenWebsite?: (url: string, title: string) => void;
   onCopyCleanText?: () => Promise<void>;
+  scale: number;
+  position: { x: number; y: number };
 }
 
 const BoardHeader: React.FC<BoardHeaderProps> = ({
@@ -78,7 +81,9 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   boardElements,
   onOpenWebsite,
   onBoardUpdate,
-  onCopyCleanText
+  onCopyCleanText,
+  scale,
+  position
 }) => {
   const { user } = useUser();
   const [isChatOpen, setIsChatOpen] = useState(false);
