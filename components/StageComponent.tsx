@@ -515,8 +515,13 @@ const StageComponent: React.FC<StageComponentProps> = ({
             if (k.points) {
                updates.points = k.points.map((val, index) => index % 2 === 0 ? val * scaleX : val * scaleY);
                const arrowScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
-               updates.pointerLength = (k.pointerLength ?? 10) * arrowScale;
-               updates.pointerWidth = (k.pointerWidth ?? 10) * arrowScale;
+               
+               // Use type assertion to avoid any 'implicit any' errors if type definition is missing
+               const pLength = (k as any).pointerLength ?? 10;
+               const pWidth = (k as any).pointerWidth ?? 10;
+               
+               updates.pointerLength = pLength * arrowScale;
+               updates.pointerWidth = pWidth * arrowScale;
             }
             break;
           default:
