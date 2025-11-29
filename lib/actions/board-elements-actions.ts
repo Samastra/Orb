@@ -92,6 +92,11 @@ export const saveBoardElements = async (
     lines: safeLines.length,
   });
 
+    console.log("💾 SAVING TO DB - Shape positions:", {
+  stageFrames: elements.stageFrames.map(f => ({ id: f.id, x: f.x, y: f.y })),
+  konvaShapes: elements.konvaShapes.map(s => ({ id: s.id, x: s.x, y: s.y }))
+    });
+
   const supabase = createSupabaseClient();
 
   try {
@@ -214,6 +219,9 @@ export const loadBoardElements = async (boardId: string) => {
     const lines: Line[] = [];
     let stageState = { scale: 1, position: { x: 0, y: 0 } };
 
+
+
+
     data?.forEach(element => {
       const shapeData = element.properties;
 
@@ -260,6 +268,11 @@ export const loadBoardElements = async (boardId: string) => {
       connections: connections.length,
       lines: lines.length,
     });
+
+    console.log("📥 LOADING FROM DB - Shape positions:", {
+  stageFrames: stageFrames.map(f => ({ id: f.id, x: f.x, y: f.y })),
+  konvaShapes: konvaShapes.map(s => ({ id: s.id, x: s.x, y: s.y }))
+});
 
     return {
       reactShapes,

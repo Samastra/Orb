@@ -17,7 +17,7 @@ import ResourceList from "@/components/ResourceList";
 import SaveBoardModal from "@/components/save-modal-board";
 import ChatModal from "@/components/ChatModal";
 import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal";
-import CreateBoard from "@/components/createBoard"; // USE EXISTING COMPONENT
+import CreateBoard from "@/components/createBoard"; 
 import { useUser } from "@clerk/nextjs";
 import { 
   Mic, 
@@ -33,14 +33,13 @@ import {
   Sparkles,
   FileImage,
   FileText,
-  Image,
+  Image as ImageIcon, // Renamed to avoid conflict with next/image or Konva Image
   Edit3
 } from "lucide-react";
 import type { ReactShape, ImageShape, Connection } from "@/types/board-types";
 import type { KonvaShape } from "@/hooks/useShapes";
 import { downloadAsImage, downloadAsPDF } from "@/lib/download-utils";
 
-// Add Konva import
 import type Konva from "konva";
 
 interface BoardHeaderProps {
@@ -59,7 +58,7 @@ interface BoardHeaderProps {
     stageFrames: KonvaShape[];
     images: ImageShape[];
     connections: Connection[];
-    stageState: { scale: number; position: { x: number; y: number } }; // ← Add stageState here
+    stageState?: { scale: number; position: { x: number; y: number } }; 
   };
   onBoardUpdate?: (updates: { title: string; category: string }) => void;
   onOpenWebsite?: (url: string, title: string) => void;
@@ -90,7 +89,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDownloadSubmenuOpen, setIsDownloadSubmenuOpen] = useState(false);
-  const [isEditBoardModalOpen, setIsEditBoardModalOpen] = useState(false); // CHANGED TO USE CREATEBOARD
+  const [isEditBoardModalOpen, setIsEditBoardModalOpen] = useState(false); 
 
   const handleDownload = async (format: 'png' | 'jpeg' | 'pdf'): Promise<void> => {
     setIsMenuOpen(false);
@@ -173,7 +172,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                           onClick={() => handleDownload('jpeg')}
                           className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                         >
-                          <Image className="w-4 h-4" />
+                          <ImageIcon className="w-4 h-4" />
                           <span>Download as JPEG</span>
                         </button>
                         <button 
@@ -208,7 +207,6 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
               </div>
               <div className="w-px h-6 bg-gray-300/80"></div>
               <div className="flex items-center gap-2 group">
-                {/* EDITABLE TITLE SECTION - UPDATED TO USE CREATEBOARD */}
                 <button
                   onClick={() => setIsEditBoardModalOpen(true)}
                   className="flex items-center gap-2 hover:bg-gray-100/80 rounded-lg px-2 py-1 transition-all duration-300 group"
@@ -234,7 +232,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
           
           <div className="flex items-center gap-3">
 
-                {onCopyCleanText && (
+              {onCopyCleanText && (
               <button 
                 onClick={onCopyCleanText}
                 className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 transition-all duration-300 group"
@@ -311,8 +309,6 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
             
             <Button  
               onClick={() => {
-                console.log("🔄 Save button clicked - currentBoardId:", currentBoardId);
-                console.log("🔄 Save button clicked - showSaveModal will be:", !showSaveModal);
                 setShowSaveModal(true);
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 transition-all duration-300 shadow-sm hover:shadow-md group"
@@ -340,7 +336,15 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         tempBoardId={currentBoardId}
-        boardElements={boardElements}
+        // ✨ FIXED: Added explicit fallbacks for optional properties
+        boardElements={{
+          reactShapes: boardElements?.reactShapes || [],
+          konvaShapes: boardElements?.konvaShapes || [],
+          stageFrames: boardElements?.stageFrames || [],
+          images: boardElements?.images || [],
+          connections: boardElements?.connections || [],
+          stageState: { scale, position }
+        }}
       />
       
       <ChatModal
@@ -355,7 +359,6 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
         boardTitle={boardInfo.title}
       />
 
-      {/* USE THE EXISTING CREATEBOARD MODAL FOR EDITING */}
       <CreateBoard 
         open={isEditBoardModalOpen}
         onOpenChange={setIsEditBoardModalOpen}
