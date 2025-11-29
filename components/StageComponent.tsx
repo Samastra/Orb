@@ -15,6 +15,9 @@ const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
   ssr: false,
 });
 
+// Helper type to fix MouseEvent vs TouchEvent conflicts
+type KonvaPointerEvent = Konva.KonvaEventObject<MouseEvent | TouchEvent>;
+
 interface StageComponentProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   trRef: React.RefObject<Konva.Transformer | null>;
@@ -145,7 +148,7 @@ ImageElement.displayName = 'ImageElement';
 const ConnectionElement = React.forwardRef<Konva.Path, {
   connection: Connection;
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
-  onClick: (e: Konva.KonvaEventObject<MouseEvent>) => void;
+  onClick: (e: KonvaPointerEvent) => void;
   updateConnection: (id: string, updates: Partial<Connection>) => void;
   onDelete: (id: string) => void;
 }>(({
@@ -326,7 +329,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   const shapeRefs = useRef<{ [key: string]: React.RefObject<Konva.Node | null> }>({});
   const dragStartPos = useRef<Map<string, { x: number; y: number }>>(new Map());
 
-  // Ensure Konva nodes match loaded state (fixes "wrong position on reload")
+  // Ensure Konva nodes match loaded state
   useEffect(() => {
     if (!stageRef.current) return;
 
@@ -348,7 +351,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
     });
   }, [shapes, reactShapes, images, stageFrames, stageRef]);
 
-  // Disable hit detection during drag for performance
   useEffect(() => {
     Konva.hitOnDragEnabled = false;
   }, []);
@@ -358,7 +360,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const node = e.target;
     if (!node || selectedNodeIds.length <= 1) return;
 
-    // Store original positions of ALL selected nodes for multi-drag delta calculation
     selectedNodeIds.forEach(id => {
       const ref = shapeRefs.current[id]?.current;
       if (ref && ref !== node) {
@@ -389,15 +390,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (trRef.current) trRef.current.forceUpdate();
   }, [selectedNodeIds, trRef]);
 
-  // ========== NEW: SINGLE DRAG END HANDLER (CRITICAL FIX) ==========
+  // ========== SINGLE DRAG END HANDLER (Fixes Monkey Dance) ==========
   const handleSingleDragEnd = useCallback((item: CombinedShape, e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
     const newX = node.x();
     const newY = node.y();
 
-    console.log("📍 Single Drag End - Syncing to State:", item.id, { x: newX, y: newY });
-
-    // Update the specific state array based on type to persist position
     if (item.__kind === 'react') {
       setReactShapes(prev => prev.map(s => s.id === item.id ? { ...s, x: newX, y: newY } : s));
     } else if (item.__kind === 'konva') {
@@ -407,8 +405,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
     } else if (item.__kind === 'stage') {
       setStageFrames(prev => prev.map(f => f.id === item.id ? { ...f, x: newX, y: newY } : f));
     }
-    
-    // Clear drag tracker just in case
     dragStartPos.current.delete(item.id);
   }, [setReactShapes, setShapes, setImages, setStageFrames]);
 
@@ -432,18 +428,13 @@ const StageComponent: React.FC<StageComponentProps> = ({
       const newX = startPos.x + dx;
       const newY = startPos.y + dy;
 
-      console.log("🔄 Multi-Drag End - Shape moved:", { id, newX, newY });
-
       if (reactShapes.some(s => s.id === id)) {
         setReactShapes(prev => prev.map(s => s.id === id ? { ...s, x: newX, y: newY } : s));
-      }
-      else if (shapes.some(s => s.id === id)) { 
+      } else if (shapes.some(s => s.id === id)) { 
         setShapes(prev => prev.map(s => s.id === id ? { ...s, x: newX, y: newY } : s));
-      }
-      else if (images.some(i => i.id === id)) {
+      } else if (images.some(i => i.id === id)) {
         setImages(prev => prev.map(i => i.id === id ? { ...i, x: newX, y: newY } : i));
-      }
-      else if (stageFrames.some(f => f.id === id)) {
+      } else if (stageFrames.some(f => f.id === id)) {
         setStageFrames(prev => prev.map(f => f.id === id ? { ...f, x: newX, y: newY } : f));
       }
     });
@@ -451,27 +442,25 @@ const StageComponent: React.FC<StageComponentProps> = ({
     dragStartPos.current.clear();
   }, [selectedNodeIds, reactShapes, shapes, images, stageFrames, setReactShapes, setShapes, setImages, setStageFrames]);
 
-  // ========== EXISTING HANDLE SHAPE TRANSFORM END ==========
+  // ========== TRANSFORM HANDLER (Fixes Arrow Scaling) ==========
   const handleShapeTransformEnd = (item: CombinedShape, e: Konva.KonvaEventObject<Event>) => {
     try {
       const node = e.target;
       if (item.__kind === 'connection') return;
+      
+      const hasPosition = (shape: CombinedShape): shape is CombinedShape & { x: number; y: number } => {
+        return shape.__kind !== 'connection';
+      };
+      if (!hasPosition(item)) return;
 
-      // 1. Reset Scale to 1 (we will bake scale into dimensions)
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
       
-      // Reset node scale visually immediately to prevent jumpiness
       node.scaleX(1);
       node.scaleY(1);
 
-      const commonAttrs = {
-        x: node.x(),
-        y: node.y(),
-        rotation: node.rotation(),
-      };
-
-      // --- REACT SHAPES (Text/Sticky) ---
+      const commonAttrs = { x: node.x(), y: node.y(), rotation: node.rotation() };
+      
       if (item.__kind === 'react') {
         const updates: Partial<ReactShape> = { ...commonAttrs };
         if (item.type === 'text') {
@@ -482,32 +471,28 @@ const StageComponent: React.FC<StageComponentProps> = ({
           const stickyItem = item as ReactShape;
           updates.width = Math.max(50, (stickyItem.width ?? 200) * scaleX);
           updates.height = Math.max(50, (stickyItem.height ?? 200) * scaleY);
+          if (stickyItem.fontSize) {
+            updates.fontSize = Math.max(8, stickyItem.fontSize * scaleY);
+          }
         }
         setReactShapes(prev => prev.map(s => s.id === item.id ? { ...s, ...updates } : s));
         return;
       }
-
-      // --- IMAGES ---
+      
       if (item.__kind === 'image') {
         const imageNode = node as Konva.Image;
-        const newWidth = Math.max(1, imageNode.width() * scaleX);
-        const newHeight = Math.max(1, imageNode.height() * scaleY);
-        
-        setImages(prev => prev.map(img => img.id === item.id ? { ...img, ...commonAttrs, width: newWidth, height: newHeight } : img));
+        setImages(prev => prev.map(img =>
+          img.id === item.id ? { ...img, ...commonAttrs, width: Math.max(1, imageNode.width() * scaleX), height: Math.max(1, imageNode.height() * scaleY) } : img
+        ));
         return;
       }
-
-      // --- STAGE FRAMES ---
+      
       if (item.__kind === 'stage') {
         const stageNode = node as Konva.Rect;
-        const newWidth = Math.max(1, stageNode.width() * scaleX);
-        const newHeight = Math.max(1, stageNode.height() * scaleY);
-        
-        setStageFrames(prev => prev.map(f => f.id === item.id ? { ...f, ...commonAttrs, width: newWidth, height: newHeight } : f));
+        setStageFrames(prev => prev.map(f => f.id === item.id ? { ...f, ...commonAttrs, width: Math.max(1, stageNode.width() * scaleX), height: Math.max(1, stageNode.height() * scaleY) } : f));
         return;
       }
-
-      // --- KONVA SHAPES (Circle, Arrow, etc) ---
+      
       if (item.__kind === 'konva') {
         const k = item as KonvaShape;
         const updates: Partial<KonvaShape> = { ...commonAttrs };
@@ -517,105 +502,43 @@ const StageComponent: React.FC<StageComponentProps> = ({
             updates.width = Math.max(1, (k.width ?? 100) * scaleX);
             updates.height = Math.max(1, (k.height ?? 100) * scaleY);
             break;
-
           case 'circle':
-            // Scale radius by the average scale
+          case 'triangle':
             const avgScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
             updates.radius = Math.max(1, (k.radius ?? 50) * avgScale);
             break;
-
           case 'ellipse':
             updates.radiusX = Math.max(1, (k.radiusX ?? 80) * scaleX);
             updates.radiusY = Math.max(1, (k.radiusY ?? 50) * scaleY);
             break;
-
-          case 'triangle': // RegularPolygon
-            // Like circle, scale the radius
-            const triScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
-            updates.radius = Math.max(1, (k.radius ?? 50) * triScale);
-            break;
-
           case 'arrow':
-            // FIX FOR ARROW: Bake scale into points
             if (k.points) {
-               updates.points = k.points.map((val, index) => {
-                 // Even index is X, Odd index is Y
-                 return index % 2 === 0 ? val * scaleX : val * scaleY;
-               });
+               updates.points = k.points.map((val, index) => index % 2 === 0 ? val * scaleX : val * scaleY);
+               const arrowScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
+               updates.pointerLength = (k.pointerLength ?? 10) * arrowScale;
+               updates.pointerWidth = (k.pointerWidth ?? 10) * arrowScale;
             }
             break;
-
           default:
-            // Fallback for custom shapes if any
-             if ('width' in k) updates.width = (k.width as number) * scaleX;
-             if ('height' in k) updates.height = (k.height as number) * scaleY;
+            if ('width' in k) updates.width = ((k as any).width as number) * scaleX;
+            if ('height' in k) updates.height = ((k as any).height as number) * scaleY;
             break;
         }
-
         updateShape(item.id, updates);
         return;
       }
-
     } catch (error) {
       console.error('Error in handleShapeTransformEnd:', error);
     }
-};
+  };
 
-  useEffect(() => {
-    if (!stageRef.current || !hasLoaded) return;
-
-    const stage = stageRef.current;
-    
-    // Wait for the next frame to ensure all shapes are rendered
-    requestAnimationFrame(() => {
-      const allShapes = [...shapes, ...reactShapes, ...images, ...stageFrames];
-      let updatedCount = 0;
-      
-      stage.find('[id]').forEach(node => {
-        const id = node.id();
-        const saved = allShapes.find(s => s.id === id);
-        
-        if (saved) {
-          // Only update if positions are different to avoid unnecessary changes
-          if ('x' in saved && 'y' in saved) {
-            const currentX = node.x();
-            const currentY = node.y();
-            const savedX = saved.x;
-            const savedY = saved.y;
-            
-            if (currentX !== savedX || currentY !== savedY) {
-              node.x(savedX);
-              node.y(savedY);
-              updatedCount++;
-            }
-          }
-          
-          if ('rotation' in saved && saved.rotation !== undefined) {
-            const currentRotation = node.rotation();
-            if (currentRotation !== saved.rotation) {
-              node.rotation(saved.rotation);
-              updatedCount++;
-            }
-          }
-        }
-      });
-      
-      if (updatedCount > 0) {
-        stage.batchDraw();
-      }
-    });
-  }, [shapes, reactShapes, images, stageFrames, stageRef, hasLoaded]);
-
-  
   useEffect(() => {
       if (!stageRef.current) return;
-      
       const stage = stageRef.current;
       stage.scale({ x: scale, y: scale });
       stage.position(position);
       stage.batchDraw();
     }, [scale, position]);
-
 
   useEffect(() => {
     const allIds = [
@@ -626,28 +549,23 @@ const StageComponent: React.FC<StageComponentProps> = ({
       ...connections.map(c => c.id)
     ];
     const map: { [key: string]: React.RefObject<Konva.Node | null> } = { ...shapeRefs.current };
-    
     allIds.forEach(id => {
       if (!map[id]) map[id] = React.createRef<Konva.Node | null>();
     });
-      
     Object.keys(map).forEach(k => {
       if (!allIds.includes(k)) delete map[k];
     });
     shapeRefs.current = map;
   }, [stageFrames, shapes, reactShapes, images, connections]);
 
-  // ========== TRANSFORMER SYNC ==========
   useEffect(() => {
     if (!trRef.current || selectedNodeIds.length === 0) {
       trRef.current?.nodes([]);
       return;
     }
-
     const nodes = selectedNodeIds
       .map(id => shapeRefs.current[id]?.current)
-      .filter((n): n is Konva.Node => !!n && n.getClassName() !== 'Path'); // exclude connections
-
+      .filter((n): n is Konva.Node => !!n && n.getClassName() !== 'Path');
     trRef.current.nodes(nodes);
     trRef.current.getLayer()?.batchDraw();
   }, [selectedNodeIds, trRef]);
@@ -662,7 +580,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
     ];
   }, [stageFrames, shapes, reactShapes, images, connections]);
 
-  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleStageClick = (e: KonvaPointerEvent) => {
     const stage = e.target.getStage();
     if (!stage) return;
     
@@ -673,8 +591,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
     
     if (e.target.hasName('selectable-shape')) {
       const clickedId = e.target.id();
-      
-      const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+      const evt = e.evt as MouseEvent | TouchEvent;
+      const isMultiSelect = (evt as any).shiftKey || (evt as any).ctrlKey || (evt as any).metaKey;
       
       if (isMultiSelect) {
         if (selectedNodeIds.includes(clickedId)) {
@@ -688,12 +606,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
   };
 
-  const handleShapeClick = (item: CombinedShape, e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleShapeClick = (item: CombinedShape, e: KonvaPointerEvent) => {
     e.cancelBubble = true;
     if (activeTool === "select") {
       const clickedId = item.id;
-      
-      const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+      const evt = e.evt as MouseEvent | TouchEvent;
+      const isMultiSelect = (evt as any).shiftKey || (evt as any).ctrlKey || (evt as any).metaKey;
       
       if (isMultiSelect) {
         if (selectedNodeIds.includes(clickedId)) {
@@ -707,13 +625,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
   };
 
-  const handleConnectionClick = (connection: Connection, e: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleConnectionClick = (connection: Connection, e: KonvaPointerEvent) => {
     e.cancelBubble = true;
     if (activeTool === "select") {
-      console.log('🔗 Connection clicked:', connection.id);
       const clickedId = connection.id;
-      
-      const isMultiSelect = e.evt.shiftKey || e.evt.ctrlKey || e.evt.metaKey;
+      const evt = e.evt as MouseEvent | TouchEvent;
+      const isMultiSelect = (evt as any).shiftKey || (evt as any).ctrlKey || (evt as any).metaKey;
       
       if (isMultiSelect) {
         if (selectedNodeIds.includes(clickedId)) {
@@ -733,24 +650,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
     
     if (wasResized) {
       setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
-        img.id === imageShape.id
-          ? {
-              ...img,
-              x: node.x(),
-              y: node.y(),
-              width: node.width(),
-              height: node.height()
-            }
-          : img
+        img.id === imageShape.id ? { ...img, x: node.x(), y: node.y(), width: node.width(), height: node.height() } : img
       ));
-    } else {
-        // Fallback if not resized, handled by handleSingleDragEnd primarily
-        // But keeping as safety net
-        if (selectedNodeIds.length <= 1) {
-             setImages((prev: ImageShape[]) => prev.map((img: ImageShape) =>
-                img.id === imageShape.id ? { ...img, x: node.x(), y: node.y() } : img
-            ));
-        }
     }
   };
 
@@ -784,28 +685,14 @@ const StageComponent: React.FC<StageComponentProps> = ({
         <GridLayer stage={stageInstance} baseSize={30} color="#d6d4d4ff" />
         <Layer name="draw-layer">
           {allShapesToRender.map((item) => {
-            console.log(`🎯 Rendering shape: ${item.id} (${item.__kind}:${item.type})`);
-            
-            const commonProps: {
-              id: string;
-              draggable: boolean;
-              name: string;
-              onClick: (e: Konva.KonvaEventObject<MouseEvent>) => void;
-              onTap: (e: Konva.KonvaEventObject<MouseEvent>) => void;
-              onDragStart: (e: Konva.KonvaEventObject<DragEvent>) => void;
-              onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
-              onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
-              x?: number;
-              y?: number;
-            } = {
+            const commonProps = {
               id: item.id,
               draggable: (item.draggable ?? true) && activeTool === "select",
               name: 'selectable-shape',
-              onClick: (e: Konva.KonvaEventObject<MouseEvent>) => handleShapeClick(item, e),
-              onTap: (e: Konva.KonvaEventObject<MouseEvent>) => handleShapeClick(item, e),
+              onClick: (e: KonvaPointerEvent) => handleShapeClick(item, e),
+              onTap: (e: KonvaPointerEvent) => handleShapeClick(item, e),
               onDragStart: handleDragStart,
               onDragMove: handleDragMove,
-              // ✨ CRITICAL FIX: Conditionally fire single or multi drag end
               onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
                   if (selectedNodeIds.length > 1 && selectedNodeIds.includes(item.id)) {
                       handleMultiDragEnd(e);
@@ -815,12 +702,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
               }
             };
 
-            // Add position handlers only for shapes that support them
-            if (item.__kind !== 'connection') {
-              const positionedItem = item as CombinedShape & { x: number; y: number };
-              commonProps.x = positionedItem.x;
-              commonProps.y = positionedItem.y;
-            }
+            const extraProps = (item.__kind !== 'connection') ? { x: (item as any).x, y: (item as any).y } : {};
 
             if (item.__kind === 'stage') {
               const stageItem = item as KonvaShape;
@@ -829,6 +711,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                   key={item.id}
                   ref={shapeRefs.current[item.id] as React.RefObject<Konva.Rect>}
                   {...commonProps}
+                  {...extraProps}
                   width={stageItem.width ?? 800}
                   height={stageItem.height ?? 600}
                   fill={stageItem.fill || "#ffffff"}
@@ -863,7 +746,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                   ref={shapeRefs.current[item.id] as React.RefObject<Konva.Path>}
                   connection={connectionItem}
                   onDragEnd={commonProps.onDragEnd}
-                  onClick={(e: Konva.KonvaEventObject<MouseEvent>) => handleConnectionClick(connectionItem, e)}
+                  onClick={(e: KonvaPointerEvent) => handleConnectionClick(connectionItem, e)}
                   updateConnection={updateConnection}
                   onDelete={onDelete}
                 />
@@ -872,76 +755,15 @@ const StageComponent: React.FC<StageComponentProps> = ({
               const konvaItem = item as KonvaShape;
               switch (item.type) {
                 case 'rect':
-                  return (
-                    <Rect
-                      key={item.id}
-                      ref={shapeRefs.current[item.id] as React.RefObject<Konva.Rect>}
-                      {...commonProps}
-                      width={konvaItem.width ?? 100}
-                      height={konvaItem.height ?? 100}
-                      fill={konvaItem.fill}
-                      cornerRadius={konvaItem.cornerRadius ?? 0}
-                      stroke={konvaItem.stroke}
-                      strokeWidth={konvaItem.strokeWidth ?? 0}
-                      onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
-                    />
-                  );
+                  return <Rect key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.Rect>} {...commonProps} {...extraProps} width={konvaItem.width ?? 100} height={konvaItem.height ?? 100} fill={konvaItem.fill} cornerRadius={konvaItem.cornerRadius ?? 0} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 case 'circle':
-                  return (
-                    <Circle
-                      key={item.id}
-                      ref={shapeRefs.current[item.id] as React.RefObject<Konva.Circle>}
-                      {...commonProps}
-                      radius={konvaItem.radius ?? 50}
-                      fill={konvaItem.fill}
-                      stroke={konvaItem.stroke}
-                      strokeWidth={konvaItem.strokeWidth ?? 0}
-                      onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
-                    />
-                  );
+                  return <Circle key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.Circle>} {...commonProps} {...extraProps} radius={konvaItem.radius ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 case 'ellipse':
-                  return (
-                    <Ellipse
-                      key={item.id}
-                      ref={shapeRefs.current[item.id] as React.RefObject<Konva.Ellipse>}
-                      {...commonProps}
-                      radiusX={konvaItem.radiusX ?? 80}
-                      radiusY={konvaItem.radiusY ?? 50}
-                      fill={konvaItem.fill}
-                      stroke={konvaItem.stroke}
-                      strokeWidth={konvaItem.strokeWidth ?? 0}
-                      onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
-                    />
-                  );
+                  return <Ellipse key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.Ellipse>} {...commonProps} {...extraProps} radiusX={konvaItem.radiusX ?? 80} radiusY={konvaItem.radiusY ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 case 'triangle':
-                  return (
-                    <RegularPolygon
-                      key={item.id}
-                      ref={shapeRefs.current[item.id] as React.RefObject<Konva.RegularPolygon>}
-                      {...commonProps}
-                      sides={3}
-                      radius={konvaItem.radius ?? 50}
-                      fill={konvaItem.fill}
-                      stroke={konvaItem.stroke}
-                      strokeWidth={konvaItem.strokeWidth ?? 0}
-                      onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
-                    />
-                  );
+                  return <RegularPolygon key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.RegularPolygon>} {...commonProps} {...extraProps} sides={3} radius={konvaItem.radius ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 case 'arrow':
-                  return (
-                    <Arrow
-                      key={item.id}
-                      ref={shapeRefs.current[item.id] as React.RefObject<Konva.Arrow>}
-                      {...commonProps}
-                      points={(konvaItem.points as number[]) ?? [0, 0, 100, 0]}
-                      stroke={konvaItem.fill ?? konvaItem.stroke}
-                      fill={konvaItem.fill}
-                      strokeWidth={konvaItem.strokeWidth ?? 2}
-                      pointerLength={(konvaItem as KonvaShape & { pointerLength?: number }).pointerLength ?? 10}
-                      pointerWidth={(konvaItem as KonvaShape & { pointerWidth?: number }).pointerWidth ?? 10}
-                      onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)}
-                    />
-                  );
+                  return <Arrow key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.Arrow>} {...commonProps} {...extraProps} points={(konvaItem.points as number[]) ?? [0, 0, 100, 0]} stroke={konvaItem.fill ?? konvaItem.stroke} fill={konvaItem.fill} strokeWidth={konvaItem.strokeWidth ?? 2} pointerLength={konvaItem.pointerLength ?? 10} pointerWidth={konvaItem.pointerWidth ?? 10} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 default:
                   return null;
               }
@@ -949,7 +771,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
               if (item.type === 'text') {
                 const textItem = item as ReactShape;
                 const isEditing = selectedNodeIds.includes(item.id) && activeTool === "text";
-                
                 return (
                   <TextComponent
                     key={item.id}
@@ -969,22 +790,10 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     rotation={textItem.rotation ?? 0}
                     isSelected={selectedNodeIds.includes(item.id)}
                     isEditing={isEditing}
-                    onSelect={() => {
-                      if (activeTool === "select") {
-                        setSelectedNodeIds([item.id]);
-                      }
-                    }}
-                    onUpdate={(newAttrs: Partial<ReactShape>) => {
-                      setReactShapes(prev => prev.map(shape =>
-                        shape.id === item.id ? { ...shape, ...newAttrs } : shape
-                      ));
-                    }}
-                    onStartEditing={() => {
-                      setActiveTool("text");
-                    }}
-                    onFinishEditing={() => {
-                      setActiveTool("select");
-                    }}
+                    onSelect={() => activeTool === "select" && setSelectedNodeIds([item.id])}
+                    onUpdate={(newAttrs: Partial<ReactShape>) => setReactShapes(prev => prev.map(shape => shape.id === item.id ? { ...shape, ...newAttrs } : shape))}
+                    onStartEditing={() => setActiveTool("text")}
+                    onFinishEditing={() => setActiveTool("select")}
                     onDragStart={commonProps.onDragStart}
                     onDragMove={commonProps.onDragMove}
                     onDragEnd={commonProps.onDragEnd}
@@ -999,85 +808,37 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     shapeData={item as ReactShape}
                     isSelected={selectedNodeIds.includes(item.id)}
                     activeTool={activeTool}
-                    onSelect={() => {
-                      if (activeTool === "select") {
-                        setSelectedNodeIds([item.id]);
-                      }
-                    }}
-                    onUpdate={(newAttrs: Partial<ReactShape>) => {
-                      setReactShapes(prev => prev.map(shape =>
-                        shape.id === item.id ? { ...shape, ...newAttrs } : shape
-                      ));
-                    }}
+                    onSelect={() => activeTool === "select" && setSelectedNodeIds([item.id])}
+                    onUpdate={(newAttrs: Partial<ReactShape>) => setReactShapes(prev => prev.map(shape => shape.id === item.id ? { ...shape, ...newAttrs } : shape))}
                     onDragStart={commonProps.onDragStart}
                     onDragMove={commonProps.onDragMove}
                     onDragEnd={commonProps.onDragEnd}
-                    
                   />
                 );
-              } else {
-                return null;
               }
-            } else {
-              return null;
             }
+            return null;
           })}
-          
           {lines.map((line, i) => (
-            <Line
-              key={`line-${i}`}
-              points={line.points}
-              stroke={line.tool === 'brush' ? '#000000' : '#ffffff'}
-              strokeWidth={5}
-              tension={0.5}
-              lineCap="round"
-              lineJoin="round"
-              globalCompositeOperation={
-                line.tool === 'eraser' ? 'destination-out' : 'source-over'
-              }
-              listening={false}
-            />
+            <Line key={`line-${i}`} points={line.points} stroke={line.tool === 'brush' ? '#000000' : '#ffffff'} strokeWidth={5} tension={0.5} lineCap="round" lineJoin="round" globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'} listening={false} />
           ))}
           <Transformer
             ref={trRef}
-            enabledAnchors={[
-              "top-left", "top-right",
-              "bottom-left", "bottom-right","top-center", "bottom-center",
-              "middle-left", "middle-right"
-            ]}
+            enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right","top-center", "bottom-center", "middle-left", "middle-right"]}
             boundBoxFunc={(oldBox, newBox) => {
-              if (selectedNodeIds.length > 1) {
-                return newBox;
-              }
-              
+              if (selectedNodeIds.length > 1) return newBox;
               const selectedShapes = allShapesToRender.filter(item => selectedNodeIds.includes(item.id));
               const selectedImage = selectedShapes.find(item => item.__kind === 'image');
-              
               if (selectedImage) {
                 const imageShape = selectedImage as ImageShape;
                 const aspectRatio = imageShape.width / imageShape.height;
-                
                 let width = newBox.width;
                 let height = newBox.height;
-                
-                if (Math.abs(width - oldBox.width) > Math.abs(height - oldBox.height)) {
-                  height = width / aspectRatio;
-                } else {  
-                  width = height * aspectRatio;
-                }
-                
-                return {
-                  ...newBox,
-                  width: Math.max(20, width),
-                  height: Math.max(20, height),
-                };
+                if (Math.abs(width - oldBox.width) > Math.abs(height - oldBox.height)) height = width / aspectRatio;
+                else width = height * aspectRatio;
+                return { ...newBox, width: Math.max(20, width), height: Math.max(20, height) };
               }
-              
-              return {
-                ...newBox,
-                width: Math.max(5, newBox.width),
-                height: Math.max(5, newBox.height),
-              };
+              return { ...newBox, width: Math.max(5, newBox.width), height: Math.max(5, newBox.height) };
             }}
             keepRatio={selectedNodeIds.length === 1}
             rotateEnabled={true}
@@ -1087,11 +848,11 @@ const StageComponent: React.FC<StageComponentProps> = ({
             borderStroke="#0099e5"
             borderStrokeWidth={2}
             anchorCornerRadius={6}
-            anchorStroke="#0099e5"                                                  
+            anchorStroke="#0099e5"
             anchorFill="#ffffff"
             ignoreStroke={true}
           />
-        </Layer>                                                
+        </Layer>
       </Stage>
     </div>
   );
