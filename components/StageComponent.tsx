@@ -18,6 +18,11 @@ const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), {
 // Helper type to fix MouseEvent vs TouchEvent conflicts
 type KonvaPointerEvent = Konva.KonvaEventObject<MouseEvent | TouchEvent>;
 
+// Helper to safely check for modifier keys
+const isMouseEvent = (evt: Event): evt is MouseEvent => {
+  return 'shiftKey' in evt;
+};
+
 interface StageComponentProps {
   stageRef: React.RefObject<Konva.Stage | null>;
   trRef: React.RefObject<Konva.Transformer | null>;
@@ -164,6 +169,7 @@ const ConnectionElement = React.forwardRef<Konva.Path, {
   const endAnchorRef = React.useRef<Konva.Circle>(null);
 
   React.useImperativeHandle(ref, () => pathRef.current!);
+  
   const computeSmartControlPoints = (from: {x: number, y: number}, to: {x: number, y: number}) => {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
@@ -516,17 +522,22 @@ const StageComponent: React.FC<StageComponentProps> = ({
                updates.points = k.points.map((val, index) => index % 2 === 0 ? val * scaleX : val * scaleY);
                const arrowScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
                
-               // Use type assertion to avoid any 'implicit any' errors if type definition is missing
-               const pLength = (k as any).pointerLength ?? 10;
-               const pWidth = (k as any).pointerWidth ?? 10;
+               // Use proper property access
+               const pLength = k.pointerLength ?? 10;
+               const pWidth = k.pointerWidth ?? 10;
                
                updates.pointerLength = pLength * arrowScale;
                updates.pointerWidth = pWidth * arrowScale;
             }
             break;
           default:
-            if ('width' in k) updates.width = ((k as any).width as number) * scaleX;
-            if ('height' in k) updates.height = ((k as any).height as number) * scaleY;
+            // Safe property check without 'any'
+            if ('width' in k && typeof k.width === 'number') {
+               updates.width = k.width * scaleX;
+            }
+            if ('height' in k && typeof k.height === 'number') {
+               updates.height = k.height * scaleY;
+            }
             break;
         }
         updateShape(item.id, updates);
@@ -543,7 +554,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
       stage.scale({ x: scale, y: scale });
       stage.position(position);
       stage.batchDraw();
-    }, [scale, position]);
+    }, [scale, position, stageRef]);
 
   useEffect(() => {
     const allIds = [
@@ -596,8 +607,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
     
     if (e.target.hasName('selectable-shape')) {
       const clickedId = e.target.id();
-      const evt = e.evt as MouseEvent | TouchEvent;
-      const isMultiSelect = (evt as any).shiftKey || (evt as any).ctrlKey || (evt as any).metaKey;
+      const evt = e.evt; // native event
+      
+      // Type safe check for modifier keys
+      const isMultiSelect = isMouseEvent(evt) 
+        ? evt.shiftKey || evt.ctrlKey || evt.metaKey 
+        : false;
       
       if (isMultiSelect) {
         if (selectedNodeIds.includes(clickedId)) {
@@ -615,8 +630,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
     e.cancelBubble = true;
     if (activeTool === "select") {
       const clickedId = item.id;
-      const evt = e.evt as MouseEvent | TouchEvent;
-      const isMultiSelect = (evt as any).shiftKey || (evt as any).ctrlKey || (evt as any).metaKey;
+      const evt = e.evt;
+      
+      // Type safe check for modifier keys
+      const isMultiSelect = isMouseEvent(evt) 
+        ? evt.shiftKey || evt.ctrlKey || evt.metaKey 
+        : false;
       
       if (isMultiSelect) {
         if (selectedNodeIds.includes(clickedId)) {
@@ -634,8 +653,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
     e.cancelBubble = true;
     if (activeTool === "select") {
       const clickedId = connection.id;
-      const evt = e.evt as MouseEvent | TouchEvent;
-      const isMultiSelect = (evt as any).shiftKey || (evt as any).ctrlKey || (evt as any).metaKey;
+      const evt = e.evt;
+      
+      // Type safe check for modifier keys
+      const isMultiSelect = isMouseEvent(evt) 
+        ? evt.shiftKey || evt.ctrlKey || evt.metaKey 
+        : false;
       
       if (isMultiSelect) {
         if (selectedNodeIds.includes(clickedId)) {
