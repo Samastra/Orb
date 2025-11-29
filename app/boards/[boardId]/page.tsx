@@ -292,7 +292,7 @@ const updateAnyShape = useCallback((
 
   Object.keys(updates).forEach(key => {
     if (allowedKeys.includes(key)) {
-       // @ts-ignore - Dynamic assignment is safe here because we filtered keys
+     
        safeUpdates[key] = updates[key as keyof typeof updates];
     }
   });

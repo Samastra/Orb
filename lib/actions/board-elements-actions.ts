@@ -50,8 +50,8 @@ const normalizeKonvaShape = (shape: KonvaShape): KonvaShape => {
       return { 
         ...baseShape, 
         points: shape.points ?? [0, 0, 100, 0],
-        pointerLength: (shape as any).pointerLength,
-        pointerWidth: (shape as any).pointerWidth
+        pointerLength: shape.pointerLength,
+        pointerWidth: shape.pointerWidth
       };
       
     default:
