@@ -31,32 +31,29 @@ const normalizeKonvaShape = (shape: KonvaShape): KonvaShape => {
 
   switch (shape.type) {
     case "rect":
-      return {
-        ...baseShape,
-        width: shape.width ?? 100,
-        height: shape.height ?? 100,
-      };
+      return { ...baseShape, width: shape.width ?? 100, height: shape.height ?? 100 };
     case "circle":
-      return {
-        ...baseShape,
-        radius: shape.radius ?? 50,
-      };
+      return { ...baseShape, radius: shape.radius ?? 50 };
     case "ellipse":
-      return {
-        ...baseShape,
-        radiusX: shape.radiusX ?? 80,
-        radiusY: shape.radiusY ?? 50,
-      };
+      return { ...baseShape, radiusX: shape.radiusX ?? 80, radiusY: shape.radiusY ?? 50 };
+    
+    // FIX 1: Triangle uses Radius, not Points
     case "triangle":
-      return {
-        ...baseShape,
-        points: shape.points ?? [0, 0, 100, 0, 50, 86.6],
+      return { 
+        ...baseShape, 
+        radius: shape.radius ?? 50,
+        sides: 3 
       };
+      
+    // FIX 2: Arrow needs points
     case "arrow":
-      return {
-        ...baseShape,
+      return { 
+        ...baseShape, 
         points: shape.points ?? [0, 0, 100, 0],
+        pointerLength: (shape as any).pointerLength,
+        pointerWidth: (shape as any).pointerWidth
       };
+      
     default:
       return baseShape;
   }

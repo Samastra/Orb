@@ -274,86 +274,63 @@ const updateAnyShape = useCallback((
 ) => {
   let updated = false;
 
-  // Create a safe updates object with only properties that exist in updates
-  const safeUpdates: Record<string, unknown> = {};
-  
-  // Only include properties that actually exist in the updates object
-  if ('x' in updates && updates.x !== undefined) safeUpdates.x = updates.x;
-  if ('y' in updates && updates.y !== undefined) safeUpdates.y = updates.y;
-  if ('rotation' in updates && updates.rotation !== undefined) safeUpdates.rotation = updates.rotation;
-  if ('fill' in updates && updates.fill !== undefined) safeUpdates.fill = updates.fill;
-  if ('stroke' in updates && updates.stroke !== undefined) safeUpdates.stroke = updates.stroke;
-  if ('strokeWidth' in updates && updates.strokeWidth !== undefined) safeUpdates.strokeWidth = updates.strokeWidth;
-  if ('width' in updates && updates.width !== undefined) safeUpdates.width = updates.width;
-  if ('height' in updates && updates.height !== undefined) safeUpdates.height = updates.height;
-  if ('fontSize' in updates && updates.fontSize !== undefined) safeUpdates.fontSize = updates.fontSize;
-  if ('fontFamily' in updates && updates.fontFamily !== undefined) safeUpdates.fontFamily = updates.fontFamily;
+  // 1. Define ALL properties we want to save to the database
+  const allowedKeys = [
+    'x', 'y', 'rotation', 'fill', 'stroke', 'strokeWidth',
+    'width', 'height',             // Rects, Images, Text, Sticky
+    'radius',                      // Circles, Triangles
+    'radiusX', 'radiusY',          // Ellipses
+    'points',                      // Arrows
+    'sides',                       // Triangles
+    'pointerLength', 'pointerWidth', // Arrows
+    'fontSize', 'fontFamily', 'text', 'fontWeight', 'fontStyle', 'align', // Text
+    'from', 'to', 'cp1x', 'cp1y', 'cp2x', 'cp2y' // Connections
+  ];
 
+  // 2. Create the safe update object dynamically
+  const safeUpdates: Record<string, unknown> = {};
+
+  Object.keys(updates).forEach(key => {
+    if (allowedKeys.includes(key)) {
+       // @ts-ignore - Dynamic assignment is safe here because we filtered keys
+       safeUpdates[key] = updates[key as keyof typeof updates];
+    }
+  });
+
+  // 3. Apply updates to the correct state array
+  
   // React-managed shapes (text, sticky notes)
   if (reactShapes.some(s => s.id === id)) {
-    setReactShapes(prev => prev.map(s => 
-      s.id === id ? { ...s, ...safeUpdates } : s
-    ));
+    setReactShapes(prev => prev.map(s => s.id === id ? { ...s, ...safeUpdates } : s));
     updated = true;
   }
 
-  // Konva-managed shapes (rect, circle, triangle, etc.)
+  // Konva-managed shapes (rect, circle, arrow, etc)
   if (konvaShapes.some(s => s.id === id)) {
-    setKonvaShapes(prev => prev.map(s => 
-      s.id === id ? { ...s, ...safeUpdates } : s
-    ));
+    setKonvaShapes(prev => prev.map(s => s.id === id ? { ...s, ...safeUpdates } : s));
     updated = true;
   }
 
   // Images
   if (images.some(i => i.id === id)) {
-    setImages(prev => prev.map(i => 
-      i.id === id ? { ...i, ...safeUpdates } : i
-    ));
+    setImages(prev => prev.map(i => i.id === id ? { ...i, ...safeUpdates } : i));
     updated = true;
   }
 
   // Stage frames
   if (stageFrames.some(f => f.id === id)) {
-    setStageFrames(prev => prev.map(f => 
-      f.id === id ? { ...f, ...safeUpdates } : f
-    ));
+    setStageFrames(prev => prev.map(f => f.id === id ? { ...f, ...safeUpdates } : f));
     updated = true;
   }
 
-  // Connections (stroke, etc.)
+  // Connections
   if (connections.some(c => c.id === id)) {
-    // For connections, we need to handle connection-specific properties
-    const connectionUpdates: Partial<Connection> = { ...safeUpdates };
-    
-    // Add connection-specific properties if they exist
-    if ('from' in updates) connectionUpdates.from = updates.from as Connection['from'];
-    if ('to' in updates) connectionUpdates.to = updates.to as Connection['to'];
-    if ('cp1x' in updates) connectionUpdates.cp1x = updates.cp1x as number;
-    if ('cp1y' in updates) connectionUpdates.cp1y = updates.cp1y as number;
-    if ('cp2x' in updates) connectionUpdates.cp2x = updates.cp2x as number;
-    if ('cp2y' in updates) connectionUpdates.cp2y = updates.cp2y as number;
-    
-    updateConnection(id, connectionUpdates);
+    updateConnection(id, safeUpdates);
     updated = true;
   }
 
-  if (updated) {
-    setHasChanges(true);
-  }
-}, [
-  reactShapes,
-  konvaShapes,
-  images,
-  stageFrames,
-  connections,
-  setReactShapes,
-  setKonvaShapes,
-  setImages,
-  setStageFrames,
-  updateConnection,
-]);
-
+  if (updated) setHasChanges(true);
+}, [reactShapes, konvaShapes, images, stageFrames, connections, setReactShapes, setKonvaShapes, setImages, setStageFrames, updateConnection]);
 
     const handleStageShapeUpdate = useCallback((id: string, attrs: Partial<ShapeAttributes>) => {
   if (!id) return;

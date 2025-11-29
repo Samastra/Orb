@@ -456,19 +456,24 @@ const StageComponent: React.FC<StageComponentProps> = ({
     try {
       const node = e.target;
       if (item.__kind === 'connection') return;
+
+      // 1. Reset Scale to 1 (we will bake scale into dimensions)
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
       
-      const hasPosition = (shape: CombinedShape): shape is CombinedShape & { x: number; y: number } => {
-        return shape.__kind !== 'connection';
+      // Reset node scale visually immediately to prevent jumpiness
+      node.scaleX(1);
+      node.scaleY(1);
+
+      const commonAttrs = {
+        x: node.x(),
+        y: node.y(),
+        rotation: node.rotation(),
       };
-      if (!hasPosition(item)) return;
-      
+
+      // --- REACT SHAPES (Text/Sticky) ---
       if (item.__kind === 'react') {
-        const newX = node.x();
-        const newY = node.y();
-        const newRotation = node.rotation();
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
-        const updates: Partial<ReactShape> = { x: newX, y: newY, rotation: newRotation };
+        const updates: Partial<ReactShape> = { ...commonAttrs };
         if (item.type === 'text') {
           const textItem = item as ReactShape;
           updates.width = Math.max(20, (textItem.width ?? 200) * scaleX);
@@ -477,127 +482,84 @@ const StageComponent: React.FC<StageComponentProps> = ({
           const stickyItem = item as ReactShape;
           updates.width = Math.max(50, (stickyItem.width ?? 200) * scaleX);
           updates.height = Math.max(50, (stickyItem.height ?? 200) * scaleY);
-          if (stickyItem.fontSize) {
-            updates.fontSize = Math.max(8, stickyItem.fontSize * scaleY);
-          }
         }
-        node.scaleX(1);
-        node.scaleY(1);
         setReactShapes(prev => prev.map(s => s.id === item.id ? { ...s, ...updates } : s));
         return;
       }
-      
+
+      // --- IMAGES ---
       if (item.__kind === 'image') {
         const imageNode = node as Konva.Image;
-        const newWidth = Math.max(1, imageNode.width() * imageNode.scaleX());
-        const newHeight = Math.max(1, imageNode.height() * imageNode.scaleY());
-        imageNode.scaleX(1);
-        imageNode.scaleY(1);
+        const newWidth = Math.max(1, imageNode.width() * scaleX);
+        const newHeight = Math.max(1, imageNode.height() * scaleY);
         
-        setImages(prev => prev.map(img =>
-          img.id === item.id
-            ? {
-                ...img,
-                x: imageNode.x(),
-                y: imageNode.y(),
-                width: newWidth,
-                height: newHeight,
-                rotation: imageNode.rotation()
-              }
-            : img
-        ));
+        setImages(prev => prev.map(img => img.id === item.id ? { ...img, ...commonAttrs, width: newWidth, height: newHeight } : img));
         return;
       }
-      
+
+      // --- STAGE FRAMES ---
       if (item.__kind === 'stage') {
         const stageNode = node as Konva.Rect;
-        const newWidth = Math.max(1, stageNode.width() * stageNode.scaleX());
-        const newHeight = Math.max(1, stageNode.height() * stageNode.scaleY());
-        stageNode.scaleX(1);
-        stageNode.scaleY(1);
-        updateShape(item.id, {
-          x: stageNode.x(),
-          y: stageNode.y(),
-          width: newWidth,
-          height: newHeight,
-          rotation: stageNode.rotation()
-        });
+        const newWidth = Math.max(1, stageNode.width() * scaleX);
+        const newHeight = Math.max(1, stageNode.height() * scaleY);
+        
+        setStageFrames(prev => prev.map(f => f.id === item.id ? { ...f, ...commonAttrs, width: newWidth, height: newHeight } : f));
         return;
       }
-      
+
+      // --- KONVA SHAPES (Circle, Arrow, etc) ---
       if (item.__kind === 'konva') {
         const k = item as KonvaShape;
+        const updates: Partial<KonvaShape> = { ...commonAttrs };
+
         switch (k.type) {
-          case 'rect': {
-            const rectNode = node as Konva.Rect;
-            const newW = Math.max(1, rectNode.width() * rectNode.scaleX());
-            const newH = Math.max(1, rectNode.height() * rectNode.scaleY());
-            rectNode.scaleX(1);
-            rectNode.scaleY(1);
-            updateShape(item.id, {
-              x: rectNode.x(),
-              y: rectNode.y(),
-              width: newW,
-              height: newH,
-              rotation: rectNode.rotation()
-            });
+          case 'rect':
+            updates.width = Math.max(1, (k.width ?? 100) * scaleX);
+            updates.height = Math.max(1, (k.height ?? 100) * scaleY);
             break;
-          }
-          case 'circle': {
-            const circleNode = node as Konva.Circle;
-            const newR = Math.max(1, circleNode.radius() * circleNode.scaleX());
-            circleNode.scaleX(1);
-            circleNode.scaleY(1);
-            updateShape(item.id, {
-              x: circleNode.x(),
-              y: circleNode.y(),
-              radius: newR,
-              rotation: circleNode.rotation()
-            });
+
+          case 'circle':
+            // Scale radius by the average scale
+            const avgScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
+            updates.radius = Math.max(1, (k.radius ?? 50) * avgScale);
             break;
-          }
-          case 'ellipse': {
-            const ellipseNode = node as Konva.Ellipse;
-            const newRx = Math.max(1, ellipseNode.radiusX() * ellipseNode.scaleX());
-            const newRy = Math.max(1, ellipseNode.radiusY() * ellipseNode.scaleY());
-            ellipseNode.scaleX(1);
-            ellipseNode.scaleY(1);
-            updateShape(item.id, {
-              x: ellipseNode.x(),
-              y: ellipseNode.y(),
-              radiusX: newRx,
-              radiusY: newRy,
-              rotation: ellipseNode.rotation()
-            });
+
+          case 'ellipse':
+            updates.radiusX = Math.max(1, (k.radiusX ?? 80) * scaleX);
+            updates.radiusY = Math.max(1, (k.radiusY ?? 50) * scaleY);
             break;
-          }
-          case 'triangle':
+
+          case 'triangle': // RegularPolygon
+            // Like circle, scale the radius
+            const triScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
+            updates.radius = Math.max(1, (k.radius ?? 50) * triScale);
+            break;
+
           case 'arrow':
-          default: {
-            const newAttrs: Partial<KonvaShape> = {
-              x: node.x(),
-              y: node.y(),
-              rotation: node.rotation()
-            };
-            if ('width' in node.attrs && 'height' in node.attrs) {
-              const shapeNode = node as Konva.Shape;
-              const newW = Math.max(1, shapeNode.width() * shapeNode.scaleX());
-              const newH = Math.max(1, shapeNode.height() * shapeNode.scaleY());
-              shapeNode.scaleX(1);
-              shapeNode.scaleY(1);
-              newAttrs.width = newW;
-              newAttrs.height = newH;
+            // FIX FOR ARROW: Bake scale into points
+            if (k.points) {
+               updates.points = k.points.map((val, index) => {
+                 // Even index is X, Odd index is Y
+                 return index % 2 === 0 ? val * scaleX : val * scaleY;
+               });
             }
-            updateShape(item.id, newAttrs);
             break;
-          }
+
+          default:
+            // Fallback for custom shapes if any
+             if ('width' in k) updates.width = (k.width as number) * scaleX;
+             if ('height' in k) updates.height = (k.height as number) * scaleY;
+            break;
         }
+
+        updateShape(item.id, updates);
         return;
       }
+
     } catch (error) {
       console.error('Error in handleShapeTransformEnd:', error);
     }
-  };
+};
 
   useEffect(() => {
     if (!stageRef.current || !hasLoaded) return;
