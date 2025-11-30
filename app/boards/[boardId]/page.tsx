@@ -463,76 +463,97 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
   // FINAL WORKING LOADING CODE — COPY-PASTE THIS EXACTLY
 // In page.tsx - REPLACE the entire useLayoutEffect loading code with this:
 useLayoutEffect(() => {
-  if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
+    // 1. Safety Checks
+    if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
 
-  const loadSavedElements = async () => {
-    try {
-      console.log("🔄 LOADING BOARD ELEMENTS...");
-      
-      const elements = await loadBoardElements(currentBoardId);
-      
-      console.log("📥 LOADED FROM DB:", {
-        scale: elements.stageState?.scale,
-        position: elements.stageState?.position,
-        shapes: {
-          react: elements.reactShapes?.length,
-          konva: elements.konvaShapes?.length,
-          frames: elements.stageFrames?.length,
-          images: elements.images?.length,
-          connections: elements.connections?.length
+    const loadSavedElements = async () => {
+      try {
+        console.log("🔄 LOADING BOARD ELEMENTS...");
+        const elements = await loadBoardElements(currentBoardId);
+
+        // 2. Handle Camera (View) Setup
+        if (stageRef.current) {
+          const stage = stageRef.current;
+
+          // CHECK: Do we have saved camera data?
+          if (elements.stageState && elements.stageState.scale) {
+            // --- CASE A: EXISTING BOARD (Restore View) ---
+            console.log("📥 Restoring saved camera view...");
+            
+            // Update Konva Stage immediately
+            stage.scale({ x: elements.stageState.scale, y: elements.stageState.scale });
+            stage.position(elements.stageState.position);
+            
+            // Sync React State
+            boardState.setScale(elements.stageState.scale);
+            boardState.setPosition(elements.stageState.position);
+          
+          } else {
+            // --- CASE B: NEW BOARD (Set Default "Helicopter" View) ---
+            console.log("🆕 New Board Detected - Applying Default View...");
+
+            const defaultScale = 0.4; // 40% Zoom (Spacious)
+            
+            // Calculate center of the viewport
+            const centerX = stage.width() / 2;
+            const centerY = stage.height() / 2;
+
+            // Apply to Konva Stage
+            stage.scale({ x: defaultScale, y: defaultScale });
+            stage.position({ x: centerX, y: centerY });
+
+            // Sync React State
+            boardState.setScale(defaultScale);
+            boardState.setPosition({ x: centerX, y: centerY });
+          }
+
+          stage.batchDraw(); // Force draw
         }
-      });
 
-      // CRITICAL FIX: Apply camera state to the actual Konva stage FIRST
-      if (elements.stageState && stageRef.current) {
-        console.log("🎯 APPLYING CAMERA TO STAGE:", elements.stageState);
-        
-        // Update React state
-        boardState.setScale(elements.stageState.scale);
-        boardState.setPosition(elements.stageState.position);
-        
-        // CRITICAL: Directly update the Konva stage instance
-        const stage = stageRef.current;
-        stage.scale({ x: elements.stageState.scale, y: elements.stageState.scale });
-        stage.position(elements.stageState.position);
-        stage.batchDraw(); // Force immediate redraw
-        
-        console.log("✅ CAMERA APPLIED TO STAGE");
+        // 3. Load Shapes (Small delay ensures camera is set first)
+        setTimeout(() => {
+          console.log("📝 Populating shapes...");
+          
+          // Clear first to be safe
+          setReactShapes([]);
+          setKonvaShapes([]);
+          setStageFrames([]);
+          setImages([]);
+          setConnections([]);
+          setLines([]);
+          
+          // Populate from DB
+          setReactShapes(elements.reactShapes || []);
+          setKonvaShapes(elements.konvaShapes || []);
+          setStageFrames(elements.stageFrames || []);
+          setImages(elements.images || []);
+          setConnections(elements.connections || []);
+          setLines(elements.lines || []);
+          
+          setHasLoaded(true);
+          console.log("✅ BOARD FULLY INITIALIZED");
+        }, 50);
+
+      } catch (error) {
+        console.error("❌ LOAD FAILED:", error);
+        setHasLoaded(true); // Prevent infinite loading state
       }
+    };
 
-      // CRITICAL FIX: Wait for camera to be applied, THEN load shapes
-      setTimeout(() => {
-        console.log("📝 LOADING SHAPES AFTER CAMERA...");
-        
-        // Clear existing state first to prevent conflicts
-        setReactShapes([]);
-        setKonvaShapes([]);
-        setStageFrames([]);
-        setImages([]);
-        setConnections([]);
-        setLines([]);
-        
-        // Then set the loaded shapes
-        setReactShapes(elements.reactShapes || []);
-        setKonvaShapes(elements.konvaShapes || []);
-        setStageFrames(elements.stageFrames || []);
-        setImages(elements.images || []);
-        setConnections(elements.connections || []);
-        setLines(elements.lines || []);
-        
-        setHasLoaded(true);
-        console.log("✅ BOARD FULLY LOADED");
-      }, 50); // Small delay to ensure camera is applied
-
-    } catch (error) {
-      console.error("❌ LOAD FAILED:", error);
-      setHasLoaded(true);
-    }
-  };
-
-  loadSavedElements();
-}, [currentBoardId, isTemporaryBoard, hasLoaded, boardState, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setLines]); // Force-save drags (1s debounce)
-
+    loadSavedElements();
+  }, [
+    currentBoardId, 
+    isTemporaryBoard, 
+    hasLoaded, 
+    boardState, 
+    setReactShapes, 
+    setKonvaShapes, 
+    setStageFrames, 
+    setImages, 
+    setConnections, 
+    setLines
+  ]);
+  
   // In page.tsx - Add this right after the loading useLayoutEffect
 useEffect(() => {
   // Force stage to update when camera changes

@@ -12,7 +12,7 @@ interface GridLayerProps {
 const GridLayer: React.FC<GridLayerProps> = ({ 
   stage, 
   baseSize = 40, 
-  color = "#C0C0C0", 
+  color = "#aaaaaaff", 
   size = 1.5 // Small size looks like Canva/Mural
 }) => {
   const layerRef = useRef<Konva.Layer>(null);

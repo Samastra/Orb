@@ -45,8 +45,8 @@ export const useBoardState = () => {
   const [connectionStart, setConnectionStart] = useState<{ x: number; y: number } | null>(null);
   const [tempConnection, setTempConnection] = useState<Konva.Line | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [scale, setScale] = useState(0.4);
+  const [position, setPosition] = useState({ x: 400, y: 300 });
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [actions, setActions] = useState<Action[]>([]);
   const [undoneActions, setUndoneActions] = useState<Action[]>([]);
