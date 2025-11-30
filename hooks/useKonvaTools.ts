@@ -5,11 +5,9 @@ import { Connection, Side } from "./useBoardState";
 import { getAnchorPoint, Rect } from "@/lib/connection-utils"; 
 import { KonvaShape } from "./useShapes";
 
-// STATIC CONSTANTS (Moved outside to prevent re-creation)
 const SNAP_THRESHOLD_SIDES: Side[] = ["top", "right", "bottom", "left"];
-const THROTTLE_MS = 16; // ~60 FPS cap
+const THROTTLE_MS = 16;
 
-// Helper to get relative pointer position
 function getRelativePointerPosition(stage: Konva.Stage) {
   const transform = stage.getAbsoluteTransform().copy();
   transform.invert();
@@ -18,12 +16,7 @@ function getRelativePointerPosition(stage: Konva.Stage) {
   return transform.point(pos);
 }
 
-// Helper: Check if a point is near a line (for eraser)
-function isPointNearLine(
-  point: { x: number; y: number },
-  linePoints: number[],
-  threshold: number = 10
-): boolean {
+function isPointNearLine(point: { x: number; y: number }, linePoints: number[], threshold: number = 10): boolean {
   for (let i = 0; i < linePoints.length - 2; i += 2) {
     const x1 = linePoints[i];
     const y1 = linePoints[i + 1];
@@ -36,40 +29,25 @@ function isPointNearLine(
     const dot = A * C + B * D;
     const lenSq = C * C + D * D;
     let param = -1;
-    if (lenSq !== 0) {
-      param = dot / lenSq;
-    }
+    if (lenSq !== 0) param = dot / lenSq;
     let xx, yy;
-    if (param < 0) {
-      xx = x1;
-      yy = y1;
-    } else if (param > 1) {
-      xx = x2;
-      yy = y2;
-    } else {
-      xx = x1 + param * C;
-      yy = y1 + param * D;
-    }
+    if (param < 0) { xx = x1; yy = y1; }
+    else if (param > 1) { xx = x2; yy = y2; }
+    else { xx = x1 + param * C; yy = y1 + param * D; }
     const dx = point.x - xx;
     const dy = point.y - yy;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    if (distance <= threshold) {
-      return true;
-    }
+    if (Math.sqrt(dx * dx + dy * dy) <= threshold) return true;
   }
   return false;
 }
 
-// Helper: Check if text input is focused (prevents shortcuts)
 const isTextInputFocused = (): boolean => {
   if (typeof document === 'undefined') return false;
   const activeElement = document.activeElement;
   if (!activeElement) return false;
-  
   const tagName = activeElement.tagName.toLowerCase();
   const isInput = tagName === 'input' || tagName === 'textarea';
   const isContentEditable = activeElement.getAttribute('contenteditable') === 'true';
-  
   return isInput || isContentEditable;
 };
 
@@ -99,20 +77,16 @@ export const useKonvaTools = (
 ) => {
   const isDrawing = useRef(false);
   const lastErasedLines = useRef<number[]>([]);
-  const isSpacePressed = useRef(false);
   const isPanning = useRef(false);
   const lastPointerPosition = useRef<{ x: number; y: number } | null>(null);
   const isSelecting = useRef(false);
   const selectionStart = useRef({ x: 0, y: 0 });
   const selectionRect = useRef<Konva.Rect | null>(null);
-  
-  // PERFORMANCE: Timestamp for throttling
   const lastFrameTime = useRef<number>(0);
-
-  // New State for Anchors
+  
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
-  // ========== CURSOR HELPERS ==========
   const getCursorForTool = useCallback((tool: Tool | null, mode: "brush" | "eraser") => {
     switch (tool) {
       case "connect": return "crosshair"; 
@@ -122,89 +96,99 @@ export const useKonvaTools = (
     }
   }, []);
 
-  // ========== DRAGGABLE MANAGEMENT ==========
+  // ========== FORCE DRAGGABLES ==========
   const updateDraggables = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
     const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
     if (!drawLayer) return;
     
+    // Logic: If Tool is Select/Null AND Space is NOT pressed -> EVERYTHING IS MOVABLE
+    const enableDrag = (activeTool === "select" || activeTool === null) && !isSpacePressed;
+    
     const shapes = drawLayer.find(".selectable-shape");
-    const enableDrag = activeTool === "select" && !isSpacePressed.current;
-    
     shapes.forEach((shape: Konva.Node) => {
-      shape.draggable(enableDrag && selectedNodeIds.includes(shape.id()));
+      shape.draggable(enableDrag);
     });
-    
-    drawLayer.batchDraw();
-  }, [activeTool, selectedNodeIds, stageRef]);
+  }, [activeTool, isSpacePressed, stageRef]);
 
   useEffect(() => {
     updateDraggables();
-  }, [updateDraggables, activeTool, isSpacePressed.current]);
+  }, [updateDraggables, activeTool, isSpacePressed]);
 
-  // ========== PANNING LOGIC ==========
-  const handleKeyDown = useCallback((e: Konva.KonvaEventObject<KeyboardEvent>) => {
-    if (e.evt.key === ' ' && isTextInputFocused()) return;
-
-    if (e.evt.key === ' ') {
-      isSpacePressed.current = true;
-      const stage = stageRef.current;
-      if (stage) {
-        stage.container().style.cursor = 'grab';
-        updateDraggables();
+  // ========== KEYBOARD EVENTS ==========
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === ' ' && isTextInputFocused()) return;
+      if (e.key === ' ') {
+        setIsSpacePressed(true); 
+        e.preventDefault();
+        if (stageRef.current) {
+            stageRef.current.container().style.cursor = 'grab';
+            const layer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
+            if(layer) layer.find(".selectable-shape").forEach(s => s.draggable(false));
+        }
       }
-      e.evt.preventDefault();
-    }
-  }, [stageRef, updateDraggables]);
+    };
+    const handleGlobalKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ' && isTextInputFocused()) return;
+      if (e.key === ' ') {
+        setIsSpacePressed(false);
+        isPanning.current = false;
+        if (stageRef.current) {
+            stageRef.current.container().style.cursor = getCursorForTool(activeTool, drawingMode);
+            const layer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
+            if(layer) layer.find(".selectable-shape").forEach(s => s.draggable(true));
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener('keyup', handleGlobalKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+      window.removeEventListener('keyup', handleGlobalKeyUp);
+    };
+  }, [activeTool, drawingMode, getCursorForTool, stageRef]);
 
+  // ========== PANNING ==========
   const handlePanningMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (!isSpacePressed.current) return;
+    if (!isSpacePressed) return;
     const stage = stageRef.current;
     if (!stage) return;
     isPanning.current = true;
     const pointerPos = stage.getPointerPosition();
-    if (pointerPos) {
-      lastPointerPosition.current = pointerPos;
-    }
+    if (pointerPos) lastPointerPosition.current = pointerPos;
     stage.container().style.cursor = 'grabbing';
     e.cancelBubble = true;
-  }, [stageRef]);
+  }, [stageRef, isSpacePressed]);
 
   const handlePanningMouseUp = useCallback(() => {
-    if (!isSpacePressed.current) return;
+    if (!isSpacePressed) return;
     isPanning.current = false;
-    const stage = stageRef.current;
-    if (stage) {
-      stage.container().style.cursor = 'grab';
-    }
-  }, [stageRef]);
+    if (stageRef.current) stageRef.current.container().style.cursor = 'grab';
+  }, [stageRef, isSpacePressed]);
 
   const handlePanningMouseMove = useCallback(() => {
-    if (!isSpacePressed.current || !isPanning.current) return;
+    if (!isSpacePressed || !isPanning.current) return;
     const stage = stageRef.current;
     if (!stage) return;
     
-    // Throttle Panning slightly
     const now = Date.now();
-    if (now - lastFrameTime.current < 8) return; // 120fps cap for panning
+    if (now - lastFrameTime.current < 8) return; 
     lastFrameTime.current = now;
 
     const point = stage.getPointerPosition();
     if (!point || !lastPointerPosition.current) return;
     const dx = point.x - lastPointerPosition.current.x;
     const dy = point.y - lastPointerPosition.current.y;
-    stage.position({
-      x: stage.x() + dx,
-      y: stage.y() + dy,
-    });
+    stage.position({ x: stage.x() + dx, y: stage.y() + dy });
     stage.batchDraw();
     lastPointerPosition.current = point;
-  }, [stageRef]);
+  }, [stageRef, isSpacePressed]);
 
-  // ========== SELECTION LOGIC ==========
+  // ========== SELECTION ==========
   const handleSelectionStart = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool !== "select" || isSpacePressed.current) return;
+    if (activeTool !== "select" || isSpacePressed) return;
     if (e.target !== stageRef.current) return;
 
     const stage = stageRef.current;
@@ -232,7 +216,7 @@ export const useKonvaTools = (
     drawLayer.add(selectionRect.current);
     drawLayer.batchDraw();
     e.cancelBubble = true;
-  }, [activeTool, stageRef]);
+  }, [activeTool, stageRef, isSpacePressed]);
 
   const handleSelectionMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isSelecting.current || !selectionRect.current || !stageRef.current) return;
@@ -266,7 +250,6 @@ export const useKonvaTools = (
           selectedShapes.push(node.id());
         }
       });
-      
       setSelectedNodeIds(selectedShapes);
       selectionRect.current.destroy();
       selectionRect.current = null;
@@ -276,7 +259,7 @@ export const useKonvaTools = (
     e.cancelBubble = true;
   }, [stageRef, setSelectedNodeIds]);
 
-  // ========== DRAWING LOGIC ==========
+  // ========== DRAWING ==========
   const detectAndEraseLines = useCallback((currentPoint: { x: number; y: number }) => {
     setLines(prevLines => {
       const linesToKeep: Array<{ tool: "brush" | "eraser"; points: number[] }> = [];
@@ -324,7 +307,6 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    // Throttle Drawing
     const now = Date.now();
     if (now - lastFrameTime.current < THROTTLE_MS) return;
     lastFrameTime.current = now;
@@ -355,7 +337,7 @@ export const useKonvaTools = (
     if (drawingMode === "eraser") lastErasedLines.current = [];
   }, [activeTool, drawingMode, lines, addAction]);
 
-  // ========== ZOOM HANDLERS ==========
+  // ========== ZOOM ==========
   const handleZoomIn = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -382,7 +364,6 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    // Throttle Wheel zoom slightly
     const now = Date.now();
     if (now - lastFrameTime.current < 8) return; 
     lastFrameTime.current = now;
@@ -390,36 +371,21 @@ export const useKonvaTools = (
     const oldScale = stage.scaleX();
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
-    const mousePointTo = {
-      x: (pointer.x - stage.x()) / oldScale,
-      y: (pointer.y - stage.y()) / oldScale,
-    };
+    const mousePointTo = { x: (pointer.x - stage.x()) / oldScale, y: (pointer.y - stage.y()) / oldScale };
     const direction = e.evt.deltaY > 0 ? 1 : -1;
     const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
     stage.scale({ x: newScale, y: newScale });
-    const newPos = {
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale,
-    };
+    const newPos = { x: pointer.x - mousePointTo.x * newScale, y: pointer.y - mousePointTo.y * newScale };
     stage.position(newPos);
     stage.batchDraw();
   }, [stageRef]);
 
-  // ========== NEW CONNECTION LOGIC (Figma Style) ==========
-  
-  // 1. ANCHOR MOUSE DOWN
-  const handleAnchorMouseDown = useCallback((
-    e: Konva.KonvaEventObject<MouseEvent>, 
-    nodeId: string, 
-    side: Side, 
-    anchorPos: { x: number; y: number }
-  ) => {
+  // ========== CONNECTIONS ==========
+  const handleAnchorMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>, nodeId: string, side: Side, anchorPos: { x: number; y: number }) => {
     e.cancelBubble = true;
     e.evt.stopPropagation(); 
-
     setIsConnecting(true);
     setConnectionStart({ nodeId, side, x: anchorPos.x, y: anchorPos.y });
-
     const temp: Connection = {
       id: "temp-connection",
       type: "connection",
@@ -432,11 +398,9 @@ export const useKonvaTools = (
     setTempConnection(temp);
   }, [setIsConnecting, setConnectionStart, setTempConnection]);
 
-  // 2. MOUSE MOVE (Phantom Line) - HEAVILY OPTIMIZED
+  // 2. MOUSE MOVE (Phantom Line) - WITH EXCLUSION FIX
   const handleConnectionMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isConnecting || !connectionStart || !tempConnection) return;
-    
-    // PERFORMANCE: Throttle to 60fps (16ms)
     const now = Date.now();
     if (now - lastFrameTime.current < THROTTLE_MS) return;
     lastFrameTime.current = now;
@@ -451,59 +415,46 @@ export const useKonvaTools = (
     let endNodeId: string | null = null;
     let endSide: Side | undefined = undefined;
 
-    // OPTIMIZATION: Only search for target if close enough
-    // We iterate manually to avoid creating closures/objects in a .find()
     for (let i = 0; i < allShapes.length; i++) {
         const s = allShapes[i];
-        if (s.id === connectionStart.nodeId) continue; // Skip self
+        if (s.id === connectionStart.nodeId) continue; 
+        
+        // 🛑 CRITICAL FIX: SKIP TEXT AND STICKY NOTES
+        if (s.type === 'text' || s.type === 'stickyNote') continue;
 
-        // Bounding Box Check
-        // Using "as any" for speed here, assuming standardized shape structure
-        const x = (s as any).x;
-        const y = (s as any).y;
-        const w = (s as any).width || 100;
-        const h = (s as any).height || 100;
+        let x = (s as any).x;
+        let y = (s as any).y;
+        let w = (s as any).width || 100;
+        let h = (s as any).height || 100;
 
-        // Simple Hit Test
+        if (s.type === 'circle') {
+            const r = (s as any).radius || 50;
+            x -= r; y -= r; w = r * 2; h = r * 2;
+        } else if (s.type === 'ellipse') {
+            const rx = (s as any).radiusX || 80;
+            const ry = (s as any).radiusY || 50;
+            x -= rx; y -= ry; w = rx * 2; h = ry * 2;
+        }
+
         if (pos.x >= x && pos.x <= x + w && pos.y >= y && pos.y <= y + h) {
-            // WE HAVE A HIT!
             const rect: Rect = { x, y, width: w, height: h };
             let minDist = Infinity;
-
-            // Find closest side
             for (const side of SNAP_THRESHOLD_SIDES) {
                 const p = getAnchorPoint(rect, side);
-                // Squared distance is faster than sqrt for comparison
                 const distSq = (p.x - pos.x) ** 2 + (p.y - pos.y) ** 2;
-                
-                if (distSq < minDist) {
-                    minDist = distSq;
-                    endX = p.x;
-                    endY = p.y;
-                    endNodeId = s.id;
-                    endSide = side;
-                }
+                if (distSq < minDist) { minDist = distSq; endX = p.x; endY = p.y; endNodeId = s.id; endSide = side; }
             }
-            break; // Found the top-most shape, stop searching
+            break;
         }
     }
-
     setTempConnection({
       ...tempConnection,
-      to: { 
-        nodeId: endNodeId, 
-        side: endSide,
-        x: endX, 
-        y: endY 
-      }
+      to: { nodeId: endNodeId, side: endSide, x: endX, y: endY }
     });
-
   }, [isConnecting, connectionStart, tempConnection, stageRef, allShapes, setTempConnection]);
 
-  // 3. MOUSE UP
   const handleConnectionMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isConnecting || !tempConnection || !connectionStart) return;
-
     if (tempConnection.to.nodeId) {
       const newConnection: Connection = {
         id: `conn-${Date.now()}`,
@@ -514,97 +465,55 @@ export const useKonvaTools = (
         strokeWidth: 4,
         draggable: false
       };
-      
       setConnections(prev => [...prev, newConnection]);
       addAction({ type: "add-connection", data: newConnection });
     }
-
     setIsConnecting(false);
     setConnectionStart(null);
     setTempConnection(null);
   }, [isConnecting, tempConnection, connectionStart, setConnections, addAction, setIsConnecting, setConnectionStart, setTempConnection]);
 
-  // 4. ANCHOR CLICK (Quick Create)
-  const handleAnchorClick = useCallback((
-    e: Konva.KonvaEventObject<MouseEvent>,
-    nodeId: string,
-    side: Side
-  ) => {
+  const handleAnchorClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>, nodeId: string, side: Side) => {
     e.cancelBubble = true;
     e.evt.stopPropagation();
-
     const sourceShape = allShapes.find(s => s.id === nodeId);
     if (!sourceShape) return;
-
     const gap = 150;
     let newX = (sourceShape as any).x;
     let newY = (sourceShape as any).y;
     const width = (sourceShape as any).width || 100;
     const height = (sourceShape as any).height || 100;
+    let offsetX = width;
+    let offsetY = height;
+    if (sourceShape.type === 'circle') { const r = (sourceShape as any).radius || 50; offsetX = r; offsetY = r; }
 
     switch (side) {
-      case "right": newX += width + gap; break;
-      case "left": newX -= (width + gap + 20); break;
-      case "bottom": newY += height + gap; break;
-      case "top": newY -= (height + gap + 20); break;
+      case "right": newX += offsetX + gap; break;
+      case "left": newX -= (offsetX + gap); break;
+      case "bottom": newY += offsetY + gap; break;
+      case "top": newY -= (offsetY + gap); break;
     }
-
     let type: Tool = 'rect';
     if (sourceShape.type === 'stickyNote') type = 'stickyNote';
     if (sourceShape.type === 'circle') type = 'circle';
-    
     addShape(type, addAction, { x: newX, y: newY });
-    
   }, [allShapes, addShape, addAction]);
 
-  // ========== HOVER & EVENTS ==========
   const handleShapeMouseEnter = useCallback((id: string) => {
     if (!isConnecting) setHoveredNodeId(id);
   }, [isConnecting]);
 
-  // Global Event Listeners
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.key === ' ' && isTextInputFocused()) return;
-      handleKeyDown({ evt: e } as any);
-    };
-    const handleGlobalKeyUp = (e: KeyboardEvent) => {
-      if (e.key === ' ' && isTextInputFocused()) return;
-      
-      if (e.key === ' ') {
-        isSpacePressed.current = false;
-        isPanning.current = false;
-        const stage = stageRef.current;
-        if (stage) {
-            stage.container().style.cursor = getCursorForTool(activeTool, drawingMode);
-            updateDraggables();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    window.addEventListener('keyup', handleGlobalKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeyDown);
-      window.removeEventListener('keyup', handleGlobalKeyUp);
-    };
-  }, [activeTool, drawingMode, getCursorForTool, stageRef, handleKeyDown, updateDraggables]);
-
-  // Mouse Handlers
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     handlePanningMouseDown(e);
-    if (activeTool === "select" && !isSpacePressed.current) {
-        handleSelectionStart(e);
-    }
-    if (activeTool === "pen") {
-        handleDrawingMouseDown(e);
-    }
-  }, [activeTool, handleDrawingMouseDown, handlePanningMouseDown, handleSelectionStart]);
+    if (activeTool === "select" && !isSpacePressed) handleSelectionStart(e);
+    if (activeTool === "pen") handleDrawingMouseDown(e);
+  }, [activeTool, handleDrawingMouseDown, handlePanningMouseDown, handleSelectionStart, isSpacePressed]);
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     handlePanningMouseMove();
     if (isSelecting.current) handleSelectionMove(e);
     if (activeTool === "pen") handleDrawingMouseMove(e);
-    handleConnectionMouseMove(e); // Phantom line (Now Throttled)
+    handleConnectionMouseMove(e); 
   }, [activeTool, handleDrawingMouseMove, handlePanningMouseMove, handleSelectionMove, handleConnectionMouseMove]);
 
   const handleMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -623,14 +532,12 @@ export const useKonvaTools = (
     handleZoomIn,
     handleZoomOut,
     isDrawing,
-    
-    // Figma Logic Exposed
     hoveredNodeId,
     setHoveredNodeId,
     handleAnchorMouseDown,
     handleAnchorClick,
     handleShapeMouseEnter,
-    
+    isSpacePressed,
     handleTouchStart: (e: any) => { if(activeTool === 'pen') handleDrawingMouseDown(e) },
     handleTouchEnd: (e: any) => { if(activeTool === 'pen') handleDrawingMouseUp() },
     handleTouchMove: (e: any) => { if(activeTool === 'pen') handleDrawingMouseMove(e) }

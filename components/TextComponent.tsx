@@ -1,3 +1,4 @@
+// components/TextComponent.tsx
 "use client";
 import React, { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Text as KonvaText } from "react-konva";
@@ -19,6 +20,10 @@ interface TextComponentProps {
   isSelected: boolean;
   isEditing: boolean;
   activeTool: string | null;
+  // Added missing props that come from StageComponent's commonProps
+  name?: string; 
+  draggable?: boolean;
+  
   onSelect: () => void;
   onUpdate: (attrs: any) => void;
   onStartEditing: () => void;
@@ -48,6 +53,8 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       isSelected,
       isEditing,
       activeTool,
+      name, // Capture the name prop
+      draggable, // Capture the draggable prop from parent
       onSelect,
       onUpdate,
       onDragStart,
@@ -199,28 +206,24 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
       };
 
-      // --- THE FIX IS HERE ---
       const handleFinish = () => {
-         const val = textarea.value;
-         
-         // 1. Calculate the FINAL height from the textarea
-         const absScale = node.getAbsoluteScale();
-         // Force a recalc of scrollHeight to be safe
-         textarea.style.height = "auto";
-         textarea.style.height = `${textarea.scrollHeight}px`;
-         const finalHeight = textarea.scrollHeight / absScale.y;
+          const val = textarea.value;
+          
+          const absScale = node.getAbsoluteScale();
+          textarea.style.height = "auto";
+          textarea.style.height = `${textarea.scrollHeight}px`;
+          const finalHeight = textarea.scrollHeight / absScale.y;
 
-         // 2. Save BOTH text AND height to state/database
-         onUpdateRef.current({ 
+          onUpdateRef.current({ 
              text: val,
              height: finalHeight 
-         });
+          });
 
-         if (val.trim() === "") {
-           onDeleteRef.current(id);
-         } else {
-           onFinishEditingRef.current();
-         }
+          if (val.trim() === "") {
+            onDeleteRef.current(id);
+          } else {
+            onFinishEditingRef.current();
+          }
       };
 
       const handleKeydown = (e: KeyboardEvent) => {
@@ -261,6 +264,8 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         <KonvaText
           ref={internalRef}
           id={id}
+          // Apply the name so useKonvaTools can find it
+          name={name} 
           x={x}
           y={y}
           text={isEditing ? "" : (initialText || " ")} 
@@ -276,7 +281,8 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           wrap="word"
           lineHeight={1.4}
           rotation={rotation}
-          draggable={!isEditing && isSelected}
+          // FIX: Use parent draggable state, but disable when editing
+          draggable={!isEditing && (draggable ?? true)} 
           onDragStart={onDragStart}
           onDragMove={onDragMove}
           onDragEnd={onDragEnd}
@@ -294,7 +300,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           onDblTap={(e) => {
              if (!isEditing) onStartEditing();
           }}
-          perfectDrawEnabled={false} // Optimized rendering
+          perfectDrawEnabled={false} 
           shadowForStrokeEnabled={false}
           hitStrokeWidth={0}
         />

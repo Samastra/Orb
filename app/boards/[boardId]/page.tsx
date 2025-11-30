@@ -414,7 +414,7 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
       type: 'text',
       x: position.x,
       y: position.y,
-      text: "", // Start empty (cursor only)
+      text: "",
       fontSize: 24,
       fill: "#000000",
       fontFamily: "Inter, Arial, sans-serif",
@@ -422,22 +422,18 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
       fontStyle: "normal",
       align: "left",
       draggable: true,
-      width: 200, // Default width
+      width: 200,
       rotation: 0,
     };
     
     setReactShapes(prev => [...prev, newTextShape]);
-    
-    // Select the node
     setSelectedNodeIds([shapeId]); 
-    
-    // CRITICAL: Immediately enter editing mode
     setEditingId(shapeId); 
     
-    // CRITICAL: Switch back to select tool immediately (Miro behavior)
+    // CRITICAL FIX: FORCE SWITCH TO SELECT TOOL IMMEDIATELY
     setActiveTool("select"); 
     
-    console.log('✅ Text created and set to editing mode');
+    console.log('✅ Text created, swapped to Select Tool');
   }, [setReactShapes, setSelectedNodeIds, setActiveTool]);
 
     // AUTO-SAVE ON ANY POSITION CHANGE — NEVER MISS A DRAG AGAIN
@@ -674,6 +670,11 @@ useEffect(() => {
     // Pass this calculated center as the 3rd argument
     addShape(type, undoRedoAddAction, center); 
 
+    if (type === 'stickyNote' || type === 'text') {
+        setActiveTool("select");
+    }
+
+
     if (currentBoardId && !isTemporaryBoard && user) {
       triggerSave({
         reactShapes,
@@ -689,6 +690,8 @@ useEffect(() => {
     }
     setTimeout(handleInteractionEnd, 100);
   }, [stageRef, scale, position, addShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, handleInteractionStart, handleInteractionEnd]);
+  
+  
   const handleImageUpload = useCallback(async (file: File) => {
     try {
       handleInteractionStart();
@@ -1108,6 +1111,7 @@ useEffect(() => {
           handleAnchorClick={toolHandlers.handleAnchorClick}
           handleShapeMouseEnter={toolHandlers.handleShapeMouseEnter}
           tempConnection={tempConnection}
+          isSpacePressed={toolHandlers.isSpacePressed}
         />
       </div>
       <CreateBoard 
