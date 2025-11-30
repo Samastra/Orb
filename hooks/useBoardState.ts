@@ -394,101 +394,104 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
     applyReorderedShapes(updatedShapes);
   };
 
-  // Shape management
-const addShape = useCallback((type: Tool, addAction: (action: Action) => void) => {
-  console.log('🎯 addShape called with type:', type);
-  
-  if (!stageInstance) {
-    console.log('❌ No stage instance');
-    return;
-  }
-
-  // CALCULATE VIEWPORT CENTER (where user is currently looking)
-  const viewportCenter = {
-    x: -position.x / scale + stageInstance.width() / (2 * scale),
-    y: -position.y / scale + stageInstance.height() / (2 * scale)
-  };
-
-  console.log('📍 Creating shape at viewport center:', viewportCenter);
-
-  if (type === "text") {
-  const shapeId = `text-${Date.now()}`;
-  
-  const newTextShape: ReactShape = {
-    id: shapeId,
-    type: 'text',
-    x: viewportCenter.x,
-    y: viewportCenter.y,
-    text: "Type something...", // ← CHANGED: Shorter default text
-    fontSize: 20,
-    fill: "#000000",
-    fontFamily: "Inter, Arial, sans-serif", // ← CHANGED: Better font stack
-    fontWeight: "400",
-    fontStyle: "normal",
-    align: "left", // ← REMOVED: textDecoration
-    draggable: true,
-  };
-  
-  console.log('➕ Adding Text shape:', newTextShape);
-  setReactShapes(prev => [...prev, newTextShape]);
-  
-  addAction({
-    type: "add-react-shape",
-    shapeType: 'text',
-    data: newTextShape
-  });
-  
-  // CHANGED: Set single selection for new text
-  setSelectedNodeIds([shapeId]);
-  setActiveTool("text"); // Switch to text tool for immediate editing
-
-  } else if (type === "stickyNote") {
-    const shapeId = `sticky-${Date.now()}`;
+// Shape management
+ const addShape = useCallback((type: Tool, addAction: (action: Action) => void, customPosition?: { x: number; y: number }) => {
     
-    const newStickyNote: ReactShape = {
-      id: shapeId,
-      type: 'stickyNote',
-      x: viewportCenter.x - 100,
-      y: viewportCenter.y - 75,
-      text: "Double click to edit...",
-      fontSize: 16,
-      width: 200,
-      height: 150,
-      backgroundColor: "#ffeb3b",
-      textColor: "#000000",
-      fontFamily: "Arial",
-      draggable: true,
-    };
-    
-    console.log('➕ Adding Sticky Note:', newStickyNote);
-    setReactShapes(prev => [...prev, newStickyNote]);
-    
-    addAction({
-      type: "add-react-shape",
-      shapeType: 'stickyNote',
-      data: newStickyNote
-    });
-    
-    if (activeTool === "select") {
-      setSelectedNodeIds([shapeId]);
+    // 1. CRITICAL: Use the customPosition if it exists!
+    // If customPosition is passed (from BoardPage), use it. 
+    // Otherwise fallback to 0,0 (but log a warning).
+    let spawnPos = customPosition;
+
+    if (!spawnPos) {
+       console.warn("⚠️ No custom position provided to addShape. Using fallback (0,0).");
+       // Fallback to center of the stage if stageInstance exists, or 0,0
+       if (stageInstance) {
+          spawnPos = {
+            x: -stageInstance.x() / stageInstance.scaleX() + stageInstance.width() / (2 * stageInstance.scaleX()),
+            y: -stageInstance.y() / stageInstance.scaleY() + stageInstance.height() / (2 * stageInstance.scaleY())
+          };
+       } else {
+          spawnPos = { x: 0, y: 0 };
+       }
     }
-  } else {
-    console.log('➕ Adding Konva shape:', type);
-    const result = addKonvaShape(type, viewportCenter, true);
-    
-    if (result) {
+
+    console.log('📍 Creating shape at exact world position:', spawnPos);
+
+    if (type === "text") {
+      const shapeId = `text-${Date.now()}`;
+      
+      const newTextShape: ReactShape = {
+        id: shapeId,
+        type: 'text',
+        x: spawnPos.x, 
+        y: spawnPos.y, 
+        text: "Type something...",
+        fontSize: 20,
+        fill: "#000000",
+        fontFamily: "Inter, Arial, sans-serif",
+        fontWeight: "400",
+        fontStyle: "normal",
+        align: "left",
+        draggable: true,
+      };
+      
+      setReactShapes(prev => [...prev, newTextShape]);
+      
       addAction({
-        type: "add-konva-shape",
-        shapeType: type,
-        data: result.shapeData
+        type: "add-react-shape",
+        shapeType: 'text',
+        data: newTextShape
+      });
+      
+      setSelectedNodeIds([shapeId]);
+      setActiveTool("text");
+
+    } else if (type === "stickyNote") {
+      const shapeId = `sticky-${Date.now()}`;
+      
+      const newStickyNote: ReactShape = {
+        id: shapeId,
+        type: 'stickyNote',
+        x: spawnPos.x - 100, // Center the note
+        y: spawnPos.y - 75,  
+        text: "Double click to edit...",
+        fontSize: 16,
+        width: 200,
+        height: 150,
+        backgroundColor: "#ffeb3b",
+        textColor: "#000000",
+        fontFamily: "Arial",
+        draggable: true,
+      };
+      
+      setReactShapes(prev => [...prev, newStickyNote]);
+      
+      addAction({
+        type: "add-react-shape",
+        shapeType: 'stickyNote',
+        data: newStickyNote
       });
       
       if (activeTool === "select") {
-        setSelectedNodeIds([result.shapeId]);
+        setSelectedNodeIds([shapeId]);
+      }
+    } else {
+      // Pass spawnPos to addKonvaShape
+      const result = addKonvaShape(type, spawnPos, true);
+      
+      if (result) {
+        addAction({
+          type: "add-konva-shape",
+          shapeType: type,
+          data: result.shapeData
+        });
+        
+        if (activeTool === "select") {
+          setSelectedNodeIds([result.shapeId]);
+        }
       }
     }
-  }
-}, [stageInstance, scale, position, activeTool, addKonvaShape, setActiveTool]);
+  }, [stageInstance, activeTool, addKonvaShape, setActiveTool]);
 
 
 const addStageFrame = useCallback((width: number, height: number, addAction: (action: Action) => void, centerPosition?: { x: number; y: number }) => {

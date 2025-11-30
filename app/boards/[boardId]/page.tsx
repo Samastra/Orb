@@ -634,18 +634,22 @@ useEffect(() => {
     const stage = stageRef.current;
 
     handleInteractionStart();
-    const safePosition = position ?? { x: 0, y: 0 }; 
 
+    // 1. LIVE CALCULATION (The Fix)
+    // We calculate exactly where the center of your screen is in "World Coordinates"
+    // Formula: (ScreenHalfWidth - CameraPanX) / ZoomLevel
     const center = {
-      x: stage.width() / 2 / scale - safePosition.x / scale,
-      y: stage.height() / 2 / scale - safePosition.y / scale,
+      x: (stage.width() / 2 - stage.x()) / stage.scaleX(),
+      y: (stage.height() / 2 - stage.y()) / stage.scaleY(),
     };
 
-    console.log("📝 Adding shape:", { type, center });
-    addShape(type, undoRedoAddAction);
+    console.log("🎯 Live Center Calculation:", center);
+    
+    // 2. PASS TO STATE
+    // Pass this calculated center as the 3rd argument
+    addShape(type, undoRedoAddAction, center); 
 
     if (currentBoardId && !isTemporaryBoard && user) {
-      console.log("💾 Immediate save for new shape:", { type });
       triggerSave({
         reactShapes,
         konvaShapes,
@@ -656,11 +660,10 @@ useEffect(() => {
         scale,
         position,
       }, true);
-      setHasChanges(false); // Reset after immediate save
+      setHasChanges(false);
     }
     setTimeout(handleInteractionEnd, 100);
-  }, [stageRef, scale, position, addShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, handleInteractionStart, handleInteractionEnd,setReactShapes]);
-
+  }, [stageRef, scale, position, addShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, handleInteractionStart, handleInteractionEnd]);
   const handleImageUpload = useCallback(async (file: File) => {
     try {
       handleInteractionStart();
