@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   MousePointer2,
   Type,
@@ -6,10 +6,12 @@ import {
   Image as ImageIcon,
   Pen,
   Eraser,
-  TvMinimal, // Icon for Stage
-  Cable, // Perfect icon for "Connection"
+  TvMinimal,
+  Cable,
   Shapes,
-  Upload
+  GripHorizontal,
+  Undo2, // Added Undo Icon
+  Redo2  // Added Redo Icon
 } from "lucide-react";
 import {
   Tooltip,
@@ -36,12 +38,10 @@ import { shapeOptions } from "../constants/tool-constants";
 
 // --- HELPER COMPONENTS ---
 
-// A simple divider to separate tool groups
 const Divider = () => (
   <div className="w-full h-[1px] bg-gray-200 my-1 md:w-8 md:h-[1px] md:my-2" />
 );
 
-// A reusable button component to keep code clean
 interface ToolbarBtnProps {
   onClick: () => void;
   isActive: boolean;
@@ -57,13 +57,11 @@ const ToolbarBtn = ({ onClick, isActive, icon: Icon, label }: ToolbarBtnProps) =
         className={cn(
           "relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl transition-all duration-200 group",
           isActive
-            ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105" // Active State
-            : "text-gray-500 hover:bg-gray-100 hover:text-gray-900" // Inactive State
+            ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105"
+            : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
         )}
       >
         <Icon className={cn("w-5 h-5", isActive ? "stroke-[2.5px]" : "stroke-2")} />
-        
-        {/* Subtle dot indicator for active state (optional, adds polish) */}
         {isActive && (
           <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-600 md:bg-transparent" />
         )}
@@ -86,10 +84,11 @@ interface ToolbarProps {
   addShape: (type: Tool) => void;
   setTempDimensions: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
   handleApplyStage: () => void;
-  undo: () => void;
-  redo: () => void;
   compact?: boolean;
   onImageUpload?: (file: File) => void;
+  // FIXED: Added these back to satisfy page.tsx
+  undo: () => void;
+  redo: () => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -103,7 +102,53 @@ const Toolbar: React.FC<ToolbarProps> = ({
   handleApplyStage,
   compact = false,
   onImageUpload,
+  undo,
+  redo
 }) => {
+  
+  // --- DRAGGABLE LOGIC ---
+  const [position, setPosition] = useState({ x: 20, y: 120 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 }); 
+  const elementStartRef = useRef({ x: 0, y: 0 }); 
+
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDragging) return;
+      
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+
+      setPosition({
+        x: elementStartRef.current.x + dx,
+        y: elementStartRef.current.y + dy,
+      });
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+      document.body.style.cursor = 'default';
+    };
+
+    if (isDragging) {
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+    }
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDragging]);
+
+  const handleDragStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    elementStartRef.current = { x: position.x, y: position.y };
+    document.body.style.cursor = 'grabbing';
+  };
+
   const handleImageUploadWrapper = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && onImageUpload) {
@@ -113,12 +158,27 @@ const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   return (
-    <div className={cn(
-      "fixed md:absolute left-4 top-24 md:top-1/2 md:-translate-y-1/2 z-30 transition-all duration-300",
-      compact ? "scale-90 origin-left" : ""
-    )}>
+    <div 
+      style={{ 
+        transform: `translate(${position.x}px, ${position.y}px)`,
+        touchAction: 'none' 
+      }}
+      className={cn(
+        "fixed top-0 left-0 z-30 transition-shadow duration-300 will-change-transform",
+        compact ? "scale-90 origin-left" : ""
+      )}
+    >
       <div className="flex flex-col items-center p-2 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5">
         
+        {/* --- DRAG HANDLE --- */}
+        <div 
+          onPointerDown={handleDragStart}
+          className="w-full flex justify-center py-1 mb-1 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors"
+          title="Drag toolbar"
+        >
+          <GripHorizontal className="w-5 h-5" />
+        </div>
+
         {/* --- GROUP 1: POINTERS --- */}
         <div className="flex flex-col gap-2">
           <ToolbarBtn 
@@ -143,7 +203,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <ToolbarBtn 
             label="Text" 
             icon={Type} 
-            isActive={false} // Text tool usually resets after click, usually doesn't stay 'active' like a brush
+            isActive={false}
             onClick={() => addShape("text")} 
           />
           
@@ -224,8 +284,28 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         <Divider />
 
-        {/* --- GROUP 4: ADVANCED --- */}
+        {/* --- GROUP 4: ADVANCED / HISTORY --- */}
         <div className="flex flex-col gap-2">
+          
+           {/* Undo */}
+           <ToolbarBtn 
+            label="Undo (Ctrl+Z)" 
+            icon={Undo2} 
+            isActive={false} 
+            onClick={undo} 
+          />
+
+           {/* Redo */}
+           <ToolbarBtn 
+            label="Redo (Ctrl+Y)" 
+            icon={Redo2} 
+            isActive={false} 
+            onClick={redo} 
+          />
+
+          <Divider />
+
+          {/* Stage Frame */}
           <Popover>
             <Tooltip>
               <TooltipTrigger asChild>

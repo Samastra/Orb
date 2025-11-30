@@ -1,26 +1,32 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Settings } from "lucide-react";
-import AdvancedTextControls from "./AdvancedTextControls";
+import AdvancedTextControls from "./AdvancedTextControls"; // Assuming this file exists
+import { cn } from "@/lib/utils";
 
+// Unified Lucide Imports
 import { 
   AlignLeft, 
   AlignCenter, 
   AlignRight,
   ChevronDown,
-  Palette,
   Type,
   CornerDownLeft,
-  Minus,
   Underline,
   ArrowUpWideNarrow,
   Italic,
-  StickyNote
+  StickyNote,
+  Settings,
+  Layers,
+  ChevronUp,
+  GripHorizontal,
+  Palette,
+  Minus
 } from "lucide-react";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,11 +40,100 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
-import ColorPicker from "./ColorPicker";
-import { ChevronUp,Layers } from "lucide-react";
+import ColorPicker from "./ColorPicker"; // Assuming this file exists
+
+// --- HELPER COMPONENTS ---
+
+const Divider = () => (
+  <div className="w-[1px] h-6 bg-gray-200 mx-1" />
+);
+
+interface FormatBtnProps {
+  onClick?: () => void;
+  isActive?: boolean;
+  icon: React.ElementType;
+  label: string;
+  children?: React.ReactNode; // For dropdown arrows or extra text
+  className?: string;
+}
+
+const FormatBtn = React.forwardRef<HTMLButtonElement, FormatBtnProps>(
+  ({ onClick, isActive, icon: Icon, label, children, className, ...props }, ref) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          ref={ref}
+          variant="ghost"
+          size="sm"
+          onClick={onClick}
+          className={cn(
+            "h-8 px-2 hover:bg-gray-100/80 transition-all duration-200 rounded-lg gap-2 text-gray-600",
+            isActive && "bg-blue-50 text-blue-600 hover:bg-blue-100",
+            className
+          )}
+          {...props}
+        >
+          <Icon className={cn("h-4 w-4", isActive ? "stroke-[2.5px]" : "stroke-2")} />
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="bg-gray-900 text-white border-0 text-xs">
+        <p>{label}</p>
+      </TooltipContent>
+    </Tooltip>
+  )
+);
+FormatBtn.displayName = "FormatBtn";
+
+// --- DATA CONSTANTS ---
+
+const fonts = [
+  { label: "Arial", value: "Arial" },
+  { label: "Canva Sans", value: "Canva Sans" },
+  { label: "Poppins", value: "Poppins" },
+  { label: "Roboto", value: "Roboto" },
+  { label: "Montserrat", value: "Montserrat" },
+  { label: "Inter", value: "Inter" },
+  { label: "Open Sans", value: "Open Sans" },
+];
+
+const FONT_WEIGHTS = [
+  { value: "100", label: "Thin" },
+  { value: "200", label: "Extra Light" },
+  { value: "300", label: "Light" },
+  { value: "400", label: "Regular" },
+  { value: "500", label: "Medium" },
+  { value: "600", label: "Semi Bold" },
+  { value: "700", label: "Bold" },
+  { value: "800", label: "Extra Bold" },
+  { value: "900", label: "Black" }
+];
+
+const FONT_STYLES = [
+  { value: "normal", label: "Regular" },
+  { value: "italic", label: "Italic" },
+  { value: "oblique", label: "Oblique" }
+];
+
+const STICKY_NOTE_COLORS = [
+  { value: "#ffeb3b", label: "Yellow" },
+  { value: "#e3f2fd", label: "Blue" },
+  { value: "#e8f5e8", label: "Green" },
+  { value: "#fce4ec", label: "Pink" },
+  { value: "#fff3e0", label: "Orange" },
+  { value: "#f3e5f5", label: "Purple" },
+  { value: "#e0f2f1", label: "Teal" },
+  { value: "#fafafa", label: "White" }
+];
+
+const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72];
+const strokeWidths = [1, 2, 3, 4, 5, 6, 8, 10, 12];
+const borderRadiusValues = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80];
+
+// --- MAIN COMPONENT ---
 
 interface FormattingToolbarProps {
-    selectedShape: {
+  selectedShape: {
     type?: string;
     fontSize?: number;
     fontFamily?: string;
@@ -61,66 +156,13 @@ interface FormattingToolbarProps {
       offsetX: number;
       offsetY: number;
     };
-} | null;
+  } | null;
   onChange: (updates: Record<string, unknown>) => void;
   onBringForward: () => void;
   onSendBackward: () => void;
   onBringToFront: () => void;
   onSendToBack: () => void;
 }
-
-// Font data - simplified without hardcoded weights
-const fonts = [
-  { label: "Arial", value: "Arial" },
-  { label: "Canva Sans", value: "Canva Sans" },
-  { label: "Poppins", value: "Poppins" },
-  { label: "Roboto", value: "Roboto" },
-  { label: "Montserrat", value: "Montserrat" },
-  { label: "Inter", value: "Inter" },
-  { label: "Open Sans", value: "Open Sans" },
-];
-
-// Common font weights - browser will handle fallbacks
-const FONT_WEIGHTS = [
-  { value: "100", label: "Thin" },
-  { value: "200", label: "Extra Light" },
-  { value: "300", label: "Light" },
-  { value: "400", label: "Regular" },
-  { value: "500", label: "Medium" },
-  { value: "600", label: "Semi Bold" },
-  { value: "700", label: "Bold" },
-  { value: "800", label: "Extra Bold" },
-  { value: "900", label: "Black" }
-];
-
-// Font styles
-const FONT_STYLES = [
-  { value: "normal", label: "Regular" },
-  { value: "italic", label: "Italic" },
-  { value: "oblique", label: "Oblique" }
-];
-
-// Sticky note colors
-const STICKY_NOTE_COLORS = [
-  { value: "#ffeb3b", label: "Yellow" },
-  { value: "#e3f2fd", label: "Blue" },
-  { value: "#e8f5e8", label: "Green" },
-  { value: "#fce4ec", label: "Pink" },
-  { value: "#fff3e0", label: "Orange" },
-  { value: "#f3e5f5", label: "Purple" },
-  { value: "#e0f2f1", label: "Teal" },
-  { value: "#fafafa", label: "White" }
-];
-
-const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72];
-const strokeWidths = [1, 2, 3, 4, 5, 6, 8, 10, 12];
-const borderRadiusValues = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80];
-
-// const getKonvaFontWeight = (weight: string): string => {
-//   const numericWeight = parseInt(weight, 10);
-//   if (numericWeight >= 600) return "bold";
-//   return "normal";
-// };
 
 const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   selectedShape,
@@ -132,670 +174,317 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [formats, setFormats] = useState<string[]>([]);
+  
+  // Dragging State
+  const [position, setPosition] = useState({ x: 0, y: 80 }); // Initial Offset from top-center
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const elementStartRef = useRef({ x: 0, y: 0 });
 
-  const handleBringForward = () => {
-    console.log('🎯 Bring Forward button CLICKED');
-    onBringForward();
-  };
+  // --- DRAG LOGIC ---
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStartRef.current.x;
+      const dy = e.clientY - dragStartRef.current.y;
+      setPosition({
+        x: elementStartRef.current.x + dx,
+        y: elementStartRef.current.y + dy,
+      });
+    };
+    const handlePointerUp = () => {
+      setIsDragging(false);
+      document.body.style.cursor = 'default';
+    };
+    if (isDragging) {
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+    }
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDragging]);
 
-  const handleSendBackward = () => {
-    console.log('🎯 Send Backward button CLICKED');
-    onSendBackward();
-  };
-
-  const handleBringToFront = () => {
-    console.log('🎯 Bring to Front button CLICKED');
-    onBringToFront();
-  };
-
-  const handleSendToBack = () => {
-    console.log('🎯 Send to Back button CLICKED');
-    onSendToBack();
+  const handleDragStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    elementStartRef.current = { x: position.x, y: position.y };
+    document.body.style.cursor = 'grabbing';
   };
 
   useEffect(() => {
     if (!selectedShape) return;
-    
     const activeFormats: string[] = [];
-    if (selectedShape.textDecoration === "underline") 
-      activeFormats.push("underline");
-    
+    if (selectedShape.textDecoration === "underline") activeFormats.push("underline");
     setFormats(activeFormats);
   }, [selectedShape]);
 
-  // CRITICAL FIX: Define isImage BEFORE the early return condition
-  const isImage = selectedShape?.type === "image";
+  if (!selectedShape || selectedShape.type === "stage") return null;
 
-  if (!selectedShape || selectedShape.type === "stage") {
-    return null; // Don't show formatting toolbar for stage frames or when nothing is selected
-  }
-    
   const isText = selectedShape.type === "text";
+  const isImage = selectedShape.type === "image";
   const isStickyNote = selectedShape.type === "stickyNote";
   const isShape = ["rect", "circle", "ellipse", "triangle", "arrow"].includes(selectedShape.type || "");
   const hasStroke = isShape || selectedShape.type === "stage";
   const hasCorners = ["rect", "stage"].includes(selectedShape.type || "");
-  
-  // FIXED: Proper color handling for different shape types
+
+  if (!isText && !isStickyNote && !isShape && !isImage) return null;
+
+  // Values
   const currentFontSize = selectedShape.fontSize || (isStickyNote ? 16 : 20);
   const currentFontFamily = selectedShape.fontFamily || "Arial";
   const currentFontWeight = selectedShape.fontWeight || "400";
   const currentFontStyle = selectedShape.fontStyle || "normal";
-  const currentFillColor = selectedShape.fill || "#000000"; // For shapes and text
-  const currentTextColor = isStickyNote ? (selectedShape.textColor || "#000000") : (selectedShape.fill || "#000000"); // For text in sticky notes
+  const currentFillColor = selectedShape.fill || "#000000";
+  const currentTextColor = isStickyNote ? (selectedShape.textColor || "#000000") : (selectedShape.fill || "#000000");
   const currentBackgroundColor = isStickyNote ? (selectedShape.backgroundColor || "#ffeb3b") : "#000000";
   const currentAlign = selectedShape.align || "left";
   const currentStroke = selectedShape.stroke || "#000000";
   const currentStrokeWidth = selectedShape.strokeWidth || 0;
   const currentCornerRadius = selectedShape.cornerRadius || 0;
 
-  // Get display label for current weight
-  // Get display label for current weight
-      const getWeightLabel = (weight: string) => {
-      const weightObj = FONT_WEIGHTS.find(w => w.value === weight);
-      return weightObj ? weightObj.label : "Regular";
-    };
+  // Labels
+  const getWeightLabel = (w: string) => FONT_WEIGHTS.find(o => o.value === w)?.label || "Regular";
+  const getStyleLabel = (s: string) => FONT_STYLES.find(o => o.value === s)?.label || "Regular";
+  const getStickyNoteColorLabel = (c: string) => STICKY_NOTE_COLORS.find(o => o.value === c)?.label || "Custom";
 
-  // Get display label for current style
-  const getStyleLabel = (style: string) => {
-    const styleObj = FONT_STYLES.find(s => s.value === style);
-    return styleObj ? styleObj.label : "Regular";
+  // Handlers
+  const handleFormatChange = (vals: string[]) => {
+    setFormats(vals);
+    onChange({ textDecoration: vals.includes("underline") ? "underline" : "none" });
   };
-
-  // Get display label for sticky note color
-  const getStickyNoteColorLabel = (color: string) => {
-    const colorObj = STICKY_NOTE_COLORS.find(c => c.value === color);
-    return colorObj ? colorObj.label : "Custom";
-  };
-
-  const handleFormatChange = (values: string[]) => {
-    setFormats(values);
-    
-    if (values.includes("underline") !== formats.includes("underline")) {
-      onChange({ 
-        textDecoration: values.includes("underline") ? "underline" : "none" 
-      });
-    }
-  };
-
-  const handleFontSizeChange = (size: number) => {
-    onChange({ fontSize: size });
-  };
-
-  const handleAlignmentChange = (align: string) => {
-    onChange({ align });
-  };
-
-  // FIXED: Proper color handling
-  const handleFillColorChange = (color: string) => {
-    onChange({ fill: color });
-  };
-
-  const handleTextColorChange = (color: string) => {
-    if (isStickyNote) {
-      onChange({ textColor: color });
-    } else {
-      onChange({ fill: color });
-    }
-  };
-
-  const handleBackgroundColorChange = (color: string) => {
-    onChange({ backgroundColor: color });
-  };
-
-  const handleStrokeColorChange = (color: string) => {
-    onChange({ stroke: color });
-  };
-
-  const handleStrokeWidthChange = (width: number) => {
-    onChange({ strokeWidth: width });
-  };
-
-  const handleCornerRadiusChange = (radius: number) => {
-    onChange({ cornerRadius: radius });
-  };
-
-  const handleFontFamilyChange = (fontFamily: string) => {
-    onChange({ fontFamily });
-  };
-
-    const handleFontWeightChange = (weight: string) => {
-    console.log('🎯 Changing font weight to:', weight);
-    onChange({ fontWeight: weight });
-  };
-
-  const handleFontStyleChange = (style: string) => {
-    onChange({ fontStyle: style });
-  };
-
-  // FIXED: Include images in the supported types check
-  if (!isText && !isStickyNote && !isShape && !isImage) {
-    return null;
-  }
 
   return (
     <TooltipProvider>
-      {/* Premium Glass Morphism Formatting Toolbar */}
-      <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200/80 rounded-2xl px-5 py-3 min-h-[56px] transition-all duration-300 hover:shadow-2xl">
-        
-        {/* Sticky Note Color Picker */}
-        {isStickyNote && (
-          <>
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[140px] justify-start hover:bg-gray-100/80 transition-all duration-300 rounded-lg">
-                      <StickyNote className="h-4 w-4" style={{ color: currentBackgroundColor }} />
-                      <span className="truncate">{getStickyNoteColorLabel(currentBackgroundColor)}</span>
-                      <ChevronDown className="h-4 w-4 ml-auto" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent className="bg-gray-900 text-white border-0">
-                  <p>Note Color</p>
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="start" className="w-48 bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl">
-                {STICKY_NOTE_COLORS.map((color) => (
-                  <DropdownMenuItem
-                    key={color.value}
-                    onSelect={() => handleBackgroundColorChange(color.value)}
-                    className="flex items-center gap-2 hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
-                  >
-                    <div 
-                      className="w-4 h-4 rounded border"
-                      style={{ backgroundColor: color.value }}
-                    />
-                    {color.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Separator orientation="vertical" className="h-6 bg-gray-300/80" />
-          </>
-        )}
-
-        {/* Font Family */}
-        {(isText || isStickyNote) && (
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[160px] justify-start hover:bg-gray-100/80 transition-all duration-300 rounded-lg">
-                    <Type className="h-4 w-4" />
-                    <span className="truncate">{currentFontFamily}</span>
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Font Family</p>
-              </TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="start" className="w-48 max-h-[300px] overflow-y-auto bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl">
-              {fonts.map((font) => (
-                <DropdownMenuItem
-                  key={font.value}
-                  onSelect={() => handleFontFamilyChange(font.value)}
-                  className="flex items-center gap-2 hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
-                  style={{ fontFamily: font.value }}
-                >
-                  {font.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6 bg-gray-300/80" />}
-
-        {/* Font Weight */}
-        {(isText || isStickyNote) && (
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[120px] justify-start hover:bg-gray-100/80 transition-all duration-300 rounded-lg">
-                    <ArrowUpWideNarrow className="h-4 w-4" />
-                    <span className="truncate">{getWeightLabel(currentFontWeight)}</span>
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Font Weight</p>
-              </TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="start" className="w-32 bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl">
-              {FONT_WEIGHTS.map((weight) => (
-                <DropdownMenuItem
-                  key={weight.value}
-                  onSelect={() => handleFontWeightChange(weight.value)}
-                  className="flex justify-between hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
-                  style={{ 
-                    fontWeight: weight.value,
-                    fontFamily: currentFontFamily || "Arial" 
-                  }}
-                >
-                  {weight.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6 bg-gray-300/80" />}
-
-        {/* Font Style */}
-        {(isText || isStickyNote) && (
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[100px] justify-start hover:bg-gray-100/80 transition-all duration-300 rounded-lg">
-                    <Italic className="h-4 w-4" />
-                    <span className="truncate">{getStyleLabel(currentFontStyle)}</span>
-                    <ChevronDown className="h-4 w-4 ml-auto" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Font Style</p>
-              </TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="start" className="w-28 bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl">
-              {FONT_STYLES.map((style) => (
-                <DropdownMenuItem
-                  key={style.value}
-                  onSelect={() => handleFontStyleChange(style.value)}
-                  className="flex justify-between hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
-                  style={{ 
-                    fontStyle: style.value,
-                     fontFamily: currentFontFamily || "Arial"
-                  }}
-                >
-                  {style.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6 bg-gray-300/80" />}
-
-        {/* Font Size */}
-        {(isText || isStickyNote) && (
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[70px] hover:bg-gray-100/80 transition-all duration-300 rounded-lg">
-                    {currentFontSize}
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Font Size</p>
-              </TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="start" className="w-24 max-h-[300px] overflow-y-auto bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl">
-              {fontSizes.map((size) => (
-                <DropdownMenuItem
-                  key={size}
-                  onSelect={() => handleFontSizeChange(size)}
-                  className="flex justify-center hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
-                >
-                  {size}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-
-        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6 bg-gray-300/80" />}
-
-        {/* Underline Toggle */}
-        {(isText || isStickyNote) && (
-          <ToggleGroup
-            type="single" 
-            value={formats.includes("underline") ? "underline" : ""}
-            onValueChange={(value) => handleFormatChange(value ? ["underline"] : [])}
-            className="flex gap-0 rounded-lg border bg-background/80 p-1"
+      <div 
+        style={{ 
+          transform: `translate(calc(-50% + ${position.x}px), ${position.y}px)`,
+          touchAction: 'none'
+        }}
+        className="fixed top-0 left-1/2 z-50 flex flex-col items-center gap-2 will-change-transform"
+      >
+        {/* --- MAIN TOOLBAR --- */}
+        <div className="flex items-center gap-1 bg-white/90 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5 rounded-2xl px-3 py-2 transition-all duration-300">
+          
+          {/* Drag Handle */}
+          <div 
+            onPointerDown={handleDragStart}
+            className="flex items-center justify-center px-1 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500"
           >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem value="underline" aria-label="Underline" className="h-8 w-8 p-0 hover:bg-gray-100/80 transition-all duration-300 rounded-md">
-                  <Underline className="h-4 w-4" />
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Underline</p>
-              </TooltipContent>
-            </Tooltip>
-          </ToggleGroup>
-        )}
+            <GripHorizontal className="w-4 h-4" />
+          </div>
 
-        {(isText || isStickyNote) && <Separator orientation="vertical" className="h-6 bg-gray-300/80" />}
+          <Divider />
 
-        {/* Text Alignment */}
-        {(isText || isStickyNote) && (
-          <ToggleGroup
-            type="single"
-            value={currentAlign}
-            onValueChange={handleAlignmentChange}
-            className="flex gap-0 rounded-lg border bg-background/80 p-1"
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem value="left" aria-label="Align Left" className="h-8 w-8 p-0 hover:bg-gray-100/80 transition-all duration-300 rounded-md">
-                  <AlignLeft className="h-4 w-4" />
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Align Left</p>
-              </TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem value="center" aria-label="Align Center" className="h-8 w-8 p-0 hover:bg-gray-100/80 transition-all duration-300 rounded-md">
-                  <AlignCenter className="h-4 w-4" />
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Align Center</p>
-              </TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToggleGroupItem value="right" aria-label="Align Right" className="h-8 w-8 p-0 hover:bg-gray-100/80 transition-all duration-300 rounded-md">
-                  <AlignRight className="h-4 w-4" />
-                </ToggleGroupItem>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Align Right</p>
-              </TooltipContent>
-            </Tooltip>
-          </ToggleGroup>
-        )}
+          {/* Sticky Note Color */}
+          {isStickyNote && (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <FormatBtn icon={StickyNote} label="Note Color">
+                    <span className="w-2 h-2 rounded-full border border-black/10" style={{ backgroundColor: currentBackgroundColor }} />
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                  </FormatBtn>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48 bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl rounded-xl">
+                  {STICKY_NOTE_COLORS.map((color) => (
+                    <DropdownMenuItem
+                      key={color.value}
+                      onSelect={() => onChange({ backgroundColor: color.value })}
+                      className="gap-2 cursor-pointer"
+                    >
+                      <div className="w-4 h-4 rounded border" style={{ backgroundColor: color.value }} />
+                      {color.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Divider />
+            </>
+          )}
 
-        <Separator orientation="vertical" className="h-6 bg-gray-300/80" />
+          {/* Typography Controls */}
+          {(isText || isStickyNote) && (
+            <>
+              {/* Font Family */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <FormatBtn icon={Type} label="Font Family" className="w-24 justify-between">
+                    <span className="truncate text-xs">{currentFontFamily}</span>
+                  </FormatBtn>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="max-h-[300px] overflow-y-auto bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl rounded-xl">
+                  {fonts.map((f) => (
+                    <DropdownMenuItem key={f.value} onSelect={() => onChange({ fontFamily: f.value })} style={{ fontFamily: f.value }}>
+                      {f.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-        {/* FILL COLOR PICKER - For Shapes */}
-        {isShape && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div>
-                <ColorPicker
-                  value={currentFillColor}
-                  onChange={handleFillColorChange}
-                  label="Fill Color"
-                />
+              <Divider />
+
+              {/* Font Weight */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <FormatBtn icon={ArrowUpWideNarrow} label="Weight">
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                  </FormatBtn>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl rounded-xl">
+                  {FONT_WEIGHTS.map((w) => (
+                    <DropdownMenuItem key={w.value} onSelect={() => onChange({ fontWeight: w.value })} style={{ fontWeight: w.value, fontFamily: currentFontFamily }}>
+                      {w.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Font Style */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <FormatBtn icon={Italic} label="Style">
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                  </FormatBtn>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-white/95 backdrop-blur-sm border border-gray-200 shadow-xl rounded-xl">
+                  {FONT_STYLES.map((s) => (
+                    <DropdownMenuItem key={s.value} onSelect={() => onChange({ fontStyle: s.value })} style={{ fontStyle: s.value, fontFamily: currentFontFamily }}>
+                      {s.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Divider />
+
+              {/* Font Size Input */}
+              <div className="flex items-center gap-1 bg-gray-50 rounded-lg px-1 border border-transparent hover:border-gray-200 transition-colors">
+                 <button onClick={() => onChange({ fontSize: Math.max(1, currentFontSize - 1) })} className="p-1 hover:bg-white rounded-md text-gray-500">
+                    <Minus className="w-3 h-3" />
+                 </button>
+                 <Input 
+                   type="number" 
+                   value={currentFontSize}
+                   onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
+                   className="w-8 h-6 text-xs text-center p-0 border-0 bg-transparent focus-visible:ring-0"
+                 />
+                 <button onClick={() => onChange({ fontSize: currentFontSize + 1 })} className="p-1 hover:bg-white rounded-md text-gray-500">
+                    <ChevronUp className="w-3 h-3" />
+                 </button>
               </div>
-            </TooltipTrigger>
-            <TooltipContent className="bg-gray-900 text-white border-0">
-              <p>Fill Color</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
 
-        {/* TEXT COLOR PICKER - For Text and Sticky Notes */}
-        {(isText || isStickyNote) && (
-          <>
-            {isShape && <Separator orientation="vertical" className="h-6 bg-gray-300/80" />}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <ColorPicker
-                    value={currentTextColor}
-                    onChange={handleTextColorChange}
-                    label="Text Color"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Text Color</p>
-              </TooltipContent>
-            </Tooltip>
-          </>
-        )}
+              <Divider />
 
-        {/* Background Color Picker for Sticky Notes */}
-        {isStickyNote && (
-          <>
-            <Separator orientation="vertical" className="h-6 bg-gray-300/80" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <ColorPicker
-                    value={currentBackgroundColor}
-                    onChange={handleBackgroundColorChange}
-                    label="Note Color"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Note Background</p>
-              </TooltipContent>
-            </Tooltip>
-          </>
-        )}
+              {/* Alignment */}
+              <ToggleGroup type="single" value={currentAlign} onValueChange={(v) => v && onChange({ align: v })} className="gap-0.5">
+                 <ToggleGroupItem value="left" size="sm" className="h-7 w-7 p-0 data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600"><AlignLeft className="w-4 h-4" /></ToggleGroupItem>
+                 <ToggleGroupItem value="center" size="sm" className="h-7 w-7 p-0 data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600"><AlignCenter className="w-4 h-4" /></ToggleGroupItem>
+                 <ToggleGroupItem value="right" size="sm" className="h-7 w-7 p-0 data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600"><AlignRight className="w-4 h-4" /></ToggleGroupItem>
+              </ToggleGroup>
 
-        {/* Stroke/Border Controls */}
-        {hasStroke && (
-          <>
-            <Separator orientation="vertical" className="h-6 bg-gray-300/80" />
+              <ToggleGroup type="multiple" value={formats} onValueChange={handleFormatChange} className="gap-0.5 ml-1">
+                 <ToggleGroupItem value="underline" size="sm" className="h-7 w-7 p-0 data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600"><Underline className="w-4 h-4" /></ToggleGroupItem>
+              </ToggleGroup>
+            </>
+          )}
+
+          {/* Color Pickers */}
+          <Divider />
+          <div className="flex items-center gap-2">
+            {isShape && (
+              <ColorPicker value={currentFillColor} onChange={(c) => onChange({ fill: c })} label="Fill" />
+            )}
             
-            {/* Stroke Color */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <ColorPicker
-                    value={currentStroke}
-                    onChange={handleStrokeColorChange}
-                    label="Border Color"
-                    className="border-dashed"
-                  />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                <p>Border Color</p>
-              </TooltipContent>
-            </Tooltip>
+            {(isText || isStickyNote) && (
+               <ColorPicker 
+                 value={currentTextColor} 
+                 onChange={(c) => isStickyNote ? onChange({ textColor: c }) : onChange({ fill: c })} 
+                 label="Text Color" 
+               />
+            )}
+          </div>
 
-            {/* Stroke Width */}
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
+          {/* Stroke & Radius */}
+          {hasStroke && (
+            <>
+              <Divider />
+              <div className="flex items-center gap-1">
+                <ColorPicker value={currentStroke} onChange={(c) => onChange({ stroke: c })} label="Border" className="border-2 border-white ring-1 ring-gray-200" />
+                
+                <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[60px] hover:bg-gray-100/80 transition-all duration-300 rounded-lg">
-                      {currentStrokeWidth}px
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
+                     <Button variant="ghost" size="sm" className="h-7 px-1 gap-1 text-gray-500 text-xs">
+                        {currentStrokeWidth}px
+                     </Button>
                   </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent className="bg-gray-900 text-white border-0">
-                  <p>Border Width</p>
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="start" className="w-20 bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl">
-                {strokeWidths.map((width) => (
-                  <DropdownMenuItem
-                    key={width}
-                    onSelect={() => handleStrokeWidthChange(width)}
-                    className="flex justify-center hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
-                  >
-                    {width}px
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        )}
+                  <DropdownMenuContent className="min-w-[3rem]">
+                     {strokeWidths.map(w => (
+                       <DropdownMenuItem key={w} onSelect={() => onChange({ strokeWidth: w })}>{w}px</DropdownMenuItem>
+                     ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </>
+          )}
 
-        {/* Rounded Corners */}
-        {hasCorners && (
-          <>
-            <Separator orientation="vertical" className="h-6 bg-gray-300/80" />
-            
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
+          {hasCorners && (
+            <>
+               <Divider />
+               <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-2 font-medium min-w-[60px] hover:bg-gray-100/80 transition-all duration-300 rounded-lg">
-                      <CornerDownLeft className="h-4 w-4" />
-                      {currentCornerRadius}px
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
+                     <FormatBtn icon={CornerDownLeft} label="Radius" className="w-auto px-1">
+                        <span className="text-xs ml-1">{currentCornerRadius}</span>
+                     </FormatBtn>
                   </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent className="bg-gray-900 text-white border-0">
-                  <p>Corner Radius</p>
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="start" className="w-20 bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl">
-                {borderRadiusValues.map((radius) => (
-                  <DropdownMenuItem
-                    key={radius}
-                    onSelect={() => handleCornerRadiusChange(radius)}
-                    className="flex justify-center hover:bg-gray-100/80 transition-colors duration-200 rounded-lg"
-                  >
-                    {radius}px
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        )}
+                  <DropdownMenuContent className="min-w-[3rem]">
+                     {borderRadiusValues.map(r => (
+                       <DropdownMenuItem key={r} onSelect={() => onChange({ cornerRadius: r })}>{r}px</DropdownMenuItem>
+                     ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+            </>
+          )}
 
-        {/* Custom Font Size Input */}
-        {(isText || isStickyNote) && (
-          <>
-            <Separator orientation="vertical" className="h-6 bg-gray-300/80" />
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                value={currentFontSize}
-                onChange={(e) => handleFontSizeChange(Number(e.target.value))}
-                className="w-16 h-8 text-center rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                min="1"
-                max="144"
-              />
-              <span className="text-sm text-gray-600">px</span>
-            </div>
-          </>
-        )}
+          {/* Settings Toggle */}
+          {isText && (
+             <>
+               <Divider />
+               <FormatBtn 
+                  icon={Settings} 
+                  label={showAdvanced ? "Hide Advanced" : "Show Advanced"} 
+                  isActive={showAdvanced}
+                  onClick={() => setShowAdvanced(!showAdvanced)} 
+               />
+             </>
+          )}
 
-        {/* Settings Button */}
-        {isText && (
-          <>
-            <Separator orientation="vertical" className="h-6 bg-gray-300/80" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={showAdvanced ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="hover:bg-gray-100/80 transition-all duration-300 rounded-lg"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="bg-gray-900 text-white border-0">
-                {showAdvanced ? "Hide Advanced Options" : "Show Advanced Options"}
-              </TooltipContent>
-            </Tooltip>
-          </>
-        )}
+          {/* Layer Controls */}
+          {(isText || isStickyNote || isShape || isImage) && selectedShape.type !== "stage" && (
+            <>
+              <Divider />
+              <div className="flex items-center gap-0.5">
+                 <FormatBtn icon={Layers} label="To Back" onClick={onSendToBack} className="h-7 w-7 p-0 rotate-90" />
+                 <FormatBtn icon={ChevronDown} label="Backward" onClick={onSendBackward} className="h-7 w-7 p-0" />
+                 <FormatBtn icon={ChevronUp} label="Forward" onClick={onBringForward} className="h-7 w-7 p-0" />
+                 <FormatBtn icon={Layers} label="To Front" onClick={onBringToFront} className="h-7 w-7 p-0 -rotate-90" />
+              </div>
+            </>
+          )}
+        </div>
 
-        {/* Layer Controls - FIXED: Now includes images */}
-        {(isText || isStickyNote || isShape || isImage) && selectedShape.type !== "stage" && (
-          <>
-            <Separator orientation="vertical" className="h-6 bg-gray-300/80" />
-            
-            {/* Layer Controls Group */}
-            <div className="flex items-center gap-1 rounded-lg border bg-background/80 p-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSendToBack}
-                    className="h-8 w-8 p-0 hover:bg-gray-100/80 transition-all duration-300 rounded-md"
-                  >
-                    <Layers className="h-4 w-4 rotate-90" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="bg-gray-900 text-white border-0">
-                  <p>Send to Back</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleSendBackward}
-                    className="h-8 w-8 p-0 hover:bg-gray-100/80 transition-all duration-300 rounded-md"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="bg-gray-900 text-white border-0">
-                  <p>Send Backward</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBringForward}
-                    className="h-8 w-8 p-0 hover:bg-gray-100/80 transition-all duration-300 rounded-md"
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="bg-gray-900 text-white border-0">
-                  <p>Bring Forward</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleBringToFront}
-                    className="h-8 w-8 p-0 hover:bg-gray-100/80 transition-all duration-300 rounded-md"
-                  >
-                    <Layers className="h-4 w-4 -rotate-90" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="bg-gray-900 text-white border-0">
-                  <p>Bring to Front</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </>
+        {/* --- ATTACHED ADVANCED SETTINGS --- */}
+        {showAdvanced && isText && (
+          <div className="w-full bg-white/90 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5 rounded-xl px-4 py-3 animate-in slide-in-from-top-2">
+            <AdvancedTextControls
+              selectedShape={selectedShape}
+              onChange={onChange}
+            />
+          </div>
         )}
       </div>
-
-      {/* Advanced Controls Panel */}
-      {showAdvanced && isText && (
-        <div className="fixed top-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm shadow-xl border border-gray-200/80 rounded-2xl px-5 py-3 min-h-[52px] transition-all duration-300">
-          <AdvancedTextControls
-            selectedShape={selectedShape}
-            onChange={onChange}
-          />
-        </div>
-      )}
     </TooltipProvider>
   );
 };
