@@ -732,7 +732,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
         onTouchMove={handleTouchMove}
         draggable={false}
       >
-        <GridLayer stage={stageInstance} baseSize={30} color="#d6d4d4ff" />
+        <GridLayer 
+          stage={stageInstance} 
+          baseSize={40}  // 40 is a good "tight" dot grid like Canva
+          color="#cfcfcf" // Light grey
+          size={1.5}     // 1.5 or 2 makes it clear but subtle
+      />
         <Layer name="draw-layer">
           {allShapesToRender.map((item) => {
             // Callback Ref for EVERY shape - Ensures Refs are always up to date

@@ -1,81 +1,84 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
+import { Layer, Shape } from "react-konva";
 import Konva from "konva";
 
 interface GridLayerProps {
   stage: Konva.Stage | null;
-  baseSize?: number;
-  color?: string;
+  baseSize?: number; // Distance between dots
+  color?: string;    // Dot color
+  size?: number;     // Dot radius
 }
 
-export default function GridLayer({
-  stage,
-  baseSize = 50,
-  color = "#c9c8c8ff",
-}: GridLayerProps) {
-  const layerRef = useRef<Konva.Layer | null>(null);
-  const [gridSize, setGridSize] = useState(baseSize);
+const GridLayer: React.FC<GridLayerProps> = ({ 
+  stage, 
+  baseSize = 40, 
+  color = "#C0C0C0", 
+  size = 1.5 // Small size looks like Canva/Mural
+}) => {
+  const layerRef = useRef<Konva.Layer>(null);
 
-useEffect(() => {
-  if (!stage) return;
+  useEffect(() => {
+    if (!stage || !layerRef.current) return;
 
-  if (!layerRef.current) {
-    const layer = new Konva.Layer();
-    layerRef.current = layer;
-    stage.add(layer);
-  }
+    // The Magic Fix:
+    // Listen to the stage moving (drag) or zooming (transform)
+    // and force this specific layer to redraw immediately.
+    const handleDraw = () => {
+      layerRef.current?.batchDraw();
+    };
 
-  const layer = layerRef.current;
+    stage.on("dragmove transform", handleDraw);
 
-  const drawGrid = () => {
-    if (!layer) return;
-    layer.destroyChildren();
+    return () => {
+      stage.off("dragmove transform", handleDraw);
+    };
+  }, [stage]);
 
-    const scale = stage.scaleX();
-    let step = baseSize;
-    if (scale > 2) step = baseSize / 2;
-    else if (scale < 0.5) step = baseSize * 2;
+  return (
+    <Layer ref={layerRef} listening={false}> 
+      <Shape
+        sceneFunc={(context, shape) => {
+          if (!stage) return;
 
-    setGridSize(step);
+          const stageWidth = stage.width();
+          const stageHeight = stage.height();
+          
+          // Get the current camera view
+          const transform = stage.getAbsoluteTransform().copy();
+          transform.invert();
+          
+          const viewTopLeft = transform.point({ x: 0, y: 0 });
+          const viewBottomRight = transform.point({ x: stageWidth, y: stageHeight });
 
-    const width = stage.width() / scale;
-    const height = stage.height() / scale;
+          // Calculate "start" and "end" based on the View, not the World
+          // This ensures we ALWAYS draw exactly what the user can see
+          const startX = Math.floor(viewTopLeft.x / baseSize) * baseSize;
+          const endX = Math.floor(viewBottomRight.x / baseSize) * baseSize + baseSize;
 
-    const offsetX = -stage.x() / scale;
-    const offsetY = -stage.y() / scale;
+          const startY = Math.floor(viewTopLeft.y / baseSize) * baseSize;
+          const endY = Math.floor(viewBottomRight.y / baseSize) * baseSize + baseSize;
 
-    const startX = Math.floor(offsetX / step) * step;
-    const startY = Math.floor(offsetY / step) * step;
+          context.beginPath();
 
-    for (let x = startX; x < offsetX + width; x += step) {
-      layer.add(new Konva.Line({
-        points: [x, offsetY, x, offsetY + height],
-        stroke: color,
-        strokeWidth: Math.max(1 / scale, 0.5),
-      }));
-    }
+          for (let x = startX; x < endX; x += baseSize) {
+            for (let y = startY; y < endY; y += baseSize) {
+                // Draw a simple circle
+                context.moveTo(x + size, y);
+                context.arc(x, y, size, 0, Math.PI * 2, true);
+            }
+          }
+          
+          context.fillStyle = color;
+          context.fillStrokeShape(shape);
+        }}
+        // perfectDrawEnabled={false} speeds up rendering significantly
+        perfectDrawEnabled={false}
+        shadowForStrokeEnabled={false}
+        stroke={undefined}
+        fill={color}
+      />
+    </Layer>
+  );
+};
 
-    for (let y = startY; y < offsetY + height; y += step) {
-      layer.add(new Konva.Line({
-        points: [offsetX, y, offsetX + width, y],
-        stroke: color,
-        strokeWidth: Math.max(1 / scale, 0.5),
-      }));
-    }
-
-    layer.zIndex(0)
-    layer.batchDraw();
-  };
-
-  drawGrid();
-
-  // ✅ Corrected listeners
-  stage.on("dragmove wheel", drawGrid);
-
-  return () => {
-    stage.off("dragmove wheel", drawGrid);
-  };
-}, [stage, baseSize, color]);
-    return null;
-}
+export default GridLayer;
