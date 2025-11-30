@@ -151,7 +151,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           top: `${areaPosition.y}px`,
           left: `${areaPosition.x}px`,
           width: `${node.width() * absScale.x}px`,
-          // We set minHeight, but we'll let auto-growth handle the real height
           fontSize: `${node.fontSize() * absScale.y}px`,
           fontFamily: node.fontFamily(),
           fontWeight: fontWeight,
@@ -159,7 +158,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           textAlign: node.align(),
           color: fill, 
           lineHeight: node.lineHeight().toString(),
-          
           border: "none",
           padding: "0px",
           margin: "0px",
@@ -170,7 +168,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           whiteSpace: "pre-wrap",
           wordWrap: "break-word",
           boxSizing: "border-box", 
-          
           transformOrigin: "left top",
           transform: `rotateZ(${node.rotation()}deg)`,
           zIndex: "10000",
@@ -179,30 +176,22 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
 
       updateTextareaPos();
       
-      // --- THE FIX IS HERE ---
       const handleResize = () => {
-        // 1. Resize HTML Area
         textarea.style.height = "auto";
         textarea.style.height = `${textarea.scrollHeight}px`;
 
-        // 2. Sync Konva Node (and Transformer) to match HTML height
         const absScale = node.getAbsoluteScale();
         const newHeight = textarea.scrollHeight / absScale.y;
         
-        // Directly update Konva node height (bypassing React state for speed)
         node.height(newHeight);
         
-        // Force the Transformer to redraw around the new height
         const tr = stage.findOne('Transformer') as Konva.Transformer;
         if (tr) {
             tr.forceUpdate();
         }
-        
-        // Redraw layer
         node.getLayer()?.batchDraw();
       };
 
-      // Call immediately to set initial height correctly
       handleResize();
       textarea.focus();
 
@@ -210,9 +199,22 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
       };
 
+      // --- THE FIX IS HERE ---
       const handleFinish = () => {
          const val = textarea.value;
-         onUpdateRef.current({ text: val });
+         
+         // 1. Calculate the FINAL height from the textarea
+         const absScale = node.getAbsoluteScale();
+         // Force a recalc of scrollHeight to be safe
+         textarea.style.height = "auto";
+         textarea.style.height = `${textarea.scrollHeight}px`;
+         const finalHeight = textarea.scrollHeight / absScale.y;
+
+         // 2. Save BOTH text AND height to state/database
+         onUpdateRef.current({ 
+             text: val,
+             height: finalHeight 
+         });
 
          if (val.trim() === "") {
            onDeleteRef.current(id);
@@ -237,8 +239,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       };
 
       textarea.addEventListener("keydown", handleKeydown);
-      
-      // Bind Resize to Input so it grows on every letter
       textarea.addEventListener("input", handleResize);
       textarea.addEventListener("blur", handleBlur);
 
@@ -294,6 +294,9 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           onDblTap={(e) => {
              if (!isEditing) onStartEditing();
           }}
+          perfectDrawEnabled={false} // Optimized rendering
+          shadowForStrokeEnabled={false}
+          hitStrokeWidth={0}
         />
     );
   }

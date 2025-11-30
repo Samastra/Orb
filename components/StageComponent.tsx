@@ -579,19 +579,24 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }, [scale, position, stageRef]);
 
   // UPDATED: Sync selection to Transformer using safe ref access
+
   useEffect(() => {
-    if (!trRef.current || selectedNodeIds.length === 0) {
-      trRef.current?.nodes([]);
+    if (!trRef.current) return;
+
+    if (selectedNodeIds.length === 0) {
+      trRef.current.nodes([]);
       return;
     }
-    // Only grab nodes where the ref actually exists and has a current value
+
+    // THE FIX: Filter OUT any ID that belongs to a Stage Frame
     const nodes = selectedNodeIds
+      .filter(id => !stageFrames.some(frame => frame.id === id)) // <--- This line prevents the Transformer from attaching
       .map(id => shapeRefs.current[id])
       .filter((n): n is Konva.Node => !!n);
 
     trRef.current.nodes(nodes);
     trRef.current.getLayer()?.batchDraw();
-  }, [selectedNodeIds, trRef, reactShapes, shapes, images, stageFrames]); // Added dependencies to ensure re-run on shape updates
+  }, [selectedNodeIds, trRef, reactShapes, shapes, images, stageFrames]);
 
   const allShapesToRender = React.useMemo(() => {
     return [
