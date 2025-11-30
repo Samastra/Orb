@@ -16,7 +16,7 @@ import StageComponent from "@/components/StageComponent";
 import CreateBoard from "@/components/createBoard";
 import { deleteBoard } from "@/lib/actions/board-actions";
 import VideoPlayerModal from '@/components/VideoPlayerModal';
-import TextCreateTool from "@/components/TextCreateTool";
+
 // import QuillTextEditor from "@/components/QuillTextEditor";
 // Hooks
 import {KonvaShape} from "@/hooks/useShapes";
@@ -113,7 +113,7 @@ const BoardPage = () => {
   const stageRef = useRef<Konva.Stage | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
   
- 
+ const [editingId, setEditingId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false); // Track if board has unsaved changes
   const [hasLoaded, setHasLoaded] = useState(false); // Track if board elements have been loaded
   const [isInteracting, setIsInteracting] = useState(false);
@@ -401,33 +401,40 @@ const copyCleanText = async () => {
 }, [currentBoardId, isTemporaryBoard, user, debouncedTriggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, hasChanges, setIsInteracting]);
 
 const handleTextCreate = useCallback((position: { x: number; y: number }) => {
-  console.log('🎯 Creating text at position:', position);
-  
-  const shapeId = `text-${Date.now()}`;
-  
-  const newTextShape: ReactShape = {
-    id: shapeId,
-    type: 'text',
-    x: position.x,
-    y: position.y,
-    text: "Type something...",
-    fontSize: 20,
-    fill: "#000000",
-    fontFamily: "Inter, Arial, sans-serif",
-    fontWeight: "400",
-    fontStyle: "normal",
-    align: "left",
-    draggable: true,
-    width: 200,
-    rotation: 0,
-  };
-  
-  setReactShapes(prev => [...prev, newTextShape]);
-  setSelectedNodeIds([shapeId]); // FIXED: Use setSelectedNodeIds with array
-  setActiveTool("text"); // This will put the text in editing mode immediately
-  
-  console.log('✅ Text created and set to editing mode');
-}, [setReactShapes, setSelectedNodeIds, setActiveTool]);
+    console.log('🎯 Creating text at position:', position);
+    
+    const shapeId = `text-${crypto.randomUUID()}`;
+    
+    const newTextShape: ReactShape = {
+      id: shapeId,
+      type: 'text',
+      x: position.x,
+      y: position.y,
+      text: "", // Start empty (cursor only)
+      fontSize: 24,
+      fill: "#000000",
+      fontFamily: "Inter, Arial, sans-serif",
+      fontWeight: "400",
+      fontStyle: "normal",
+      align: "left",
+      draggable: true,
+      width: 200, // Default width
+      rotation: 0,
+    };
+    
+    setReactShapes(prev => [...prev, newTextShape]);
+    
+    // Select the node
+    setSelectedNodeIds([shapeId]); 
+    
+    // CRITICAL: Immediately enter editing mode
+    setEditingId(shapeId); 
+    
+    // CRITICAL: Switch back to select tool immediately (Miro behavior)
+    setActiveTool("select"); 
+    
+    console.log('✅ Text created and set to editing mode');
+  }, [setReactShapes, setSelectedNodeIds, setActiveTool]);
 
     // AUTO-SAVE ON ANY POSITION CHANGE — NEVER MISS A DRAG AGAIN
 
@@ -978,11 +985,7 @@ useEffect(() => {
           onSendToBack={sendToBack}
         />
 
-        <TextCreateTool
-          stageRef={stageRef}
-          activeTool={activeTool}
-          onTextCreate={handleTextCreate}
-        />
+       
         <div className={cn(
           "absolute bottom-6 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-4",
           "bg-white/95 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-xl border border-gray-200/80",
@@ -1047,8 +1050,11 @@ useEffect(() => {
           stageFrames={stageFrames}
           images={images}
           connections={connections}
+          editingId={editingId}
+          setEditingId={setEditingId}
           selectedNodeIds={selectedNodeIds}
           stageInstance={stageInstance}
+          onTextCreate={handleTextCreate}
           setStageFrames={setStageFrames}
           handleWheel={toolHandlers.handleWheel}
           handleMouseDown={toolHandlers.handleMouseDown}

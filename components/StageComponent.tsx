@@ -58,6 +58,12 @@ interface StageComponentProps {
   updateConnection: (id: string, updates: Partial<Connection>) => void;
   onDelete: (id: string) => void;
   setActiveTool: (tool: Tool | null) => void;
+  
+  // --- UPDATED TEXT PROPS ---
+  editingId: string | null;
+  setEditingId: (id: string | null) => void;
+  onTextCreate: (pos: { x: number; y: number }) => void;
+  
   handleStartTextEditing?: (textProps: {
     position: { x: number; y: number };
     text: string;
@@ -331,11 +337,26 @@ const StageComponent: React.FC<StageComponentProps> = ({
   onDelete,
   setActiveTool,
   handleStartTextEditing,
+  // --- PROPS ---
+  editingId,
+  setEditingId,
+  onTextCreate
 }) => {
-  const shapeRefs = useRef<{ [key: string]: React.RefObject<Konva.Node | null> }>({});
+  // Use a Mutable Object Map instead of useEffect for refs
+  // This is CRITICAL for instant availability of refs for new shapes
+  const shapeRefs = useRef<{ [key: string]: Konva.Node | null }>({});
   const dragStartPos = useRef<Map<string, { x: number; y: number }>>(new Map());
 
-  // Ensure Konva nodes match loaded state
+  // Helper to assign refs dynamically
+  const setShapeRef = (id: string, node: Konva.Node | null) => {
+    if (node) {
+      shapeRefs.current[id] = node;
+    } else {
+      delete shapeRefs.current[id];
+    }
+  };
+
+  // Ensure Konva nodes match loaded state (Sanity Check)
   useEffect(() => {
     if (!stageRef.current) return;
 
@@ -367,7 +388,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (!node || selectedNodeIds.length <= 1) return;
 
     selectedNodeIds.forEach(id => {
-      const ref = shapeRefs.current[id]?.current;
+      // Access refs directly from the map
+      const ref = shapeRefs.current[id];
       if (ref && ref !== node) {
         dragStartPos.current.set(id, { x: ref.x(), y: ref.y() });
       }
@@ -383,7 +405,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
 
     selectedNodeIds.forEach(id => {
       if (id === node.id()) return;
-      const other = shapeRefs.current[id]?.current;
+      const other = shapeRefs.current[id]; // Access directly
       if (other) {
         const start = dragStartPos.current.get(id);
         if (start) {
@@ -556,35 +578,20 @@ const StageComponent: React.FC<StageComponentProps> = ({
       stage.batchDraw();
     }, [scale, position, stageRef]);
 
-  useEffect(() => {
-    const allIds = [
-      ...stageFrames.map(s => s.id),
-      ...shapes.map(s => s.id),
-      ...reactShapes.map(r => r.id),
-      ...images.map(i => i.id),
-      ...connections.map(c => c.id)
-    ];
-    const map: { [key: string]: React.RefObject<Konva.Node | null> } = { ...shapeRefs.current };
-    allIds.forEach(id => {
-      if (!map[id]) map[id] = React.createRef<Konva.Node | null>();
-    });
-    Object.keys(map).forEach(k => {
-      if (!allIds.includes(k)) delete map[k];
-    });
-    shapeRefs.current = map;
-  }, [stageFrames, shapes, reactShapes, images, connections]);
-
+  // UPDATED: Sync selection to Transformer using safe ref access
   useEffect(() => {
     if (!trRef.current || selectedNodeIds.length === 0) {
       trRef.current?.nodes([]);
       return;
     }
+    // Only grab nodes where the ref actually exists and has a current value
     const nodes = selectedNodeIds
-      .map(id => shapeRefs.current[id]?.current)
-      .filter((n): n is Konva.Node => !!n && n.getClassName() !== 'Path');
+      .map(id => shapeRefs.current[id])
+      .filter((n): n is Konva.Node => !!n);
+
     trRef.current.nodes(nodes);
     trRef.current.getLayer()?.batchDraw();
-  }, [selectedNodeIds, trRef]);
+  }, [selectedNodeIds, trRef, reactShapes, shapes, images, stageFrames]); // Added dependencies to ensure re-run on shape updates
 
   const allShapesToRender = React.useMemo(() => {
     return [
@@ -600,11 +607,26 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const stage = e.target.getStage();
     if (!stage) return;
     
-    if (e.target === stage) {
+    // 1. Check if we clicked on empty stage
+    const clickedOnEmpty = e.target === stage;
+    
+    if (clickedOnEmpty) {
+      // MIRO LOGIC: If Text Tool is active + Click Empty Space -> Create Text
+      if (activeTool === "text") {
+        const pos = stage.getRelativePointerPosition();
+        if (pos) {
+          onTextCreate({ x: pos.x, y: pos.y });
+        }
+        return;
+      }
+
+      // Normal Select Logic: Deselect if clicking empty
       setSelectedNodeIds([]);
+      setEditingId(null); 
       return;
     }
     
+    // 2. Handle Clicking on Shapes
     if (e.target.hasName('selectable-shape')) {
       const clickedId = e.target.id();
       const evt = e.evt; // native event
@@ -713,6 +735,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
         <GridLayer stage={stageInstance} baseSize={30} color="#d6d4d4ff" />
         <Layer name="draw-layer">
           {allShapesToRender.map((item) => {
+            // Callback Ref for EVERY shape - Ensures Refs are always up to date
+            const refCallback = (node: Konva.Node | null) => setShapeRef(item.id, node);
+
             const commonProps = {
               id: item.id,
               draggable: (item.draggable ?? true) && activeTool === "select",
@@ -737,7 +762,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
               return (
                 <Rect
                   key={item.id}
-                  ref={shapeRefs.current[item.id] as React.RefObject<Konva.Rect>}
+                  ref={refCallback} // Use callback ref
                   {...commonProps}
                   {...extraProps}
                   width={stageItem.width ?? 800}
@@ -755,7 +780,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
               return (
                 <ImageElement
                   key={item.id}
-                  ref={shapeRefs.current[item.id] as React.RefObject<Konva.Image>}
+                  ref={refCallback} // Use callback ref
                   imageShape={imageItem}
                   onDragStart={commonProps.onDragStart}
                   onDragMove={commonProps.onDragMove}
@@ -771,7 +796,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
               return (
                 <ConnectionElement
                   key={item.id}
-                  ref={shapeRefs.current[item.id] as React.RefObject<Konva.Path>}
+                  ref={refCallback} // Use callback ref
                   connection={connectionItem}
                   onDragEnd={commonProps.onDragEnd}
                   onClick={(e: KonvaPointerEvent) => handleConnectionClick(connectionItem, e)}
@@ -783,30 +808,30 @@ const StageComponent: React.FC<StageComponentProps> = ({
               const konvaItem = item as KonvaShape;
               switch (item.type) {
                 case 'rect':
-                  return <Rect key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.Rect>} {...commonProps} {...extraProps} width={konvaItem.width ?? 100} height={konvaItem.height ?? 100} fill={konvaItem.fill} cornerRadius={konvaItem.cornerRadius ?? 0} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
+                  return <Rect key={item.id} ref={refCallback} {...commonProps} {...extraProps} width={konvaItem.width ?? 100} height={konvaItem.height ?? 100} fill={konvaItem.fill} cornerRadius={konvaItem.cornerRadius ?? 0} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 case 'circle':
-                  return <Circle key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.Circle>} {...commonProps} {...extraProps} radius={konvaItem.radius ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
+                  return <Circle key={item.id} ref={refCallback} {...commonProps} {...extraProps} radius={konvaItem.radius ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 case 'ellipse':
-                  return <Ellipse key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.Ellipse>} {...commonProps} {...extraProps} radiusX={konvaItem.radiusX ?? 80} radiusY={konvaItem.radiusY ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
+                  return <Ellipse key={item.id} ref={refCallback} {...commonProps} {...extraProps} radiusX={konvaItem.radiusX ?? 80} radiusY={konvaItem.radiusY ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 case 'triangle':
-                  return <RegularPolygon key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.RegularPolygon>} {...commonProps} {...extraProps} sides={3} radius={konvaItem.radius ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
+                  return <RegularPolygon key={item.id} ref={refCallback} {...commonProps} {...extraProps} sides={3} radius={konvaItem.radius ?? 50} fill={konvaItem.fill} stroke={konvaItem.stroke} strokeWidth={konvaItem.strokeWidth ?? 0} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 case 'arrow':
-                  return <Arrow key={item.id} ref={shapeRefs.current[item.id] as React.RefObject<Konva.Arrow>} {...commonProps} {...extraProps} points={(konvaItem.points as number[]) ?? [0, 0, 100, 0]} stroke={konvaItem.fill ?? konvaItem.stroke} fill={konvaItem.fill} strokeWidth={konvaItem.strokeWidth ?? 2} pointerLength={konvaItem.pointerLength ?? 10} pointerWidth={konvaItem.pointerWidth ?? 10} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
+                  return <Arrow key={item.id} ref={refCallback} {...commonProps} {...extraProps} points={(konvaItem.points as number[]) ?? [0, 0, 100, 0]} stroke={konvaItem.fill ?? konvaItem.stroke} fill={konvaItem.fill} strokeWidth={konvaItem.strokeWidth ?? 2} pointerLength={konvaItem.pointerLength ?? 10} pointerWidth={konvaItem.pointerWidth ?? 10} onTransformEnd={(e: Konva.KonvaEventObject<Event>) => handleShapeTransformEnd(item, e)} />;
                 default:
                   return null;
               }
             } else if (item.__kind === 'react') {
               if (item.type === 'text') {
                 const textItem = item as ReactShape;
-                const isEditing = selectedNodeIds.includes(item.id) && activeTool === "text";
+                const isEditingThisNode = editingId === item.id;
                 return (
                   <TextComponent
                     key={item.id}
-                    ref={shapeRefs.current[item.id] as React.RefObject<Konva.Text>}
+                    ref={refCallback} // Use callback ref
                     id={item.id}
                     x={item.x}
                     y={item.y}
-                    text={textItem.text ?? "Type something..."}
+                    text={textItem.text ?? ""}
                     fontSize={textItem.fontSize ?? 20}
                     fill={textItem.fill ?? "black"}
                     fontFamily={textItem.fontFamily ?? "Inter, Arial, sans-serif"}
@@ -817,11 +842,15 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     width={textItem.width ?? 200}
                     rotation={textItem.rotation ?? 0}
                     isSelected={selectedNodeIds.includes(item.id)}
-                    isEditing={isEditing}
+                    isEditing={isEditingThisNode}
                     onSelect={() => activeTool === "select" && setSelectedNodeIds([item.id])}
                     onUpdate={(newAttrs: Partial<ReactShape>) => setReactShapes(prev => prev.map(shape => shape.id === item.id ? { ...shape, ...newAttrs } : shape))}
-                    onStartEditing={() => setActiveTool("text")}
-                    onFinishEditing={() => setActiveTool("select")}
+                    onStartEditing={() => {
+                        setSelectedNodeIds([item.id]);
+                        setEditingId(item.id);
+                    }}
+                    onFinishEditing={() => setEditingId(null)}
+                    onDelete={onDelete} 
                     onDragStart={commonProps.onDragStart}
                     onDragMove={commonProps.onDragMove}
                     onDragEnd={commonProps.onDragEnd}
@@ -832,7 +861,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                 return (
                   <EditableStickyNoteComponent
                     key={item.id}
-                    ref={shapeRefs.current[item.id] as React.RefObject<Konva.Group>}
+                    ref={refCallback} // Use callback ref
                     shapeData={item as ReactShape}
                     isSelected={selectedNodeIds.includes(item.id)}
                     activeTool={activeTool}

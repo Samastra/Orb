@@ -1,11 +1,7 @@
 "use client";
-import React, { useRef, useEffect, useCallback, forwardRef } from "react";
-import { Text as KonvaText, Transformer } from "react-konva";
+import React, { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { Text as KonvaText } from "react-konva";
 import Konva from "konva";
-import { KonvaEventObject } from "konva/lib/Node";
-
-// Helper type to resolve MouseEvent vs TouchEvent TypeScript conflict
-type KonvaPointerEvent = KonvaEventObject<MouseEvent | TouchEvent>;
 
 interface TextComponentProps {
   id: string;
@@ -24,21 +20,10 @@ interface TextComponentProps {
   isEditing: boolean;
   activeTool: string | null;
   onSelect: () => void;
-  onUpdate: (attrs: {
-    x?: number;
-    y?: number;
-    width?: number;
-    fontSize?: number;
-    rotation?: number;
-    text?: string;
-    fontWeight?: string;
-    fontFamily?: string;
-    fontStyle?: string;
-    fill?: string;
-    align?: "left" | "center" | "right";
-  }) => void;
+  onUpdate: (attrs: any) => void;
   onStartEditing: () => void;
   onFinishEditing: () => void;
+  onDelete: (id: string) => void;
   onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -71,13 +56,22 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       onTransformEnd,
       onStartEditing,
       onFinishEditing,
-    }
+      onDelete,
+    },
+    ref
   ) => {
-    const textRef = useRef<Konva.Text>(null);
-    const trRef = useRef<Konva.Transformer>(null);
-    const isNew = useRef(true);
+    const internalRef = useRef<Konva.Text>(null);
 
-    // 1. Compute combined fontStyle for Konva
+    useImperativeHandle(ref, () => internalRef.current!);
+
+    const onUpdateRef = useRef(onUpdate);
+    const onFinishEditingRef = useRef(onFinishEditing);
+    const onDeleteRef = useRef(onDelete);
+    
+    useEffect(() => { onUpdateRef.current = onUpdate; }, [onUpdate]);
+    useEffect(() => { onFinishEditingRef.current = onFinishEditing; }, [onFinishEditing]);
+    useEffect(() => { onDeleteRef.current = onDelete; }, [onDelete]);
+
     const konvaFontStyle = (() => {
       const stylePart = fontStyle === "normal" ? "" : fontStyle;
       const weightPart =
@@ -85,103 +79,54 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           ? ""
           : fontWeight === "bold"
           ? "bold"
-          : fontWeight; 
+          : fontWeight;
       return `${stylePart} ${weightPart}`.trim() || "normal";
     })();
 
-    // 2. Force Konva update when font props change
-    useEffect(() => {
-      if (textRef.current && !isEditing) {
-        const node = textRef.current;
-        node.setAttrs({
-          fontFamily,
-          fontStyle: konvaFontStyle,
-          fontSize,
-          fill,
-          align
-        });
-        node.getLayer()?.batchDraw();
-      }
-    }, [konvaFontStyle, fontFamily, fontSize, fill, align, isEditing]);
-
-    // 3. Auto-Edit on Create
-    useEffect(() => {
-      if (isNew.current && !isEditing) {
-        isNew.current = false;
-        if (initialText === "Type something..." || initialText === "Double click to edit") {
-             onStartEditing();
-        }
-      }
-    }, [isEditing, onStartEditing, initialText]);
-
-    // 4. Transformer Logic
-    useEffect(() => {
-      if (isSelected && textRef.current && trRef.current && !isEditing) {
-        trRef.current.nodes([textRef.current]);
-        trRef.current.getLayer()?.batchDraw();
-      } else if (trRef.current) {
-        trRef.current.nodes([]);
-      }
-    }, [isSelected, isEditing]);
-
-    // 5. Live Transform Logic
+    // 1. TRANSFORM LOGIC (While Dragging)
     const handleTransform = useCallback(() => {
-      const node = textRef.current;
+      const node = internalRef.current;
+      const tr = node?.getStage()?.findOne('Transformer') as Konva.Transformer;
+      
+      if (!node || !tr) return;
+
+      const anchor = tr.getActiveAnchor();
+
+      if (anchor && ['middle-left', 'middle-right'].includes(anchor)) {
+         const scaleX = node.scaleX();
+         
+         const newWidth = Math.max(50, node.width() * scaleX);
+         node.width(newWidth);
+         
+         node.scaleX(1);
+         node.scaleY(1);
+      }
+    }, []);
+
+    // 2. TRANSFORM END LOGIC (On Drop)
+    const handleTransformEndInternal = useCallback((e: Konva.KonvaEventObject<Event>) => {
+      const node = internalRef.current;
       if (!node) return;
       
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
-      
-      node.scaleX(1);
-      node.scaleY(1);
 
-      const activeAnchor = trRef.current?.getActiveAnchor();
-      const isCornerAnchor = activeAnchor && (
-        activeAnchor.includes("top") || activeAnchor.includes("bottom")
-      );
-
-      if (isCornerAnchor) {
-         const newFontSize = Math.max(6, Math.round(node.fontSize() * scaleY));
-         const newWidth = Math.max(50, node.width() * scaleX);
-         node.fontSize(newFontSize);
-         node.width(newWidth);
-      } else {
-         const newWidth = Math.max(50, node.width() * scaleX);
-         node.width(newWidth);
-      }
-      
-      node.getLayer()?.batchDraw();
-    }, []);
-
-    const handleTransformEndInternal = useCallback((e: Konva.KonvaEventObject<Event>) => {
-      const node = textRef.current;
-      if (!node) return;
-      onUpdate({
+      onUpdateRef.current({
         x: node.x(),
         y: node.y(),
-        width: node.width(),
-        fontSize: node.fontSize(),
         rotation: node.rotation(),
+        width: Math.max(50, node.width() * scaleX),
+        fontSize: Math.max(5, node.fontSize() * scaleY), 
       });
+      
       if (onTransformEnd) onTransformEnd(e);
-    }, [onUpdate, onTransformEnd]);
+    }, [onTransformEnd]);
 
-    // 6. Generic Click Handlers
-    const handleClick = useCallback((e: KonvaPointerEvent) => {
-      e.cancelBubble = true;
-      if (activeTool === "select" && !isEditing) onSelect();
-    }, [activeTool, isEditing, onSelect]);
-
-    const handleDblClick = useCallback((e: KonvaPointerEvent) => {
-      e.cancelBubble = true;
-      if (!isEditing) onStartEditing();
-    }, [isEditing, onStartEditing]);
-
-    // 7. Manual Textarea Overlay
+    // --- EDITING LOGIC ---
     useEffect(() => {
-      if (!isEditing || !textRef.current) return;
+      if (!isEditing || !internalRef.current) return;
 
-      const node = textRef.current;
+      const node = internalRef.current;
       const stage = node.getStage();
       if (!stage) return;
 
@@ -192,27 +137,29 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         if (!textarea) return;
         const textPosition = node.getAbsolutePosition();
         const stageBox = stage.container().getBoundingClientRect();
+        
         const areaPosition = {
           x: stageBox.left + textPosition.x,
           y: stageBox.top + textPosition.y,
         };
         const absScale = node.getAbsoluteScale();
 
-        textarea.value = node.text();
+        textarea.value = initialText || ""; 
         
         Object.assign(textarea.style, {
           position: "fixed",
           top: `${areaPosition.y}px`,
           left: `${areaPosition.x}px`,
           width: `${node.width() * absScale.x}px`,
-          minHeight: `${node.height() * absScale.y}px`,
+          // We set minHeight, but we'll let auto-growth handle the real height
           fontSize: `${node.fontSize() * absScale.y}px`,
           fontFamily: node.fontFamily(),
           fontWeight: fontWeight,
           fontStyle: fontStyle,
           textAlign: node.align(),
-          color: node.fill(),
-          lineHeight: "1.4",
+          color: fill, 
+          lineHeight: node.lineHeight().toString(),
+          
           border: "none",
           padding: "0px",
           margin: "0px",
@@ -222,62 +169,110 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           resize: "none",
           whiteSpace: "pre-wrap",
           wordWrap: "break-word",
+          boxSizing: "border-box", 
+          
           transformOrigin: "left top",
           transform: `rotateZ(${node.rotation()}deg)`,
           zIndex: "10000",
         });
-        
-        textarea.style.height = "auto";
-        textarea.style.height = `${textarea.scrollHeight}px`;
       };
 
       updateTextareaPos();
+      
+      // --- THE FIX IS HERE ---
+      const handleResize = () => {
+        // 1. Resize HTML Area
+        textarea.style.height = "auto";
+        textarea.style.height = `${textarea.scrollHeight}px`;
+
+        // 2. Sync Konva Node (and Transformer) to match HTML height
+        const absScale = node.getAbsoluteScale();
+        const newHeight = textarea.scrollHeight / absScale.y;
+        
+        // Directly update Konva node height (bypassing React state for speed)
+        node.height(newHeight);
+        
+        // Force the Transformer to redraw around the new height
+        const tr = stage.findOne('Transformer') as Konva.Transformer;
+        if (tr) {
+            tr.forceUpdate();
+        }
+        
+        // Redraw layer
+        node.getLayer()?.batchDraw();
+      };
+
+      // Call immediately to set initial height correctly
+      handleResize();
       textarea.focus();
 
       const removeTextarea = () => {
         if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
       };
 
-      const handleOutsideClick = (e: MouseEvent) => {
-        if (e.target !== textarea) onFinishEditing();
+      const handleFinish = () => {
+         const val = textarea.value;
+         onUpdateRef.current({ text: val });
+
+         if (val.trim() === "") {
+           onDeleteRef.current(id);
+         } else {
+           onFinishEditingRef.current();
+         }
       };
 
       const handleKeydown = (e: KeyboardEvent) => {
-        if (e.key === "Escape") onFinishEditing();
+        e.stopPropagation(); 
+        if (e.key === "Escape") {
+            handleFinish();
+        }
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault(); 
+            handleFinish();
+        }
       };
 
-      const handleInput = () => {
-        textarea.style.height = "auto";
-        textarea.style.height = `${textarea.scrollHeight}px`;
-        onUpdate({ text: textarea.value });
+      const handleBlur = () => {
+        handleFinish();
       };
 
       textarea.addEventListener("keydown", handleKeydown);
-      textarea.addEventListener("input", handleInput);
       
-      setTimeout(() => window.addEventListener("click", handleOutsideClick), 0);
+      // Bind Resize to Input so it grows on every letter
+      textarea.addEventListener("input", handleResize);
+      textarea.addEventListener("blur", handleBlur);
 
       return () => {
         removeTextarea();
-        window.removeEventListener("click", handleOutsideClick);
       };
-    }, [isEditing, onFinishEditing, onUpdate, fontSize, fontFamily, fontWeight, fontStyle, fill, align]);
+
+    }, [
+      isEditing, 
+      id, 
+      fontSize, 
+      fontFamily, 
+      fontWeight, 
+      fontStyle, 
+      align, 
+      fill
+    ]); 
 
     return (
-      <>
-        {/* Render Konva Text */}
         <KonvaText
-          ref={textRef}
+          ref={internalRef}
           id={id}
           x={x}
           y={y}
-          text={initialText || "Double click to edit"}
+          text={isEditing ? "" : (initialText || " ")} 
           fontSize={fontSize}
           fontFamily={fontFamily}
           fontStyle={konvaFontStyle}
-          fill={isEditing ? "transparent" : fill}
+          fill={fill}
+          opacity={isEditing ? 0 : 1}
           align={align}
           width={width}
+          scaleX={1}
+          scaleY={1}
           wrap="word"
           lineHeight={1.4}
           rotation={rotation}
@@ -287,29 +282,19 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           onDragEnd={onDragEnd}
           onTransform={handleTransform}
           onTransformEnd={handleTransformEndInternal}
-          onClick={handleClick}
-          onTap={handleClick}
-          onDblClick={handleDblClick}
-          onDblTap={handleDblClick}
+          onClick={(e) => {
+            if (activeTool === "select") onSelect();
+          }}
+          onTap={(e) => {
+             if (activeTool === "select") onSelect();
+          }}
+          onDblClick={(e) => {
+             if (!isEditing) onStartEditing();
+          }}
+          onDblTap={(e) => {
+             if (!isEditing) onStartEditing();
+          }}
         />
-
-        {/* Transformer - FIXED: Removed redundant 'node' prop */}
-        {isSelected && !isEditing && (
-          <Transformer
-            ref={trRef}
-            boundBoxFunc={(oldBox, newBox) => {
-              newBox.width = Math.max(50, newBox.width);
-              return newBox;
-            }}
-            enabledAnchors={[
-              "top-left", "top-right", "bottom-left", "bottom-right",
-              "middle-left", "middle-right"
-            ]}
-            rotateEnabled={true}
-            keepRatio={false}
-          />
-        )}
-      </>
     );
   }
 );
