@@ -15,24 +15,17 @@ const reorderArray = <T,>(arr: T[], from: number, to: number): T[] => {
   return newArr;
 };
 
-// NEW: Connection type definition
-// In useBoardState.ts, update Connection to extend BaseShape:
+export type Side = "top" | "right" | "bottom" | "left";
+
+// 2. Update the Connection type definition
 export type Connection = {
   id: string;
   type: 'connection';
-  from: { x: number; y: number; nodeId?: string | null };
-  to: { x: number; y: number; nodeId?: string | null };
-  cp1x: number;
-  cp1y: number;
-  cp2x: number;
-  cp2y: number;
+  from: { nodeId: string; side: Side; x: number; y: number };
+  to: { nodeId?: string | null; side?: Side; x: number; y: number };
   stroke?: string;
   strokeWidth?: number;
   draggable: boolean;
-  // Make x and y optional since connections don't really have a position
-  x?: number;
-  y?: number;
-  rotation?: number;
 };
 
 
@@ -42,8 +35,8 @@ export const useBoardState = () => {
   // State
   const [stageDimensions, setStageDimensions] = useState(defaultStageDimensions);
   const [tempDimensions, setTempDimensions] = useState(defaultStageDimensions);
-  const [connectionStart, setConnectionStart] = useState<{ x: number; y: number } | null>(null);
-  const [tempConnection, setTempConnection] = useState<Konva.Line | null>(null);
+  const [connectionStart, setConnectionStart] = useState<{ nodeId: string; side: Side; x: number; y: number } | null>(null);
+  const [tempConnection, setTempConnection] = useState<Connection | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [scale, setScale] = useState(0.4);
   const [position, setPosition] = useState({ x: 400, y: 300 });
@@ -71,20 +64,19 @@ export const useBoardState = () => {
 
 
   // NEW: Add connection function
-  const addConnection = useCallback((connectionData: Omit<Connection, 'id' | 'type'>, addAction: (action: Action) => void) => {
-    const connectionId = `connection-${Date.now()}`;
+ const addConnection = useCallback((connectionData: any, addAction: (action: Action) => void) => {
+    const connectionId = `conn-${Date.now()}`;
     
     const newConnection: Connection = {
       id: connectionId,
       type: 'connection',
       ...connectionData,
-      draggable: false, // Connections themselves aren't draggable, only endpoints
+      draggable: false, 
     };
     
     console.log('➕ Adding Connection:', newConnection);
     setConnections(prev => [...prev, newConnection]);
     
-    // ADD ACTION RECORDING
     addAction({
       type: "add-connection",
       data: newConnection

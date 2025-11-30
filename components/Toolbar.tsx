@@ -60,6 +60,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   return (
+    
     <div className={cn(
       "fixed md:absolute left-4 top-24 md:top-24 flex flex-col items-center z-30 transition-all duration-300",
       compact ? "scale-90 origin-left" : ""
@@ -246,26 +247,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
             </div>
           </PopoverContent>
         </Popover>
-
-        {/* Connection Tool */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => handleToolChange("connect")}
-              className={cn(
-                "flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl transition-all duration-300 border-2",
-                activeTool === "connect" 
-                  ? "bg-blue-50 border-blue-500 shadow-md scale-105" 
-                  : "hover:bg-gray-100/80 border-transparent hover:border-gray-300 hover:scale-105"
-              )}
-            >
-              <img src={toolIcons["connect"]} alt="connect" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-            <p className="text-xs font-medium">Connection Tool</p>
-          </TooltipContent>
-        </Tooltip>
 
         {/* Shapes Dropdown */}
         <DropdownMenu>

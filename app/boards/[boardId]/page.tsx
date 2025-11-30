@@ -112,7 +112,9 @@ const BoardPage = () => {
   // Refs
   const stageRef = useRef<Konva.Stage | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
+
   
+
  const [editingId, setEditingId] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false); // Track if board has unsaved changes
   const [hasLoaded, setHasLoaded] = useState(false); // Track if board elements have been loaded
@@ -125,31 +127,7 @@ const BoardPage = () => {
     closeVideo
   } = useVideoPlayer();
 
-  // State management
-  const boardState = useBoardState();
-  const [stageKey, setStageKey] = useState(0);
-  const {
-    scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
-    isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeIds, stageInstance, tempDimensions,
-    showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
-    setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
-    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setSelectedNodeIds, setStageInstance,
-    setTempDimensions, setShowSaveModal, setShowSetupDialog, setBoardInfo,
-    // Layer functions
-    bringForward,
-    sendBackward, 
-    bringToFront,
-    sendToBack,
-    // Shape functions
-    addShape,
-    deleteShape,
-    addStageFrame,
-    addImage,
-    updateConnection,
-    removeConnection,
-  } = boardState;
-
-  const {
+    const {
   websiteUrl,
   websiteTitle,
   isWebsiteOpen,
@@ -157,16 +135,79 @@ const BoardPage = () => {
   closeWebsite
 } = useWebsitePlayer();
 
+  // State management 
+  const boardState = useBoardState();
+  const [stageKey, setStageKey] = useState(0);
+ const {
+    scale, position, activeTool, drawingMode, lines, connectionStart, tempConnection,
+    isConnecting, reactShapes, konvaShapes, stageFrames, images, connections, selectedNodeIds, stageInstance, tempDimensions,
+    showSaveModal, isTemporaryBoard, currentBoardId, showSetupDialog, boardInfo,
+    setActiveTool, setDrawingMode, setLines, setConnectionStart, setTempConnection,
+    setIsConnecting, setReactShapes, setKonvaShapes, setStageFrames, setImages, setConnections, setSelectedNodeIds, setStageInstance,
+    setTempDimensions, setShowSaveModal, setShowSetupDialog, setBoardInfo,
+    bringForward, sendBackward, bringToFront, sendToBack,    addShape, deleteShape, addStageFrame, addImage, updateConnection, removeConnection,
+  } = boardState;
+
+  const allShapes = useMemo(() => 
+    [...konvaShapes, ...reactShapes, ...images, ...stageFrames], 
+  [konvaShapes, reactShapes, images, stageFrames]);
+
+   const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
+    stageRef,
+    boardState.actions,
+    boardState.undoneActions,
+    reactShapes,
+    lines,
+    konvaShapes,
+    stageFrames,
+    images,
+    connections,
+    boardState.setActions,
+    boardState.setUndoneActions,
+    setReactShapes,
+    setLines,
+    setKonvaShapes,
+    setStageFrames,
+    setImages,
+    setConnections
+  );
+
+    const toolHandlers = useKonvaTools(
+    stageRef, 
+    activeTool, 
+    boardState.scale, 
+    boardState.position, 
+    drawingMode, 
+    lines, 
+    connectionStart, 
+    tempConnection, 
+    isConnecting, 
+    selectedNodeIds, 
+    setActiveTool, 
+    setDrawingMode, 
+    setLines, 
+    setConnectionStart, 
+    setTempConnection, 
+    setIsConnecting, 
+    setSelectedNodeIds, 
+    undoRedoAddAction,
+    setConnections,
+    updateConnection,
+    boardState.addShape, // Pass the RAW addShape from state, not the wrapped handleAddShape
+    allShapes 
+  );
+
+
     const [editingText, setEditingText] = useState<{
-  isEditing: boolean;
-  position: { x: number; y: number };
-  text: string;
-  fontSize: number;
-  fontFamily: string;
-  color: string;
-  width: number;
-  onSave: (text: string) => void;
-} | null>(null);
+        isEditing: boolean;
+        position: { x: number; y: number };
+        text: string;
+        fontSize: number;
+        fontFamily: string;
+        color: string;
+        width: number;
+        onSave: (text: string) => void;
+      } | null>(null);
 
 // Add handler for text editing
 const handleStartTextEditing = useCallback((textProps: {
@@ -189,49 +230,12 @@ const handleFinishTextEditing = useCallback(() => {
 }, []);
 
   // Undo/Redo functionality
-  const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
-    stageRef,
-    boardState.actions,
-    boardState.undoneActions,
-    reactShapes,
-    lines,
-    konvaShapes,
-    stageFrames,
-    images,
-    connections,
-    boardState.setActions,
-    boardState.setUndoneActions,
-    setReactShapes,
-    setLines,
-    setKonvaShapes,
-    setStageFrames,
-    setImages,
-    setConnections
-  );
+ 
+
+  
 
   // Tool functionality
-  const toolHandlers = useKonvaTools(
-    stageRef, 
-    activeTool, 
-    boardState.scale, 
-    boardState.position, 
-    drawingMode, 
-    lines, 
-    connectionStart, 
-    tempConnection, 
-    isConnecting, 
-    selectedNodeIds, 
-    setActiveTool, 
-    setDrawingMode, 
-    setLines, 
-    setConnectionStart, 
-    setTempConnection, 
-    setIsConnecting, 
-    setSelectedNodeIds, 
-    undoRedoAddAction,
-    setConnections,
-    updateConnection
-  );
+
 
   const { user } = useUser();
   const { triggerSave } = useAutoSave(currentBoardId, isTemporaryBoard, user?.id);
@@ -553,7 +557,7 @@ useLayoutEffect(() => {
     setConnections, 
     setLines
   ]);
-  
+
   // In page.tsx - Add this right after the loading useLayoutEffect
 useEffect(() => {
   // Force stage to update when camera changes
@@ -1098,6 +1102,12 @@ useEffect(() => {
           onDelete={handleDeleteShape}
           setActiveTool={setActiveTool}
           handleStartTextEditing={handleStartTextEditing}
+          hoveredNodeId={toolHandlers.hoveredNodeId}
+          setHoveredNodeId={toolHandlers.setHoveredNodeId}
+          handleAnchorMouseDown={toolHandlers.handleAnchorMouseDown}
+          handleAnchorClick={toolHandlers.handleAnchorClick}
+          handleShapeMouseEnter={toolHandlers.handleShapeMouseEnter}
+          tempConnection={tempConnection}
         />
       </div>
       <CreateBoard 
