@@ -1,10 +1,21 @@
 import React from "react";
 import {
+  MousePointer2,
+  Type,
+  StickyNote,
+  Image as ImageIcon,
+  Pen,
+  Eraser,
+  TvMinimal, // Icon for Stage
+  Cable, // Perfect icon for "Connection"
+  Shapes,
+  Upload
+} from "lucide-react";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Popover,
@@ -19,8 +30,52 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Tool } from "../types/board-types";
-import { toolIcons, shapeOptions } from "../constants/tool-constants";
+import { shapeOptions } from "../constants/tool-constants";
+
+// --- HELPER COMPONENTS ---
+
+// A simple divider to separate tool groups
+const Divider = () => (
+  <div className="w-full h-[1px] bg-gray-200 my-1 md:w-8 md:h-[1px] md:my-2" />
+);
+
+// A reusable button component to keep code clean
+interface ToolbarBtnProps {
+  onClick: () => void;
+  isActive: boolean;
+  icon: React.ElementType;
+  label: string;
+}
+
+const ToolbarBtn = ({ onClick, isActive, icon: Icon, label }: ToolbarBtnProps) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button
+        onClick={onClick}
+        className={cn(
+          "relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl transition-all duration-200 group",
+          isActive
+            ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105" // Active State
+            : "text-gray-500 hover:bg-gray-100 hover:text-gray-900" // Inactive State
+        )}
+      >
+        <Icon className={cn("w-5 h-5", isActive ? "stroke-[2.5px]" : "stroke-2")} />
+        
+        {/* Subtle dot indicator for active state (optional, adds polish) */}
+        {isActive && (
+          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-600 md:bg-transparent" />
+        )}
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side="right" sideOffset={15} className="bg-gray-900 text-white border-0 font-medium">
+      {label}
+    </TooltipContent>
+  </Tooltip>
+);
+
+// --- MAIN COMPONENT ---
 
 interface ToolbarProps {
   activeTool: Tool | null;
@@ -46,12 +101,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
   addShape,
   setTempDimensions,
   handleApplyStage,
-  undo,
-  redo,
   compact = false,
   onImageUpload,
 }) => {
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUploadWrapper = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && onImageUpload) {
       onImageUpload(file);
@@ -61,257 +114,179 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
   return (
     <div className={cn(
-      "fixed md:absolute left-4 top-24 md:top-24 flex flex-col items-center z-30 transition-all duration-300",
+      "fixed md:absolute left-4 top-24 md:top-1/2 md:-translate-y-1/2 z-30 transition-all duration-300",
       compact ? "scale-90 origin-left" : ""
     )}>
-      {/* Premium Glass Morphism Toolbar */}
-      <div className="flex flex-row md:flex-col items-center space-y-0 md:space-y-3 bg-white/95 backdrop-blur-sm p-3 md:p-4 rounded-2xl shadow-xl border border-gray-200/80 hover:shadow-2xl transition-all duration-300">
+      <div className="flex flex-col items-center p-2 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5">
         
-        {/* Select Tool */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => handleToolChange("select")}
-              className={cn(
-                "flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl transition-all duration-300 border-2",
-                activeTool === "select" 
-                  ? "bg-blue-50 border-blue-500 shadow-md scale-105" 
-                  : "hover:bg-gray-100/80 border-transparent hover:border-gray-300 hover:scale-105"
-              )}
-            >
-              <img src={toolIcons["select"]} alt="select" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-            <p className="text-xs font-medium">Move Tool</p>
-          </TooltipContent>
-        </Tooltip>
+        {/* --- GROUP 1: POINTERS --- */}
+        <div className="flex flex-col gap-2">
+          <ToolbarBtn 
+            label="Move Tool (V)" 
+            icon={MousePointer2} 
+            isActive={activeTool === "select"} 
+            onClick={() => handleToolChange("select")} 
+          />
+          
+          <ToolbarBtn 
+            label="Connection Tool (C)" 
+            icon={Cable} 
+            isActive={activeTool === "connect"} 
+            onClick={() => handleToolChange("connect")} 
+          />
+        </div>
 
-        {/* --- NEW CONNECTION TOOL --- */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => handleToolChange("connect")}
-              className={cn(
-                "flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl transition-all duration-300 border-2",
-                activeTool === "connect" 
-                  ? "bg-blue-50 border-blue-500 shadow-md scale-105" 
-                  : "hover:bg-gray-100/80 border-transparent hover:border-gray-300 hover:scale-105"
-              )}
-            >
-              {/* Simple Connector Icon SVG */}
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300"
-              >
-                <circle cx="18" cy="5" r="3" />
-                <circle cx="6" cy="12" r="3" />
-                <circle cx="18" cy="19" r="3" />
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-              </svg>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-            <p className="text-xs font-medium">Connection Tool</p>
-          </TooltipContent>
-        </Tooltip>
-        {/* --------------------------- */}
+        <Divider />
 
-        {/* Text Tool */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => addShape("text")}
-              className="flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl hover:bg-gray-100/80 transition-all duration-300 border-2 border-transparent hover:border-gray-300 hover:scale-105"
-            >
-              <img src={toolIcons["text"]} alt="text" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-            <p className="text-xs font-medium">Text Tool</p>
-          </TooltipContent>
-        </Tooltip>
+        {/* --- GROUP 2: CREATION --- */}
+        <div className="flex flex-col gap-2">
+          <ToolbarBtn 
+            label="Text" 
+            icon={Type} 
+            isActive={false} // Text tool usually resets after click, usually doesn't stay 'active' like a brush
+            onClick={() => addShape("text")} 
+          />
+          
+          <ToolbarBtn 
+            label="Sticky Note" 
+            icon={StickyNote} 
+            isActive={false}
+            onClick={() => addShape("stickyNote")} 
+          />
 
-        {/* Sticky Note */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => addShape("stickyNote")}
-              className="flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl hover:bg-gray-100/80 transition-all duration-300 border-2 border-transparent hover:border-gray-300 hover:scale-105"
-            >
-              <img src={toolIcons["stickyNote"]} alt="sticky-note" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-            <p className="text-xs font-medium">Sticky Note</p>
-          </TooltipContent>
-        </Tooltip>
+           {/* Shapes Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="outline-none">
+               <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200">
+                    <Shapes className="w-5 h-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={15} className="bg-gray-900 text-white border-0 font-medium">
+                  Shapes
+                </TooltipContent>
+              </Tooltip>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="start" className="w-32 bg-white/95 backdrop-blur-xl border-gray-200 shadow-xl rounded-xl p-2 ml-4">
+              <div className="grid grid-cols-2 gap-2">
+                {shapeOptions.map((shape) => (
+                  <DropdownMenuItem 
+                    key={shape.value} 
+                    onClick={() => addShape(shape.value as Tool)}
+                    className="flex flex-col items-center justify-center p-2 cursor-pointer rounded-lg hover:bg-blue-50 focus:bg-blue-50 transition-colors"
+                  >
+                    <img src={shape.icon} alt={shape.label} className="w-6 h-6 mb-1 opacity-70" />
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {/* Image Upload */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="relative">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                title="Upload image"
-              />
-              <button className="flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl hover:bg-gray-100/80 transition-all duration-300 border-2 border-transparent hover:border-gray-300 hover:scale-105">
-                <img src="/image/image-icon.png" alt="upload" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-              </button>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-            <p className="text-xs font-medium">Upload Image</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Pen Tool */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => {
-                handleToolChange("pen");
-                setDrawingMode("brush");
-              }}
-              className={cn(
-                "flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl transition-all duration-300 border-2",
-                activeTool === "pen" && drawingMode === "brush" 
-                  ? "bg-blue-50 border-blue-500 shadow-md scale-105" 
-                  : "hover:bg-gray-100/80 border-transparent hover:border-gray-300 hover:scale-105"
-              )}
-            >
-              <img src="/image/edit-pen.svg" alt="pen" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-            <p className="text-xs font-medium">Pen Tool</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Eraser Tool */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => {
-                handleToolChange("pen");
-                setDrawingMode("eraser");
-              }}
-              className={cn(
-                "flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl transition-all duration-300 border-2",
-                activeTool === "pen" && drawingMode === "eraser" 
-                  ? "bg-blue-50 border-blue-500 shadow-md scale-105" 
-                  : "hover:bg-gray-100/80 border-transparent hover:border-gray-300 hover:scale-105"
-              )}
-            >
-              <img src="/image/eraser.svg" alt="eraser" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-            <p className="text-xs font-medium">Eraser Tool</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Stage Tool */}
-        <Popover>
+          {/* Image Upload */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <PopoverTrigger asChild>
-                <button className="flex items-center justify-center my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl hover:bg-gray-100/80 transition-all duration-300 border-2 border-transparent hover:border-gray-300 hover:scale-105">
-                  <img src={toolIcons["stage"]} alt="stage" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-                </button>
-              </PopoverTrigger>
+              <div className="relative flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200 cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUploadWrapper}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  title="Upload image"
+                />
+                <ImageIcon className="w-5 h-5" />
+              </div>
             </TooltipTrigger>
-            <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-              <p className="text-xs font-medium">Add Stage</p>
+            <TooltipContent side="right" sideOffset={15} className="bg-gray-900 text-white border-0 font-medium">
+              Upload Image
             </TooltipContent>
           </Tooltip>
+        </div>
 
-          <PopoverContent side="right" sideOffset={15} className="w-80 bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl">
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <h4 className="font-semibold text-gray-900">Stage Dimensions</h4>
-                <p className="text-sm text-gray-600">
-                  Set the size for your stage frame
-                </p>
-              </div>
-              <div className="grid gap-3">
-                <div className="grid grid-cols-3 items-center gap-3">
-                  <Label htmlFor="width" className="text-sm font-medium text-gray-700">Width (px)</Label>
-                  <Input
-                    id="width"
-                    className="col-span-2 h-9 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    value={tempDimensions.width}
-                    onChange={(e) => setTempDimensions(prev => ({
-                      ...prev,
-                      width: parseInt(e.target.value) || 0
-                    }))}
-                  />
+        <Divider />
+
+        {/* --- GROUP 3: DRAWING --- */}
+        <div className="flex flex-col gap-2">
+          <ToolbarBtn 
+            label="Pen" 
+            icon={Pen} 
+            isActive={activeTool === "pen" && drawingMode === "brush"} 
+            onClick={() => { handleToolChange("pen"); setDrawingMode("brush"); }} 
+          />
+          
+          <ToolbarBtn 
+            label="Eraser" 
+            icon={Eraser} 
+            isActive={activeTool === "pen" && drawingMode === "eraser"} 
+            onClick={() => { handleToolChange("pen"); setDrawingMode("eraser"); }} 
+          />
+        </div>
+
+        <Divider />
+
+        {/* --- GROUP 4: ADVANCED --- */}
+        <div className="flex flex-col gap-2">
+          <Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200">
+                    <TvMinimal className="w-5 h-5" />
+                  </button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={15} className="bg-gray-900 text-white border-0 font-medium">
+                Add Frame
+              </TooltipContent>
+            </Tooltip>
+
+            <PopoverContent side="right" align="start" sideOffset={20} className="w-72 bg-white/95 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-2xl p-4">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h4 className="font-semibold text-gray-900">Stage Frame</h4>
+                  <p className="text-xs text-gray-500">Create a container for your content</p>
                 </div>
                 
-                <div className="grid grid-cols-3 items-center gap-3">
-                  <Label htmlFor="height" className="text-sm font-medium text-gray-700">Height (px)</Label>
-                  <Input
-                    id="height"
-                    className="col-span-2 h-9 rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    value={tempDimensions.height}
-                    onChange={(e) => setTempDimensions(prev => ({
-                      ...prev,
-                      height: parseInt(e.target.value) || 0
-                    }))}
-                  />
-                </div>
-                <div className="mt-2 flex justify-end">
+                <div className="grid gap-3">
+                  <div className="grid grid-cols-3 items-center gap-2">
+                    <Label htmlFor="width" className="text-xs font-medium text-gray-500">Width</Label>
+                    <div className="col-span-2 relative">
+                      <Input
+                        id="width"
+                        className="h-8 text-sm rounded-md border-gray-200 focus:border-blue-500 pr-8"
+                        value={tempDimensions.width}
+                        onChange={(e) => setTempDimensions(prev => ({...prev, width: parseInt(e.target.value) || 0}))}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">px</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 items-center gap-2">
+                    <Label htmlFor="height" className="text-xs font-medium text-gray-500">Height</Label>
+                    <div className="col-span-2 relative">
+                      <Input
+                        id="height"
+                        className="h-8 text-sm rounded-md border-gray-200 focus:border-blue-500 pr-8"
+                        value={tempDimensions.height}
+                        onChange={(e) => setTempDimensions(prev => ({...prev, height: parseInt(e.target.value) || 0}))}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">px</span>
+                    </div>
+                  </div>
+
                   <Button 
                     onClick={handleApplyStage} 
                     size="sm" 
-                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg transition-all duration-300 shadow-md hover:shadow-lg"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm"
                   >
-                    Create Stage
+                    Create Frame
                   </Button>
                 </div>
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+        </div>
 
-        {/* Shapes Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger className="outline-none">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="my-1 w-10 h-10 md:w-12 md:h-12 rounded-xl hover:bg-gray-100/80 flex items-center justify-center cursor-pointer transition-all duration-300 border-2 border-transparent hover:border-gray-300 hover:scale-105">
-                  <img src={toolIcons["shapes"]} alt="shapes" className="w-5 h-5 md:w-6 md:h-6 transition-transform duration-300" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10} className="bg-gray-900 text-white border-0">
-                <p className="text-xs font-medium">Shapes</p>
-              </TooltipContent>
-            </Tooltip>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" align="start" className="bg-white/95 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-xl p-2 min-w-14">
-            <div className="grid grid-cols-2 gap-2">
-              {shapeOptions.map((shape) => (
-                <DropdownMenuItem 
-                  key={shape.value} 
-                  onClick={() => addShape(shape.value as Tool)}
-                  className="flex items-center justify-center p-2 cursor-pointer rounded-lg hover:bg-gray-100/80 transition-all duration-200"
-                >
-                  <img src={shape.icon} alt={shape.label} className="w-5 h-5 transition-transform duration-300 hover:scale-110" />
-                </DropdownMenuItem>
-              ))}
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   );
