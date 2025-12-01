@@ -16,11 +16,11 @@ interface TextComponentProps {
   fontStyle?: string;
   align?: "left" | "center" | "right";
   width?: number;
+  height?: number; // <--- FIX 1: Added height to interface
   rotation?: number;
   isSelected: boolean;
   isEditing: boolean;
   activeTool: string | null;
-  // Added missing props that come from StageComponent's commonProps
   name?: string; 
   draggable?: boolean;
   
@@ -49,12 +49,13 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       fontStyle = "normal",
       align = "left",
       width = 200,
+      height, // <--- FIX 2: Destructure height
       rotation = 0,
       isSelected,
       isEditing,
       activeTool,
-      name, // Capture the name prop
-      draggable, // Capture the draggable prop from parent
+      name,
+      draggable,
       onSelect,
       onUpdate,
       onDragStart,
@@ -99,6 +100,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
 
       const anchor = tr.getActiveAnchor();
 
+      // For text, we usually only allow width resizing, not height
       if (anchor && ['middle-left', 'middle-right'].includes(anchor)) {
          const scaleX = node.scaleX();
          
@@ -118,12 +120,17 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
 
+      // Reset scale and update width/fontSize
+      node.scaleX(1);
+      node.scaleY(1);
+
       onUpdateRef.current({
         x: node.x(),
         y: node.y(),
         rotation: node.rotation(),
         width: Math.max(50, node.width() * scaleX),
         fontSize: Math.max(5, node.fontSize() * scaleY), 
+        // Note: We don't update height here because height is auto-calculated by text content
       });
       
       if (onTransformEnd) onTransformEnd(e);
@@ -190,6 +197,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         const absScale = node.getAbsoluteScale();
         const newHeight = textarea.scrollHeight / absScale.y;
         
+        // Temporarily update node height while editing so transformer grows
         node.height(newHeight);
         
         const tr = stage.findOne('Transformer') as Konva.Transformer;
@@ -212,7 +220,10 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           const absScale = node.getAbsoluteScale();
           textarea.style.height = "auto";
           textarea.style.height = `${textarea.scrollHeight}px`;
-          const finalHeight = textarea.scrollHeight / absScale.y;
+          
+          // FIX 3: Add buffer to height to prevent cutoff of descenders (g, y, j)
+          const buffer = 10; 
+          const finalHeight = (textarea.scrollHeight + buffer) / absScale.y;
 
           onUpdateRef.current({ 
              text: val,
@@ -231,6 +242,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         if (e.key === "Escape") {
             handleFinish();
         }
+        // Allow Shift+Enter for new lines, Enter to finish
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault(); 
             handleFinish();
@@ -264,7 +276,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         <KonvaText
           ref={internalRef}
           id={id}
-          // Apply the name so useKonvaTools can find it
           name={name} 
           x={x}
           y={y}
@@ -276,12 +287,12 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           opacity={isEditing ? 0 : 1}
           align={align}
           width={width}
+          height={height} // <--- FIX 4: Pass the calculated height to Konva
           scaleX={1}
           scaleY={1}
           wrap="word"
           lineHeight={1.4}
           rotation={rotation}
-          // FIX: Use parent draggable state, but disable when editing
           draggable={!isEditing && (draggable ?? true)} 
           onDragStart={onDragStart}
           onDragMove={onDragMove}
