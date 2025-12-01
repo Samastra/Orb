@@ -1,158 +1,208 @@
-import React, { useRef, forwardRef, useState } from "react";
+"use client";
+import React, { useRef, useEffect, useState, useImperativeHandle } from "react";
 import { Group, Rect, Text } from "react-konva";
 import Konva from "konva";
 
 interface StickyNoteProps {
-  shapeData: {
-    id: string;
-    x: number;
-    y: number;
-    width?: number;
-    height?: number;
-    backgroundColor?: string;
-    textColor?: string;
-    text?: string;
-    fontSize?: number;
-    fontFamily?: string;
-  };
+  id: string;
+  shapeData: any;
   isSelected: boolean;
   activeTool: string | null;
   onSelect: () => void;
-  onUpdate: (newAttrs: Record<string, unknown>) => void;
+  onUpdate: (attrs: any) => void;
+  draggable?: boolean;
+  // FIX: Allow 'any' event type to handle both MouseEvent and TouchEvent without conflict
+  onClick?: (e: Konva.KonvaEventObject<any>) => void;
+  onTap?: (e: Konva.KonvaEventObject<any>) => void;
   onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragMove?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  name?: string;
 }
 
-const StickyNoteComponent = forwardRef<Konva.Group, StickyNoteProps>(
-  ({ shapeData, isSelected, activeTool, onSelect, onUpdate, onDragStart, onDragMove, onDragEnd }, ref) => {
+const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProps>(
+  (
+    {
+      id,
+      shapeData,
+      isSelected,
+      activeTool,
+      onSelect,
+      onUpdate,
+      draggable,
+      onClick,
+      onTap,
+      onDragStart,
+      onDragMove,
+      onDragEnd,
+      name,
+    },
+    ref
+  ) => {
     const groupRef = useRef<Konva.Group>(null);
+    const textRef = useRef<Konva.Text>(null);
     const [isEditing, setIsEditing] = useState(false);
-    
-    const {
-      x,
-      y,
-      width = 200,
-      height = 150,
-      backgroundColor = "#ffeb3b",
-      textColor = "#000000",
-      text = "Double click to edit...",
-      fontSize = 14,
-      fontFamily = "Arial",
-    } = shapeData;
 
-    const handleDoubleClick = () => {
-      if (activeTool === "select") {
-        setIsEditing(true);
+    // Expose ref to parent
+    useImperativeHandle(ref, () => groupRef.current!);
+
+    // --- COLORS ---
+    // Critical Fix: Use 'fill' from shapeData, fallback to yellow if missing
+    const backgroundColor = shapeData.fill || "#ffeb3b";
+    
+    // Calculate text color (always dark for better contrast on pastel sticky notes)
+    const textColor = "#1f1f1f"; 
+
+    // --- DIMENSIONS ---
+    const width = shapeData.width || 200;
+    const height = shapeData.height || 200;
+    const padding = 20;
+
+    // --- EDITING LOGIC ---
+    useEffect(() => {
+      if (!isEditing) return;
+
+      const group = groupRef.current;
+      const stage = group?.getStage();
+      if (!group || !stage) return;
+
+      // Create textarea for editing
+      const textarea = document.createElement("textarea");
+      document.body.appendChild(textarea);
+
+      const textNode = textRef.current;
+      const tr = stage.findOne("Transformer");
+      if (tr) tr.hide(); // Hide transformer while editing
+
+      // Position textarea over the canvas
+      const updateTextareaPos = () => {
+        const textPos = group.getAbsolutePosition();
+        const stageBox = stage.container().getBoundingClientRect();
+        const areaPosition = {
+          x: stageBox.left + textPos.x + padding,
+          y: stageBox.top + textPos.y + padding,
+        };
+        const absScale = group.getAbsoluteScale();
+
+        textarea.value = shapeData.text || "";
         
-        // Create a textarea for editing
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.top = '0';
-        textarea.style.left = '0';
-        textarea.style.fontSize = `${fontSize}px`;
-        textarea.style.fontFamily = fontFamily;
-        textarea.style.color = textColor;
-        textarea.style.background = 'transparent';
-        textarea.style.border = 'none';
-        textarea.style.outline = 'none';
-        textarea.style.zIndex = '9999';
-        textarea.style.width = `${width - 20}px`;
-        textarea.style.height = `${height - 20}px`;
-        textarea.style.padding = '10px';
-        textarea.style.background = backgroundColor;
-        
-        document.body.appendChild(textarea);
-        
-        // Position the textarea over the sticky note
-        const stage = groupRef.current?.getStage();
-        if (stage) {
-          const absPos = groupRef.current?.getAbsolutePosition();
-          if (absPos) {
-            textarea.style.left = `${absPos.x + 10}px`;
-            textarea.style.top = `${absPos.y + 10}px`;
-          }
-        }
-        
-        textarea.focus();
-        textarea.select();
-        
-        const handleBlur = () => {
-          // Update the text
-          onUpdate({
-            ...shapeData,
-            text: textarea.value
-          });
-          
-          // Clean up
+        Object.assign(textarea.style, {
+          position: "fixed",
+          top: `${areaPosition.y}px`,
+          left: `${areaPosition.x}px`,
+          width: `${(width - padding * 2) * absScale.x}px`,
+          height: `${(height - padding * 2) * absScale.y}px`,
+          fontSize: `${20 * absScale.y}px`,
+          border: "none",
+          padding: "0px",
+          margin: "0px",
+          overflow: "hidden",
+          background: "none",
+          outline: "none",
+          resize: "none",
+          lineHeight: "1.5",
+          fontFamily: "Inter, sans-serif", // Match your app font
+          color: textColor,
+          textAlign: "left",
+          zIndex: "10000", // Ensure it's on top
+        });
+      };
+
+      updateTextareaPos();
+      textarea.focus();
+
+      // Handle Save
+      const handleFinish = () => {
+        onUpdate({ text: textarea.value });
+        setIsEditing(false);
+        if (textarea.parentNode) {
           document.body.removeChild(textarea);
-          setIsEditing(false);
-          textarea.removeEventListener('blur', handleBlur);
-        };
-        
-        textarea.addEventListener('blur', handleBlur);
-        
-        // Also handle Enter key to finish editing
-        const handleKeyDown = (e: KeyboardEvent) => {
-          if (e.key === 'Enter' && e.ctrlKey) {
-            handleBlur();
-          }
-        };
-        
-        textarea.addEventListener('keydown', handleKeyDown);
-      }
-    };
+        }
+        if (tr) tr.show();
+      };
+
+      // Event Listeners
+      const handleKeydown = (e: KeyboardEvent) => {
+        // Stop event from bubbling to Konva
+        e.stopPropagation();
+        if (e.key === "Escape") {
+          handleFinish();
+        }
+      };
+
+      const handleBlur = () => {
+        handleFinish();
+      };
+
+      textarea.addEventListener("keydown", handleKeydown);
+      textarea.addEventListener("blur", handleBlur);
+
+      return () => {
+        if (textarea.parentNode) {
+          document.body.removeChild(textarea);
+        }
+        textarea.removeEventListener("keydown", handleKeydown);
+        textarea.removeEventListener("blur", handleBlur);
+      };
+    }, [isEditing, width, height, shapeData.text, onUpdate]);
 
     return (
       <Group
-        ref={(node) => {
-          groupRef.current = node;
-          if (typeof ref === 'function') {
-            ref(node);
-          } else if (ref) {
-            ref.current = node;
-          }
-        }}
-        x={x}
-        y={y}
-        draggable={activeTool === "select" && !isEditing}
-        onClick={onSelect}
-        onDblClick={handleDoubleClick}
-        onDblTap={handleDoubleClick}
+        id={id}
+        ref={groupRef}
+        x={shapeData.x}
+        y={shapeData.y}
+        rotation={shapeData.rotation || 0}
+        draggable={!isEditing && (draggable ?? true)}
+        name={name} // Important for 'selectable-shape' logic
         onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}
+        onClick={(e) => {
+          if (onClick) onClick(e);
+        }}
+        onTap={(e) => {
+          if (onTap) onTap(e);
+        }}
+        onDblClick={() => setIsEditing(true)}
+        onDblTap={() => setIsEditing(true)}
       >
+        {/* 1. Sticky Note Body (The Box) */}
         <Rect
           width={width}
           height={height}
           fill={backgroundColor}
-          stroke={isSelected ? "#007AFF" : "#d4b500"}
-          strokeWidth={isSelected ? 3 : 1}
-          shadowBlur={5}
-          shadowColor="rgba(0,0,0,0.2)"
-          shadowOffsetX={2}
-          shadowOffsetY={2}
-          cornerRadius={8}
+          shadowColor="black"
+          shadowBlur={10}
+          shadowOpacity={0.1}
+          shadowOffsetX={5}
+          shadowOffsetY={5}
+          cornerRadius={2} // Slight rounded corner for realism
         />
-        
+
+        {/* 2. Sticky Note Text */}
         <Text
-          x={10}
-          y={10}
-          text={text}
-          fontSize={fontSize}
+          ref={textRef}
+          x={padding}
+          y={padding}
+          width={width - padding * 2}
+          height={height - padding * 2}
+          text={isEditing ? "" : (shapeData.text || "Double click to edit")}
+          fontSize={20}
+          fontFamily="Inter, sans-serif"
           fill={textColor}
-          fontFamily={fontFamily}
-          width={width - 20}
-          height={height - 20}
+          align="left"
+          verticalAlign="top"
+          lineHeight={1.5}
           wrap="word"
-          listening={false} // Text doesn't intercept clicks
+          ellipsis={true}
+          opacity={isEditing ? 0 : 1} // Hide Konva text when HTML textarea is active
+          listening={false} // Let clicks pass through to the Group/Rect
         />
       </Group>
     );
   }
 );
 
-StickyNoteComponent.displayName = "StickyNoteComponent";
-export default StickyNoteComponent;
+EditableStickyNoteComponent.displayName = "EditableStickyNoteComponent";
+export default EditableStickyNoteComponent;
