@@ -1087,6 +1087,7 @@ useEffect(() => {
           stageInstance={stageInstance}
           onTextCreate={handleTextCreate}
           setStageFrames={setStageFrames}
+          duplicateShape={boardState.duplicateShape}
           handleWheel={toolHandlers.handleWheel}
           handleMouseDown={toolHandlers.handleMouseDown}
           handleMouseUp={toolHandlers.handleMouseUp}

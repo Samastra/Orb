@@ -589,6 +589,80 @@ const deleteShape = useCallback(
   [reactShapes, konvaShapes, images, connections, stageFrames]
 );
 
+    const duplicateShape = useCallback((direction: 'top' | 'right' | 'bottom' | 'left') => {
+    // 1. Get currently selected shape (only support single selection for now)
+    const shapeId = selectedNodeIds[selectedNodeIds.length - 1]; // Use the last selected
+    if (!shapeId) return;
+
+    // 2. Find the shape object in any of the arrays
+    const shape: any =
+      konvaShapes.find(s => s.id === shapeId) ||
+      reactShapes.find(s => s.id === shapeId) ||
+      images.find(s => s.id === shapeId) ||
+      stageFrames.find(s => s.id === shapeId);
+
+    if (!shape) return;
+
+    // 3. Calculate Dimensions for Offset
+    let w = shape.width || 100;
+    let h = shape.height || 100;
+    
+    // Normalize dimensions for Center-based shapes (Circle/Ellipse)
+    // We want the visible width/height
+    if (shape.type === 'circle') {
+       const r = shape.radius || 50;
+       w = r * 2; 
+       h = r * 2;
+    } else if (shape.type === 'ellipse') {
+       const rx = shape.radiusX || 80;
+       const ry = shape.radiusY || 50;
+       w = rx * 2; 
+       h = ry * 2;
+    }
+
+    const GAP = 50; // Distance between shapes
+    let shiftX = 0;
+    let shiftY = 0;
+
+    // 4. Calculate Shift Vector
+    // Note: This logic works for both Center-based and Top-Left based shapes
+    // because we are shifting by the full dimension + gap.
+    if (direction === 'right') shiftX = w + GAP;
+    if (direction === 'left') shiftX = -(w + GAP);
+    if (direction === 'bottom') shiftY = h + GAP;
+    if (direction === 'top') shiftY = -(h + GAP);
+
+    const newX = shape.x + shiftX;
+    const newY = shape.y + shiftY;
+
+    // 5. Create New Shape Data
+    // We append a timestamp to ensure unique IDs
+    const newId = `${shape.type}-${Date.now()}`;
+    const newShape = { ...shape, id: newId, x: newX, y: newY };
+
+    console.log(`🚀 Duplicating ${shape.type} to ${direction}`);
+
+    // 6. Add to State & History
+    // We handle this manually to ensure immediate state update for "Rapid Fire" feel
+    if (shape.type === 'image') {
+        setImages(prev => [...prev, newShape]);
+        setActions(prev => [...prev, { type: 'add-image', data: newShape }]);
+    } else if (shape.type === 'stage') {
+         setStageFrames(prev => [...prev, newShape]);
+         setActions(prev => [...prev, { type: 'add-stage-frame', data: newShape }]);
+    } else if (['text', 'stickyNote'].includes(shape.type)) {
+         setReactShapes(prev => [...prev, newShape]);
+         setActions(prev => [...prev, { type: 'add-react-shape', shapeType: shape.type, data: newShape }]);
+    } else {
+         setKonvaShapes(prev => [...prev, newShape]);
+         setActions(prev => [...prev, { type: 'add-konva-shape', shapeType: shape.type, data: newShape }]);
+    }
+
+    // 7. RAPID FIRE: Switch selection to the new shape immediately
+    setSelectedNodeIds([newId]);
+
+  }, [selectedNodeIds, konvaShapes, reactShapes, images, stageFrames]);
+
   // CHANGED: Updated selectShape to handle single or multiple selections
   const selectShape = useCallback((id: string | string[] | null) => {
     if (id === null) {
@@ -752,5 +826,6 @@ const deleteShape = useCallback(
     removeKonvaShape,
     addStageFrame,
     addImage,
+    duplicateShape,
   };
 };

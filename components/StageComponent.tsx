@@ -65,6 +65,7 @@ interface StageComponentProps {
   handleShapeMouseEnter: (id: string) => void;
   tempConnection: Connection | null;
   isSpacePressed?: boolean;
+  duplicateShape: (direction: 'top' | 'right' | 'bottom' | 'left') => void;
 }
 
 // --- HELPER: NORMALIZE RECT ---
@@ -230,12 +231,88 @@ const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, u
 ShapeRenderer.displayName = "ShapeRenderer";
 
 
+
+// --- NEW COMPONENT: Quick Actions Overlay ---
+const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplicate }: any) => {
+  const shape = allShapesMap.get(selectedNodeId);
+  if (!shape) return null;
+
+  // 1. Calculate Bounds
+  // We reuse the normalization logic to get the visual box
+  const rect = getNormalizedRect(shape);
+  const { x, y, width, height } = rect;
+
+  // 2. Button Configuration
+  const GAP = 20; // Distance from shape edge
+  const BUTTON_SIZE = 24;
+  const HALF_BTN = BUTTON_SIZE / 2;
+
+  // Positions for 4 buttons (Top, Right, Bottom, Left)
+  const actions = [
+    { dir: 'top',    x: x + width / 2,         y: y - GAP },
+    { dir: 'right',  x: x + width + GAP,       y: y + height / 2 },
+    { dir: 'bottom', x: x + width / 2,         y: y + height + GAP },
+    { dir: 'left',   x: x - GAP,               y: y + height / 2 },
+  ];
+
+  return (
+    <Group>
+      {actions.map((action) => (
+        <Group
+          key={action.dir}
+          x={action.x}
+          y={action.dir === 'top' || action.dir === 'bottom' ? action.y - HALF_BTN : action.y - HALF_BTN} // Center adjustment
+        >
+          {/* Hit Area (Invisible, larger for easier clicking) */}
+          <Circle
+            radius={BUTTON_SIZE}
+            fill="transparent"
+            onClick={(e) => {
+               e.cancelBubble = true;
+               onDuplicate(action.dir);
+            }}
+            onMouseEnter={(e) => {
+               const container = e.target.getStage()?.container();
+               if(container) container.style.cursor = "pointer";
+               // Visual Hover Effect: Find the visible circle sibling
+               const circle = (e.target.getParent() as Konva.Group)?.findOne('.visible-btn');
+               if(circle) circle.to({ opacity: 1, scaleX: 1.2, scaleY: 1.2, duration: 0.1 });
+            }}
+            onMouseLeave={(e) => {
+               const container = e.target.getStage()?.container();
+               if(container) container.style.cursor = "default";
+               const circle = (e.target.getParent() as Konva.Group)?.findOne('.visible-btn');
+               if(circle) circle.to({ opacity: 0.5, scaleX: 1, scaleY: 1, duration: 0.1 });
+            }}
+          />
+          
+          {/* Visible Button */}
+          <Circle
+            name="visible-btn"
+            radius={8}
+            fill="#3366FF" // Your Brand Blue
+            opacity={0.0} // Hidden by default, or 0.5 if you want them always faint
+            listening={false} // Let the hit area handle events
+          />
+          
+          {/* Plus Icon (Mocked with Lines) - Only visible on hover? 
+              Actually, let's keep it simple: A Blue Dot that grows is very "Figma"
+              If you want a '+' sign, we can add Lines, but a dot is cleaner.
+          */}
+        </Group>
+      ))}
+    </Group>
+  );
+});
+QuickActionsOverlay.displayName = "QuickActionsOverlay";
+
+
 // --- MAIN COMPONENT ---
 
 const StageComponent: React.FC<StageComponentProps> = ({
   stageRef, trRef, scale, position, activeTool, lines, hasLoaded,
   reactShapes, shapes, stageFrames, images, connections,
-  selectedNodeIds, stageInstance, width, height,
+  selectedNodeIds, stageInstance, width, height,duplicateShape,
   handleWheel, handleMouseDown, handleMouseUp, handleMouseMove,
   handleTouchStart, handleTouchEnd, handleTouchMove,
   setSelectedNodeIds, setReactShapes, setShapes, setImages,
@@ -509,6 +586,17 @@ const StageComponent: React.FC<StageComponentProps> = ({
           ))}
 
           <Transformer ref={trRef} />
+
+
+          {/* NEW: Quick Actions (Only show if exactly 1 item selected) */}
+          {selectedNodeIds.length === 1 && !isSpacePressed && (
+             <QuickActionsOverlay 
+                selectedNodeId={selectedNodeIds[0]} 
+                allShapesMap={allShapesMap} 
+                onDuplicate={duplicateShape} // Pass the prop here
+             />
+          )}
+
         </Layer>
       </Stage>
     </div>
