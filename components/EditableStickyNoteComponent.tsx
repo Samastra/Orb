@@ -11,7 +11,6 @@ interface StickyNoteProps {
   onSelect: () => void;
   onUpdate: (attrs: any) => void;
   draggable?: boolean;
-  // FIX: Allow 'any' event type to handle both MouseEvent and TouchEvent without conflict
   onClick?: (e: Konva.KonvaEventObject<any>) => void;
   onTap?: (e: Konva.KonvaEventObject<any>) => void;
   onDragStart?: (e: Konva.KonvaEventObject<DragEvent>) => void;
@@ -46,12 +45,15 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
     // Expose ref to parent
     useImperativeHandle(ref, () => groupRef.current!);
 
-    // --- COLORS ---
-    // Critical Fix: Use 'fill' from shapeData, fallback to yellow if missing
-    const backgroundColor = shapeData.fill || "#ffeb3b";
-    
-    // Calculate text color (always dark for better contrast on pastel sticky notes)
-    const textColor = "#1f1f1f"; 
+    // --- DYNAMIC STYLES (Connected to Toolbar) ---
+    // We check the specific props first, then fall back to defaults
+    const backgroundColor = shapeData.backgroundColor || shapeData.fill || "#ffeb3b";
+    const textColor = shapeData.textColor || shapeData.fill || "#1f1f1f";
+    const fontSize = shapeData.fontSize || 20;
+    const fontFamily = shapeData.fontFamily || "Inter, sans-serif";
+    const fontWeight = shapeData.fontWeight || "normal";
+    const fontStyle = shapeData.fontStyle || "normal";
+    const align = shapeData.align || "left"; // Sticky notes usually look best left or center
 
     // --- DIMENSIONS ---
     const width = shapeData.width || 200;
@@ -70,7 +72,6 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
       const textarea = document.createElement("textarea");
       document.body.appendChild(textarea);
 
-      const textNode = textRef.current;
       const tr = stage.findOne("Transformer");
       if (tr) tr.hide(); // Hide transformer while editing
 
@@ -92,7 +93,7 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
           left: `${areaPosition.x}px`,
           width: `${(width - padding * 2) * absScale.x}px`,
           height: `${(height - padding * 2) * absScale.y}px`,
-          fontSize: `${20 * absScale.y}px`,
+          fontSize: `${fontSize * absScale.y}px`, // Dynamic Font Size
           border: "none",
           padding: "0px",
           margin: "0px",
@@ -101,10 +102,12 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
           outline: "none",
           resize: "none",
           lineHeight: "1.5",
-          fontFamily: "Inter, sans-serif", // Match your app font
-          color: textColor,
-          textAlign: "left",
-          zIndex: "10000", // Ensure it's on top
+          fontFamily: fontFamily, // Dynamic Font Family
+          fontWeight: fontWeight, // Dynamic Weight
+          fontStyle: fontStyle,   // Dynamic Style
+          color: textColor,       // Dynamic Color
+          textAlign: align,       // Dynamic Align
+          zIndex: "10000",
         });
       };
 
@@ -123,7 +126,6 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
 
       // Event Listeners
       const handleKeydown = (e: KeyboardEvent) => {
-        // Stop event from bubbling to Konva
         e.stopPropagation();
         if (e.key === "Escape") {
           handleFinish();
@@ -144,7 +146,7 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
         textarea.removeEventListener("keydown", handleKeydown);
         textarea.removeEventListener("blur", handleBlur);
       };
-    }, [isEditing, width, height, shapeData.text, onUpdate]);
+    }, [isEditing, width, height, shapeData.text, onUpdate, fontSize, fontFamily, fontWeight, fontStyle, textColor, align]);
 
     return (
       <Group
@@ -154,7 +156,7 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
         y={shapeData.y}
         rotation={shapeData.rotation || 0}
         draggable={!isEditing && (draggable ?? true)}
-        name={name} // Important for 'selectable-shape' logic
+        name={name}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
         onDragEnd={onDragEnd}
@@ -171,13 +173,13 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
         <Rect
           width={width}
           height={height}
-          fill={backgroundColor}
+          fill={backgroundColor} // Connected to dynamic background
           shadowColor="black"
           shadowBlur={10}
           shadowOpacity={0.1}
           shadowOffsetX={5}
           shadowOffsetY={5}
-          cornerRadius={2} // Slight rounded corner for realism
+          cornerRadius={2}
         />
 
         {/* 2. Sticky Note Text */}
@@ -187,17 +189,18 @@ const EditableStickyNoteComponent = React.forwardRef<Konva.Group, StickyNoteProp
           y={padding}
           width={width - padding * 2}
           height={height - padding * 2}
-          text={isEditing ? "" : (shapeData.text || "Double click to edit")}
-          fontSize={20}
-          fontFamily="Inter, sans-serif"
-          fill={textColor}
-          align="left"
+          text={isEditing ? "" : (shapeData.text || "Drop a thought...")} // Hide text while editing
+          fontSize={fontSize}         // Connected
+          fontFamily={fontFamily}     // Connected
+          fontStyle={`${fontWeight} ${fontStyle}`} // Connected
+          fill={textColor}            // Connected
+          align={align}               // Connected
           verticalAlign="top"
           lineHeight={1.5}
           wrap="word"
           ellipsis={true}
-          opacity={isEditing ? 0 : 1} // Hide Konva text when HTML textarea is active
-          listening={false} // Let clicks pass through to the Group/Rect
+          opacity={isEditing ? 0 : 1}
+          listening={false}
         />
       </Group>
     );

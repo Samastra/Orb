@@ -113,6 +113,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
     }, []);
 
     // 2. TRANSFORM END LOGIC (On Drop)
+    // 2. TRANSFORM END LOGIC (On Drop)
     const handleTransformEndInternal = useCallback((e: Konva.KonvaEventObject<Event>) => {
       const node = internalRef.current;
       if (!node) return;
@@ -120,17 +121,32 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
 
-      // Reset scale and update width/fontSize
+      // 1. Reset scale
       node.scaleX(1);
       node.scaleY(1);
 
+      // 2. Calculate new visual properties
+      const newWidth = Math.max(50, node.width() * scaleX);
+      const newFontSize = Math.max(5, node.fontSize() * scaleY);
+      
+      // 3. Apply properties temporarily to the node to let Konva measure the text
+      node.width(newWidth);
+      node.fontSize(newFontSize);
+      
+      // 4. CRITICAL FIX: Reset height to 'auto' to get the natural text height
+      // We cast to 'any' because strict TypeScript might not like passing undefined to height setter
+      (node as any).height(undefined); 
+      
+      const newHeight = node.height(); // Get the freshly calculated natural height
+
+      // 5. Save everything, including the new height
       onUpdateRef.current({
         x: node.x(),
         y: node.y(),
         rotation: node.rotation(),
-        width: Math.max(50, node.width() * scaleX),
-        fontSize: Math.max(5, node.fontSize() * scaleY), 
-        // Note: We don't update height here because height is auto-calculated by text content
+        width: newWidth,
+        height: newHeight, // <--- This prevents the vertical snapping/crushing
+        fontSize: newFontSize, 
       });
       
       if (onTransformEnd) onTransformEnd(e);

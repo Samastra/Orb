@@ -288,7 +288,10 @@ const updateAnyShape = useCallback((
     'sides',                       // Triangles
     'pointerLength', 'pointerWidth', // Arrows
     'fontSize', 'fontFamily', 'text', 'fontWeight', 'fontStyle', 'align', // Text
-    'from', 'to', 'cp1x', 'cp1y', 'cp2x', 'cp2y' // Connections
+    'from', 'to', 'cp1x', 'cp1y', 'cp2x', 'cp2y',
+    'cornerRadius',                      // For Rectangles
+    'backgroundColor', 'textColor',      // For Sticky Notes
+    'textDecoration'
   ];
 
   // 2. Create the safe update object dynamically

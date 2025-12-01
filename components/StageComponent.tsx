@@ -191,7 +191,7 @@ const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, u
   };
 
   if (item.__kind === 'stage') {
-    return <Rect ref={handleRef} {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} fill="#fff" stroke="#ccc" />;
+    return <Rect ref={handleRef} {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} cornerRadius={item.cornerRadius} />;
   }
   
   if (item.__kind === 'image') {
@@ -585,7 +585,34 @@ const StageComponent: React.FC<StageComponentProps> = ({
             />
           ))}
 
-          <Transformer ref={trRef} />
+          {/* 1. Calculate if we should hide anchors */}
+          {(() => {
+            const selectedNode = selectedNodeIds.length === 1 ? allShapesMap.get(selectedNodeIds[0]) : null;
+            // Hide anchors for Sticky Notes and Stage Frames
+            const shouldHideAnchors = selectedNode && (selectedNode.type === 'stickyNote' || selectedNode.type === 'stage');
+
+            return (
+              <Transformer 
+                ref={trRef}
+                
+                // --- LOGIC: HIDE ANCHORS ---
+                resizeEnabled={!shouldHideAnchors}
+                rotateEnabled={!shouldHideAnchors} // Remove this line if you still want them to rotate!
+                
+                // --- VISUALS: FIGMA STYLE UI ---
+                borderStroke="#3366FF"        // Brand Blue
+                borderStrokeWidth={1.5}       // Crisp thin line
+                anchorSize={11}               // Smaller, cleaner handles
+                anchorCornerRadius={6}        // Circular/Rounded handles (Very modern)
+                anchorStroke="#3366FF"        // Blue border on handles
+                anchorFill="#FFFFFF"          // White center
+                anchorStrokeWidth={1.5}
+                rotationSnaps={[0, 90, 180, 270]} // Snap to clean angles
+                padding={8}                   // Little breathing room between shape and border
+                ignoreStroke={true}           // keeps calculations accurate
+              />
+            );
+          })()}
 
 
           {/* NEW: Quick Actions (Only show if exactly 1 item selected) */}
