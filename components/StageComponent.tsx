@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Konva from "konva";
 import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, Image, Path, Group } from "react-konva";
-import GridLayer from "@/components/gridLayer";
+import GridLayer from "@/components/gridLayer"; // Ensure this path is correct
 import { ReactShape, Tool, ImageShape } from "../types/board-types";
 import TextComponent from "./TextComponent";
 import { KonvaShape } from "@/hooks/useShapes";
@@ -11,27 +11,11 @@ import { Connection, Side } from "@/hooks/useBoardState";
 import { getOrthogonalPath, getAnchorPoint, Rect as UtilsRect } from "@/lib/connection-utils";
 import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 
+// --- DYNAMIC IMPORT ---
 const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), { ssr: false });
 
+// --- TYPES ---
 type KonvaPointerEvent = Konva.KonvaEventObject<MouseEvent | TouchEvent>;
-
-// HELPER: Normalize any shape (Circle, Ellipse, etc) into a standard Bounding Box
-const getNormalizedRect = (shape: any): UtilsRect => {
-  if (!shape) return { x: 0, y: 0, width: 0, height: 0 };
-
-  if (shape.type === 'circle') {
-    const r = shape.radius || 50;
-    return { x: shape.x - r, y: shape.y - r, width: r * 2, height: r * 2 };
-  }
-
-  if (shape.type === 'ellipse') {
-    const rx = shape.radiusX || 80;
-    const ry = shape.radiusY || 50;
-    return { x: shape.x - rx, y: shape.y - ry, width: rx * 2, height: ry * 2 };
-  }
-
-  return { x: shape.x, y: shape.y, width: shape.width || 100, height: shape.height || 100 };
-};
 
 interface StageComponentProps {
   stageRef: React.RefObject<Konva.Stage | null>;
@@ -39,7 +23,7 @@ interface StageComponentProps {
   scale: number;
   position: { x: number; y: number };
   activeTool: Tool | null;
-  lines: Array<{tool: 'brush' | 'eraser', points: number[]}>;
+  lines: Array<{ tool: 'brush' | 'eraser', points: number[] }>;
   reactShapes: ReactShape[];
   shapes: KonvaShape[];
   stageFrames: KonvaShape[];
@@ -49,7 +33,9 @@ interface StageComponentProps {
   stageInstance: Konva.Stage | null;
   width?: number;
   height?: number;
-  hasLoaded?: boolean;
+  hasLoaded?:boolean;
+  // Event Handlers
+  handleStartTextEditing?: (textProps: any) => void;
   handleWheel: (e: Konva.KonvaEventObject<WheelEvent>) => void;
   handleMouseDown: (e: Konva.KonvaEventObject<MouseEvent>) => void;
   handleMouseUp: (e: Konva.KonvaEventObject<MouseEvent>) => void;
@@ -57,6 +43,7 @@ interface StageComponentProps {
   handleTouchStart: (e: Konva.KonvaEventObject<TouchEvent>) => void;
   handleTouchEnd: (e: Konva.KonvaEventObject<TouchEvent>) => void;
   handleTouchMove: (e: Konva.KonvaEventObject<TouchEvent>) => void;
+  // State Setters
   setSelectedNodeIds: React.Dispatch<React.SetStateAction<string[]>>;
   setReactShapes: React.Dispatch<React.SetStateAction<ReactShape[]>>;
   setShapes: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
@@ -71,15 +58,31 @@ interface StageComponentProps {
   editingId: string | null;
   setEditingId: (id: string | null) => void;
   onTextCreate: (pos: { x: number; y: number }) => void;
-  handleStartTextEditing?: (textProps: any) => void;
   hoveredNodeId: string | null;
   setHoveredNodeId: (id: string | null) => void;
-  handleAnchorMouseDown: (e: any, nodeId: string, side: Side, pos: {x: number, y: number}) => void;
+  handleAnchorMouseDown: (e: any, nodeId: string, side: Side, pos: { x: number, y: number }) => void;
   handleAnchorClick: (e: any, nodeId: string, side: Side) => void;
   handleShapeMouseEnter: (id: string) => void;
-  tempConnection: Connection | null; 
+  tempConnection: Connection | null;
   isSpacePressed?: boolean;
 }
+
+// --- HELPER: NORMALIZE RECT ---
+const getNormalizedRect = (shape: any): UtilsRect => {
+  if (!shape) return { x: 0, y: 0, width: 0, height: 0 };
+  if (shape.type === 'circle') {
+    const r = shape.radius || 50;
+    return { x: shape.x - r, y: shape.y - r, width: r * 2, height: r * 2 };
+  }
+  if (shape.type === 'ellipse') {
+    const rx = shape.radiusX || 80;
+    const ry = shape.radiusY || 50;
+    return { x: shape.x - rx, y: shape.y - ry, width: rx * 2, height: ry * 2 };
+  }
+  return { x: shape.x, y: shape.y, width: shape.width || 100, height: shape.height || 100 };
+};
+
+// --- MEMOIZED SUB-COMPONENTS ---
 
 const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onClick, selected }: any) => {
   if (!fromShape) return null;
@@ -88,7 +91,7 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
   const startPoint = getAnchorPoint(startRect, connection.from.side);
 
   let endPoint = { x: connection.to.x, y: connection.to.y };
-  let endSide: Side = connection.to.side || "left"; 
+  let endSide: Side = connection.to.side || "left";
 
   if (connection.to.nodeId && toShape) {
     const endRect = getNormalizedRect(toShape);
@@ -101,6 +104,7 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
 
   return (
     <Group onClick={onClick} onTap={onClick}>
+      {/* Invisible thicker path for easier clicking */}
       <Path data={pathData} stroke="transparent" strokeWidth={20} />
       <Path
         data={pathData}
@@ -109,6 +113,7 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
         lineCap="round"
         lineJoin="round"
         dash={connection.id === 'temp-connection' ? [5, 5] : undefined}
+        listening={false} // Optimization: Visual path doesn't need events, the transparent one handles it
       />
     </Group>
   );
@@ -117,7 +122,6 @@ OrthogonalConnection.displayName = "OrthogonalConnection";
 
 const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick }: any) => {
   if (!shape) return null;
-
   const rect = getNormalizedRect(shape);
   const sides: Side[] = ["top", "right", "bottom", "left"];
 
@@ -126,17 +130,16 @@ const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick }: any) => {
       {sides.map(side => {
         const pos = getAnchorPoint(rect, side);
         return (
-          <Group 
-            key={side} 
-            x={pos.x} 
+          <Group
+            key={side}
+            x={pos.x}
             y={pos.y}
             onMouseDown={(e) => onMouseDown(e, side, pos)}
             onClick={(e) => onClick(e, side)}
             onTap={(e) => onClick(e, side)}
           >
-            {/* Small hit area so it doesn't block underlying shapes */}
             <Circle radius={20} fill="transparent" />
-            <Circle radius={8} fill="#ffffff" stroke="#007AFF" strokeWidth={2} shadowBlur={2} shadowColor="rgba(0,0,0,0.3)"/>
+            <Circle radius={7} fill="#ffffff" stroke="#007AFF" strokeWidth={2} shadowBlur={2} shadowColor="rgba(0,0,0,0.3)" listening={false} />
           </Group>
         );
       })}
@@ -145,23 +148,23 @@ const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick }: any) => {
 });
 AnchorOverlay.displayName = "AnchorOverlay";
 
-const ImageElement = React.forwardRef<Konva.Image, any>(({ imageShape, onDragStart, onDragMove, onDragEnd, onTransformEnd }, ref) => {
+const ImageElement = React.memo(React.forwardRef<Konva.Image, any>(({ imageShape, ...props }, ref) => {
   const [image, setImage] = React.useState<HTMLImageElement | null>(null);
-  const internalRef = React.useRef<Konva.Image>(null);
-  React.useImperativeHandle(ref, () => internalRef.current!);
   
-  React.useEffect(() => {
+  // Use a ref to prevent re-creating the image object on every render
+  useEffect(() => {
+    if (!imageShape.src) return;
     const img = new window.Image();
     img.crossOrigin = "anonymous";
     img.src = imageShape.src;
     img.onload = () => setImage(img);
   }, [imageShape.src]);
-  
+
   if (!image) return <Rect x={imageShape.x} y={imageShape.y} width={imageShape.width} height={imageShape.height} fill="#f0f0f0" />;
-  
+
   return (
     <Image
-      ref={internalRef}
+      ref={ref}
       image={image}
       x={imageShape.x}
       y={imageShape.y}
@@ -169,87 +172,187 @@ const ImageElement = React.forwardRef<Konva.Image, any>(({ imageShape, onDragSta
       height={imageShape.height}
       rotation={imageShape.rotation}
       draggable={imageShape.draggable}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      onTransformEnd={onTransformEnd}
       name="selectable-shape"
       id={imageShape.id}
+      {...props}
     />
   );
-});
+}));
 ImageElement.displayName = 'ImageElement';
 
+// --- NEW: GENERIC SHAPE RENDERER ---
+// This component decides what to render and is memoized to prevent re-renders of untouched shapes
+const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, updateShape, commonProps, setShapeRef }: any) => {
+  
+  // Attach ref
+  const handleRef = (node: Konva.Node | null) => {
+     setShapeRef(item.id, node);
+  };
+
+  if (item.__kind === 'stage') {
+    return <Rect ref={handleRef} {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} fill="#fff" stroke="#ccc" />;
+  }
+  
+  if (item.__kind === 'image') {
+    return <ImageElement ref={handleRef} imageShape={item} {...commonProps} />;
+  }
+
+  if (item.__kind === 'konva') {
+    if (item.type === 'triangle') return <Line ref={handleRef} {...commonProps} points={item.points} fill={item.fill} closed={true} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
+    if (item.type === 'arrow') return <Arrow ref={handleRef} {...commonProps} points={item.points} fill={item.fill} stroke={item.stroke || item.fill} strokeWidth={item.strokeWidth || 2} pointerLength={item.pointerLength || 10} pointerWidth={item.pointerWidth || 10} />;
+    if (item.type === 'circle') return <Circle ref={handleRef} {...commonProps} x={item.x} y={item.y} radius={item.radius || 50} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
+    if (item.type === 'ellipse') return <Ellipse ref={handleRef} {...commonProps} x={item.x} y={item.y} radiusX={item.radiusX || 80} radiusY={item.radiusY || 50} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
+    return <Rect ref={handleRef} {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} cornerRadius={item.cornerRadius} />;
+  }
+
+  if (item.__kind === 'react') {
+    if (item.type === 'text') {
+      return <TextComponent ref={handleRef} {...commonProps} {...item} isSelected={isSelected} isEditing={isEditing} onStartEditing={() => setEditingId(item.id)} onFinishEditing={() => setEditingId(null)} onUpdate={(attrs) => updateShape(item.id, attrs)} />;
+    }
+    if (item.type === 'stickyNote') {
+      return <EditableStickyNoteComponent ref={handleRef} shapeData={item} isSelected={isSelected} activeTool={null} onSelect={commonProps.onClick} onUpdate={(attrs) => updateShape(item.id, attrs)} {...commonProps} />;
+    }
+  }
+
+  return null;
+}, (prev, next) => {
+  // CUSTOM COMPARISON FOR PERFORMANCE
+  // Only re-render if the item data changed, or selection/editing state changed for THIS item
+  return (
+    prev.item === next.item &&
+    prev.isSelected === next.isSelected &&
+    prev.isEditing === next.isEditing &&
+    // Optimization: Ignore commonProps functions, assuming they are stable or we don't care if they change 
+    // (unless you need to update handlers dynamically)
+    prev.commonProps.draggable === next.commonProps.draggable 
+  );
+});
+ShapeRenderer.displayName = "ShapeRenderer";
+
+
+// --- MAIN COMPONENT ---
+
 const StageComponent: React.FC<StageComponentProps> = ({
-  stageRef, trRef, scale, position, activeTool, lines,
+  stageRef, trRef, scale, position, activeTool, lines, hasLoaded,
   reactShapes, shapes, stageFrames, images, connections,
-  selectedNodeIds, stageInstance, width, height, hasLoaded,
+  selectedNodeIds, stageInstance, width, height,
   handleWheel, handleMouseDown, handleMouseUp, handleMouseMove,
   handleTouchStart, handleTouchEnd, handleTouchMove,
   setSelectedNodeIds, setReactShapes, setShapes, setImages,
-  setConnections, setStageFrames, updateShape, setStageInstance,
-  updateConnection, onDelete, setActiveTool, handleStartTextEditing,
+  setStageFrames, updateShape, setStageInstance,
   editingId, setEditingId, onTextCreate,
-  hoveredNodeId, setHoveredNodeId, handleAnchorMouseDown, handleAnchorClick, handleShapeMouseEnter, tempConnection, isSpacePressed = false
+  hoveredNodeId, setHoveredNodeId, handleAnchorMouseDown, handleAnchorClick, tempConnection, isSpacePressed = false
 }) => {
   const shapeRefs = useRef<{ [key: string]: Konva.Node | null }>({});
   const dragStartPos = useRef<Map<string, { x: number; y: number }>>(new Map());
 
-  const setShapeRef = (id: string, node: Konva.Node | null) => {
+  const setShapeRef = useCallback((id: string, node: Konva.Node | null) => {
     if (node) shapeRefs.current[id] = node;
     else delete shapeRefs.current[id];
-  };
+  }, []);
 
-  useEffect(() => {
-    if (!stageRef.current) return;
-    requestAnimationFrame(() => { stageRef.current?.batchDraw(); });
-  }, [shapes, reactShapes, images, stageFrames, stageRef]);
+  // Removed the global "useEffect batchDraw" - React-Konva handles this better alone.
 
+  // --- MEMOIZE ALL SHAPES MAP ---
+  // Create a single lookup map for connections (Optimization)
   const allShapesMap = useMemo(() => {
     const map = new Map();
     [...shapes, ...reactShapes, ...images, ...stageFrames].forEach(s => map.set(s.id, s));
     return map;
   }, [shapes, reactShapes, images, stageFrames]);
 
+  // --- OPTIMIZED DRAGGING (UNCONTROLLED) ---
   const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
-    if (!node || selectedNodeIds.length <= 1) return;
+    if (!node) return;
+    
+    // If dragging a node that isn't selected, select it (unless holding shift/ctrl)
+    if (!selectedNodeIds.includes(node.id())) {
+       setSelectedNodeIds([node.id()]);
+    }
+
+    // Capture start positions for ALL selected nodes
+    const startPositions = new Map<string, {x:number, y:number}>();
+    
+    // We need to look up the current nodes from refs to get "real" positions
     selectedNodeIds.forEach(id => {
-      const ref = shapeRefs.current[id];
-      if (ref && ref !== node) dragStartPos.current.set(id, { x: ref.x(), y: ref.y() });
+       const ref = shapeRefs.current[id];
+       if (ref) startPositions.set(id, { x: ref.x(), y: ref.y() });
     });
-    dragStartPos.current.set(node.id(), { x: node.x(), y: node.y() });
-  }, [selectedNodeIds]);
+    
+    // Ensure the dragged node is also captured (might be redundant but safe)
+    startPositions.set(node.id(), { x: node.x(), y: node.y() });
+    
+    dragStartPos.current = startPositions;
+  }, [selectedNodeIds, setSelectedNodeIds]);
 
   const handleDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-    if (selectedNodeIds.length <= 1) return;
+    // 🚀 PERFORMANCE CRITICAL: Direct DOM Manipulation
+    // We do NOT call setShapes/setReactShapes here. We just move the nodes.
     const node = e.target;
-    const dx = node.x() - (dragStartPos.current.get(node.id())?.x || node.x());
-    const dy = node.y() - (dragStartPos.current.get(node.id())?.y || node.y());
+    const startPos = dragStartPos.current.get(node.id());
+    
+    if (!startPos) return;
+
+    const dx = node.x() - startPos.x;
+    const dy = node.y() - startPos.y;
+
+    // Move all OTHER selected nodes by the same delta
     selectedNodeIds.forEach(id => {
       if (id === node.id()) return;
-      const other = shapeRefs.current[id];
-      const start = dragStartPos.current.get(id);
-      if (other && start) {
-        other.x(start.x + dx);
-        other.y(start.y + dy);
+      const otherNode = shapeRefs.current[id];
+      const otherStart = dragStartPos.current.get(id);
+      
+      if (otherNode && otherStart) {
+        otherNode.x(otherStart.x + dx);
+        otherNode.y(otherStart.y + dy);
       }
     });
-    if (trRef.current) trRef.current.forceUpdate();
+
+   if (trRef.current) trRef.current.getLayer()?.batchDraw();// Only redraw the layer, not React render
   }, [selectedNodeIds]);
 
-  const handleSingleDragEnd = useCallback((item: any, e: any) => {
-      const { x, y } = e.target.attrs;
-      if (item.__kind === 'react') setReactShapes(prev => prev.map(s => s.id === item.id ? { ...s, x, y } : s));
-      else if (item.__kind === 'konva') setShapes(prev => prev.map(s => s.id === item.id ? { ...s, x, y } : s));
-      else if (item.__kind === 'image') setImages(prev => prev.map(s => s.id === item.id ? { ...s, x, y } : s));
-      else if (item.__kind === 'stage') setStageFrames(prev => prev.map(s => s.id === item.id ? { ...s, x, y } : s));
-  }, [setReactShapes, setShapes, setImages, setStageFrames]);
+  const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    // SYNC BACK TO REACT STATE
+    const node = e.target;
+    const startPos = dragStartPos.current.get(node.id());
+    if(!startPos) return;
 
-  const handleShapeTransformEnd = (item: any, e: any) => {
+    const dx = node.x() - startPos.x;
+    const dy = node.y() - startPos.y;
+
+    // Helper to update specific list
+    const applyMove = (list: any[], setter: any) => {
+        const affected = list.filter(item => selectedNodeIds.includes(item.id));
+        if (affected.length === 0) return;
+
+        setter((prev: any[]) => prev.map(item => {
+            if (selectedNodeIds.includes(item.id)) {
+                // Careful: use the stored start pos to ensure precision
+                const myStart = dragStartPos.current.get(item.id);
+                if (myStart) {
+                    return { ...item, x: myStart.x + dx, y: myStart.y + dy };
+                }
+            }
+            return item;
+        }));
+    };
+
+    applyMove(reactShapes, setReactShapes);
+    applyMove(shapes, setShapes);
+    applyMove(images, setImages);
+    applyMove(stageFrames, setStageFrames);
+    
+    dragStartPos.current.clear();
+  }, [selectedNodeIds, reactShapes, shapes, images, stageFrames, setReactShapes, setShapes, setImages, setStageFrames]);
+
+  // --- TRANSFORM HANDLER ---
+  const handleShapeTransformEnd = useCallback((item: any, e: any) => {
     const node = e.target;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
+    
+    // Reset scale to 1 and bake into width/height/radius
     node.scaleX(1); node.scaleY(1);
     
     const updates: any = {
@@ -269,44 +372,38 @@ const StageComponent: React.FC<StageComponentProps> = ({
     }
     
     updateShape(item.id, updates);
-  };
+  }, [updateShape]);
 
+  // --- TRANSFORMER ATTACHMENT ---
   useEffect(() => {
     if (!trRef.current) return;
     if (selectedNodeIds.length === 0) {
       trRef.current.nodes([]);
       return;
     }
+    
     const nodes = selectedNodeIds
-      .filter(id => !stageFrames.some(frame => frame.id === id))
       .map(id => shapeRefs.current[id])
       .filter((n): n is Konva.Node => !!n);
+      
     trRef.current.nodes(nodes);
     trRef.current.getLayer()?.batchDraw();
-  }, [selectedNodeIds, stageFrames]);
+  }, [selectedNodeIds, shapes, reactShapes, images, stageFrames]); 
 
-  const allShapesToRender = React.useMemo(() => [
+  // --- PREPARE RENDER LISTS ---
+  // We strictly separate the lists to avoid recreating objects unnecessarily
+  const combinedShapes = useMemo(() => [
     ...stageFrames.map(s => ({ ...s, __kind: 'stage' })),
     ...shapes.map(s => ({ ...s, __kind: 'konva' })),
     ...images.map(s => ({ ...s, __kind: 'image' })),
     ...reactShapes.map(s => ({ ...s, __kind: 'react' })),
   ], [stageFrames, shapes, images, reactShapes]);
 
-  // CLICK HANDLER: Prevents "Click Outside" from creating text if we are just editing
   const handleStageClick = (e: KonvaPointerEvent) => {
     const clickedOnEmpty = e.target === e.target.getStage();
-    
     if (clickedOnEmpty) {
-        // If we were editing, just stop editing and RETURN. Do NOT create new text.
-        if (editingId) {
-            setEditingId(null);
-            return;
-        }
-
+        if (editingId) setEditingId(null);
         setSelectedNodeIds([]);
-        setEditingId(null);
-        
-        // Only create text if we are EXPLICITLY in text tool and NOT just finishing an edit
         if (activeTool === 'text') {
             const pos = e.target.getStage()?.getRelativePointerPosition();
             if(pos) onTextCreate(pos);
@@ -327,69 +424,46 @@ const StageComponent: React.FC<StageComponentProps> = ({
         onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onMouseMove={handleMouseMove}
         onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchMove={handleTouchMove}
       >
+        {/* GRID LAYER - Static, doesn't need to re-render with shapes */}
         <GridLayer stage={stageInstance} />
         
         <Layer name="draw-layer">
-          {allShapesToRender.map((item: any) => {
-            const commonProps = {
-                id: item.id,
-                draggable: (activeTool === 'select' || activeTool === null) && !isSpacePressed,
-                name: 'selectable-shape',
-                
-                onClick: (e: any) => { 
-                    e.cancelBubble=true; 
-                    setSelectedNodeIds([item.id]); 
-                    setEditingId(null);
-                },
-                onTap: (e: any) => { 
-                    e.cancelBubble=true; 
-                    setSelectedNodeIds([item.id]); 
-                    setEditingId(null);
-                },
-                
-                onDragStart: (e: any) => {
-                    if (!selectedNodeIds.includes(item.id)) {
-                        setSelectedNodeIds([item.id]);
-                    }
-                    handleDragStart(e);
-                },
-                
-                onDragMove: handleDragMove,
-                onDragEnd: (e: any) => handleSingleDragEnd(item, e),
-                onTransformEnd: (e: any) => handleShapeTransformEnd(item, e),
-                
-                // EXCLUDE TEXT FROM ANCHOR LOGIC
-                onMouseEnter: (item.type === 'text' || item.type === 'stickyNote') 
-                    ? undefined 
-                    : () => setHoveredNodeId(item.id),
-                // ADD MOUSE LEAVE TO CLEAR ANCHORS
-                onMouseLeave: () => setHoveredNodeId(null),
-            };
+          {combinedShapes.map((item: any) => (
+             <ShapeRenderer 
+                key={item.id}
+                item={item}
+                isSelected={selectedNodeIds.includes(item.id)}
+                isEditing={editingId === item.id}
+                setEditingId={setEditingId}
+                updateShape={updateShape}
+                setShapeRef={setShapeRef}
+                commonProps={{
+                    id: item.id,
+                    draggable: (activeTool === 'select' || activeTool === null) && !isSpacePressed,
+                    name: 'selectable-shape',
+                    onClick: (e: any) => { 
+                        e.cancelBubble=true; 
+                        setSelectedNodeIds([item.id]); 
+                        setEditingId(null);
+                    },
+                    onTap: (e: any) => { 
+                        e.cancelBubble=true; 
+                        setSelectedNodeIds([item.id]); 
+                        setEditingId(null);
+                    },
+                    onDragStart: handleDragStart,
+                    onDragMove: handleDragMove, // The new optimized handler
+                    onDragEnd: handleDragEnd,   // The new optimized handler
+                    onTransformEnd: (e: any) => handleShapeTransformEnd(item, e),
+                    onMouseEnter: (item.type === 'text' || item.type === 'stickyNote') 
+                        ? undefined 
+                        : () => setHoveredNodeId(item.id),
+                    onMouseLeave: () => setHoveredNodeId(null),
+                }}
+             />
+          ))}
 
-            if (item.__kind === 'stage') {
-                return <Rect key={item.id} ref={node => setShapeRef(item.id, node)} {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} fill="#fff" stroke="#ccc" />;
-            }
-            if (item.__kind === 'image') {
-                return <ImageElement key={item.id} ref={node => setShapeRef(item.id, node)} imageShape={item} {...commonProps} />;
-            }
-            if (item.__kind === 'konva') {
-              if (item.type === 'triangle') return <Line key={item.id} ref={node => setShapeRef(item.id, node)} {...commonProps} points={item.points} fill={item.fill} closed={true} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
-              if (item.type === 'arrow') return <Arrow key={item.id} ref={node => setShapeRef(item.id, node)} {...commonProps} points={item.points} fill={item.fill} stroke={item.stroke || item.fill} strokeWidth={item.strokeWidth || 2} pointerLength={item.pointerLength || 10} pointerWidth={item.pointerWidth || 10} />;
-              if (item.type === 'circle') return <Circle key={item.id} ref={node => setShapeRef(item.id, node)} {...commonProps} x={item.x} y={item.y} radius={item.radius || 50} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
-              if (item.type === 'ellipse') return <Ellipse key={item.id} ref={node => setShapeRef(item.id, node)} {...commonProps} x={item.x} y={item.y} radiusX={item.radiusX || 80} radiusY={item.radiusY || 50} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
-              return <Rect key={item.id} ref={node => setShapeRef(item.id, node)} {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} cornerRadius={item.cornerRadius} />;
-            }
-            if (item.__kind === 'react') {
-                if (item.type === 'text') {
-                    return <TextComponent key={item.id} ref={node => setShapeRef(item.id, node)} {...commonProps} {...item} isSelected={selectedNodeIds.includes(item.id)} isEditing={editingId === item.id} onStartEditing={() => setEditingId(item.id)} onFinishEditing={() => setEditingId(null)} onUpdate={(attrs) => updateShape(item.id, attrs)} />;
-                }
-                if (item.type === 'stickyNote') {
-                    return <EditableStickyNoteComponent key={item.id} ref={node => setShapeRef(item.id, node)} shapeData={item} isSelected={selectedNodeIds.includes(item.id)} activeTool={activeTool} onSelect={() => setSelectedNodeIds([item.id])} onUpdate={(attrs) => updateShape(item.id, attrs)} {...commonProps} />;
-                }
-            }
-            return null;
-          })}
-
+          {/* CONNECTIONS */}
           {connections.map(conn => (
             <OrthogonalConnection 
                 key={conn.id} 
@@ -401,6 +475,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
             />
           ))}
 
+          {/* TEMP CONNECTION */}
           {tempConnection && (
             <OrthogonalConnection 
                 connection={tempConnection} 
@@ -409,7 +484,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
             />
           )}
 
-          {/* CRITICAL FIX: Only show anchors if the Connection Tool is active */}
+          {/* ANCHORS (Only show when hovering and tool is connect) */}
           {hoveredNodeId && activeTool === "connect" && allShapesMap.has(hoveredNodeId) && (
             <AnchorOverlay 
                 shape={allShapesMap.get(hoveredNodeId)}
@@ -418,8 +493,19 @@ const StageComponent: React.FC<StageComponentProps> = ({
             />
           )}
           
+          {/* BRUSH LINES */}
           {lines.map((line, i) => (
-            <Line key={i} points={line.points} stroke={line.tool === 'brush' ? '#000' : '#fff'} strokeWidth={5} tension={0.5} lineCap="round" lineJoin="round" globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'} />
+            <Line 
+                key={i} 
+                points={line.points} 
+                stroke={line.tool === 'brush' ? '#000' : '#fff'} 
+                strokeWidth={5} 
+                tension={0.5} 
+                lineCap="round" 
+                lineJoin="round" 
+                globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'} 
+                listening={false} // Optimization: Lines don't need hit detection usually
+            />
           ))}
 
           <Transformer ref={trRef} />
