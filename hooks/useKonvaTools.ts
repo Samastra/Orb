@@ -29,7 +29,6 @@ const isTextInputFocused = (): boolean => {
 };
 
 // ⚡ OPTIMIZATION: Bounding Box Check for Eraser
-// Skips complex math if the point isn't even close to the line's area
 function isPointInLineBBox(point: {x: number, y: number}, linePoints: number[], threshold: number): boolean {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
@@ -202,7 +201,7 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    // Throttle Panning slightly for smoother FPS
+    // Throttle Panning
     const now = Date.now();
     if (now - lastFrameTime.current < 8) return; 
     lastFrameTime.current = now;
@@ -234,7 +233,6 @@ export const useKonvaTools = (
     const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
     if (!drawLayer) return;
 
-    // Destroy old rect if it exists
     if (selectionRect.current) selectionRect.current.destroy();
 
     selectionRect.current = new Konva.Rect({
@@ -247,7 +245,7 @@ export const useKonvaTools = (
       strokeWidth: 1,
       dash: [5, 5],
       name: 'selection-rect',
-      listening: false, // Performance: Don't let the rect interfere with mouse events
+      listening: false,
     });
     drawLayer.add(selectionRect.current);
     drawLayer.batchDraw();
@@ -298,7 +296,7 @@ export const useKonvaTools = (
 
   // --- DRAWING / ERASING ---
   const detectAndEraseLines = useCallback((currentPoint: { x: number; y: number }) => {
-    const threshold = 15 / scale; // Adjust threshold based on zoom
+    const threshold = 15 / scale;
 
     setLines(prevLines => {
       const linesToKeep: Array<{ tool: "brush" | "eraser"; points: number[] }> = [];
@@ -306,11 +304,7 @@ export const useKonvaTools = (
       
       prevLines.forEach((line, index) => {
         if (line.tool === "brush" && !lastErasedLines.current.includes(index)) {
-          
-          // 🚀 PERFORMANCE FIX: Pre-check Bounding Box
-          // If the mouse isn't in the rough area of the line, skip the math
           const isInBBox = isPointInLineBBox(currentPoint, line.points, threshold + 5);
-
           if (isInBBox && isPointNearLine(currentPoint, line.points, threshold)) {
             erasedLineIndices.push(index);
             addAction({ type: "delete-line", lineIndex: index });
@@ -324,7 +318,6 @@ export const useKonvaTools = (
       
       if (erasedLineIndices.length > 0) {
         lastErasedLines.current = [...lastErasedLines.current, ...erasedLineIndices];
-        // Clear cache after short delay
         setTimeout(() => {
           lastErasedLines.current = lastErasedLines.current.filter(idx => !erasedLineIndices.includes(idx));
         }, 100);
@@ -413,7 +406,6 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    // Throttle zoom slightly
     const now = Date.now();
     if (now - lastFrameTime.current < 8) return; 
     lastFrameTime.current = now;
@@ -443,16 +435,16 @@ export const useKonvaTools = (
       type: "connection",
       from: { nodeId, side, x: anchorPos.x, y: anchorPos.y },
       to: { nodeId: null, side: undefined, x: anchorPos.x, y: anchorPos.y },
-      stroke: "#000000",
+      stroke: "#64748B", // <--- SLATE GRAY (Professional look)
       strokeWidth: 4,
       draggable: false
     };
     setTempConnection(temp);
   }, [setIsConnecting, setConnectionStart, setTempConnection]);
 
-  // Phantom Line Logic - Optimized
+  // --- UPDATED: Phantom Line Logic with Halo Buffer ---
   const handleConnectionMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    // 🚀 PERFORMANCE FIX: Fail fast if we aren't connecting
+    // Fail fast
     if (!isConnecting || !connectionStart || !tempConnection) return;
     
     const now = Date.now();
@@ -469,8 +461,6 @@ export const useKonvaTools = (
     let endNodeId: string | null = null;
     let endSide: Side | undefined = undefined;
 
-    // Optimization: Don't check every shape if we are far away? 
-    // For now, the existing loop is okay, but we ensure we skip text/sticky early
     for (let i = 0; i < allShapes.length; i++) {
         const s = allShapes[i];
         if (s.id === connectionStart.nodeId) continue; 
@@ -478,7 +468,7 @@ export const useKonvaTools = (
         // Skip unconnectable shapes
         if (s.type === 'text' || s.type === 'stickyNote') continue;
 
-        // Get Dimensions (Safe Access)
+        // Get Dimensions
         let x = (s as any).x;
         let y = (s as any).y;
         let w = (s as any).width || 100;
@@ -494,18 +484,36 @@ export const useKonvaTools = (
             x -= rx; y -= ry; w = rx * 2; h = ry * 2;
         }
 
-        // Bounding Box Check - Is mouse inside shape?
-        if (pos.x >= x && pos.x <= x + w && pos.y >= y && pos.y <= y + h) {
+        // --- NEW HALO LOGIC ---
+        // We add a BUFFER zone (e.g., 25px) around the shape.
+        // If the mouse is inside this expanded box, we show the anchors.
+        const BUFFER = 25; 
+
+        if (
+            pos.x >= x - BUFFER && 
+            pos.x <= x + w + BUFFER && 
+            pos.y >= y - BUFFER && 
+            pos.y <= y + h + BUFFER
+        ) {
             const rect: Rect = { x, y, width: w, height: h };
             let minDist = Infinity;
             
             // Find closest anchor
             for (const side of SNAP_THRESHOLD_SIDES) {
                 const p = getAnchorPoint(rect, side);
+                
+                // Distance to actual anchor point
                 const distSq = (p.x - pos.x) ** 2 + (p.y - pos.y) ** 2;
-                if (distSq < minDist) { minDist = distSq; endX = p.x; endY = p.y; endNodeId = s.id; endSide = side; }
+                
+                if (distSq < minDist) { 
+                    minDist = distSq; 
+                    endX = p.x; 
+                    endY = p.y; 
+                    endNodeId = s.id; 
+                    endSide = side; 
+                }
             }
-            break; // Found a target, stop searching
+            break; // Found a target
         }
     }
     
@@ -524,7 +532,7 @@ export const useKonvaTools = (
         type: "connection",
         from: { ...connectionStart },
         to: { ...tempConnection.to },
-        stroke: "#000000",
+        stroke: "#64748B", // <--- SLATE GRAY (Professional look)
         strokeWidth: 4,
         draggable: false
       };
@@ -574,8 +582,7 @@ export const useKonvaTools = (
   }, [activeTool, handleDrawingMouseDown, handlePanningMouseDown, handleSelectionStart, isSpacePressed]);
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    // 🚀 PERFORMANCE CRITICAL: 
-    // If panning, do NOTHING else. No hover checks, no drawing, no connections.
+    // 🚀 PERFORMANCE CRITICAL: Pan Guard
     if (isPanning.current) {
         handlePanningMouseMove();
         return;

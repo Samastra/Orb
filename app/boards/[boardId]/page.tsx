@@ -1047,28 +1047,7 @@ useEffect(() => {
           </button>
           </div>
           <div className="w-px h-6 bg-gray-300/80"></div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={undo}
-              disabled={boardState.actions.length === 0}
-              className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
-              title="Undo"
-            >
-              <svg className="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </button>
-            <button
-              onClick={redo}
-              disabled={boardState.undoneActions.length === 0}
-              className="p-2 rounded-xl hover:bg-gray-100/80 transition-all duration-300 hover:scale-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
-              title="Redo"
-            >
-              <svg className="w-5 h-5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </button>
-          </div>
+         
         </div>
         <StageComponent
           key={`stage-${stageKey}`}

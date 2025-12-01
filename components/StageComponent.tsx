@@ -8,7 +8,7 @@ import { ReactShape, Tool, ImageShape } from "../types/board-types";
 import TextComponent from "./TextComponent";
 import { KonvaShape } from "@/hooks/useShapes";
 import { Connection, Side } from "@/hooks/useBoardState";
-import { getOrthogonalPath, getAnchorPoint, Rect as UtilsRect } from "@/lib/connection-utils";
+import { getOrthogonalPoints, getAnchorPoint, Rect as UtilsRect } from "@/lib/connection-utils";
 import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 
 // --- DYNAMIC IMPORT ---
@@ -92,7 +92,7 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
   const startPoint = getAnchorPoint(startRect, connection.from.side);
 
   let endPoint = { x: connection.to.x, y: connection.to.y };
-  let endSide: Side = connection.to.side || "left";
+  let endSide: Side = connection.to.side || "left"; 
 
   if (connection.to.nodeId && toShape) {
     const endRect = getNormalizedRect(toShape);
@@ -101,20 +101,34 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
     endSide = targetSide;
   }
 
-  const pathData = getOrthogonalPath(startPoint, endPoint, connection.from.side, endSide);
+  // PASS 10 as the last argument to retract the line by 10px (Arrowhead size)
+  const points = getOrthogonalPoints(startPoint, endPoint, connection.from.side, endSide, 40, 10);
+  
+  const strokeColor = selected ? "#3366FF" : (connection.stroke || "#64748B");
 
   return (
     <Group onClick={onClick} onTap={onClick}>
-      {/* Invisible thicker path for easier clicking */}
-      <Path data={pathData} stroke="transparent" strokeWidth={20} />
-      <Path
-        data={pathData}
-        stroke={selected ? "#007AFF" : (connection.stroke || "#000000")}
+      {/* 1. Fat Invisible Path (Click Target) */}
+      <Arrow 
+        points={points} 
+        stroke="transparent" 
+        strokeWidth={30} // Even fatter hit area
+        cornerRadius={30} 
+      />
+      
+      {/* 2. Visible Curve with Arrowhead */}
+      <Arrow
+        points={points}
+        stroke={strokeColor}
         strokeWidth={selected ? 4 : (connection.strokeWidth || 4)}
+        fill={strokeColor}
+        cornerRadius={30}       // <--- 30px Radius for BIG curves
+        pointerLength={10}      // <--- Arrowhead Length
+        pointerWidth={10}
         lineCap="round"
         lineJoin="round"
         dash={connection.id === 'temp-connection' ? [5, 5] : undefined}
-        listening={false} // Optimization: Visual path doesn't need events, the transparent one handles it
+        listening={false}
       />
     </Group>
   );
@@ -123,24 +137,57 @@ OrthogonalConnection.displayName = "OrthogonalConnection";
 
 const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick }: any) => {
   if (!shape) return null;
+
   const rect = getNormalizedRect(shape);
   const sides: Side[] = ["top", "right", "bottom", "left"];
+  const OFFSET = 15; // <--- PUSH DOTS OUTWARD
 
   return (
     <Group>
       {sides.map(side => {
         const pos = getAnchorPoint(rect, side);
+        
+        // Apply Offset
+        let displayX = pos.x;
+        let displayY = pos.y;
+        if (side === 'top') displayY -= OFFSET;
+        if (side === 'bottom') displayY += OFFSET;
+        if (side === 'left') displayX -= OFFSET;
+        if (side === 'right') displayX += OFFSET;
+
         return (
-          <Group
-            key={side}
-            x={pos.x}
-            y={pos.y}
-            onMouseDown={(e) => onMouseDown(e, side, pos)}
+          <Group 
+            key={side} 
+            x={displayX} 
+            y={displayY}
+            onMouseDown={(e) => {
+               e.cancelBubble = true;
+               onMouseDown(e, side, pos); // Pass original pos logic, but visual is offset
+            }}
             onClick={(e) => onClick(e, side)}
             onTap={(e) => onClick(e, side)}
+            onMouseEnter={(e) => {
+                const stage = e.target.getStage();
+                if(stage) stage.container().style.cursor = "crosshair";
+            }}
+            onMouseLeave={(e) => {
+                const stage = e.target.getStage();
+                if(stage) stage.container().style.cursor = "default";
+            }}
           >
-            <Circle radius={20} fill="transparent" />
-            <Circle radius={7} fill="#ffffff" stroke="#007AFF" strokeWidth={2} shadowBlur={2} shadowColor="rgba(0,0,0,0.3)" listening={false} />
+            {/* Massive Hit Area */}
+            <Circle radius={30} fill="transparent" />
+            
+            {/* Visible Dot */}
+            <Circle 
+               radius={6} 
+               fill="#ffffff" 
+               stroke="#3366FF" 
+               strokeWidth={2} 
+               shadowBlur={4} 
+               shadowColor="rgba(0,0,0,0.15)"
+               listening={false} 
+            />
           </Group>
         );
       })}
@@ -148,6 +195,7 @@ const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick }: any) => {
   );
 });
 AnchorOverlay.displayName = "AnchorOverlay";
+
 
 const ImageElement = React.memo(React.forwardRef<Konva.Image, any>(({ imageShape, ...props }, ref) => {
   const [image, setImage] = React.useState<HTMLImageElement | null>(null);
