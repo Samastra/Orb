@@ -1,15 +1,5 @@
-
-import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
-import {
-  Book,
-  Video,
-  ImageIcon,
-  Globe,
-  LayoutTemplate,
-  ExternalLink,
-} from "lucide-react";
+import { Book, Video, ImageIcon, Globe, ExternalLink, Plus } from "lucide-react";
 
 type ResourceCardProps = {
   heading: string;
@@ -23,268 +13,65 @@ type ResourceCardProps = {
   onOpenWebsite?: (url: string, title: string) => void;
 };
 
-const ResourceCard = ({
-  heading,
-  body,
-  image,
-  alt,
-  url,
-  type,
-  onAddToBoard,
-  onPlayVideo,
-  onOpenWebsite,
-  
-}: ResourceCardProps) => {
+const ResourceCard = ({ heading, body, image, alt, url, type, onAddToBoard, onPlayVideo, onOpenWebsite }: ResourceCardProps) => {
   const [imageError, setImageError] = useState(false);
 
   const handleClick = (e: React.MouseEvent) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  if ((type === "photo" || type === "vector") && image && onAddToBoard) {
-    console.log("🎯 Adding image to board:", image);
-    onAddToBoard(image, alt);
-    return;
-  }
-
-  if (type === "video" && onPlayVideo && url) {
-    const extractYouTubeId = (url: string): string | null => {
-      const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
-      const match = url.match(regExp);
-      return match && match[7].length === 11 ? match[7] : null;
-    };
-    const videoId = extractYouTubeId(url);
-    if (videoId) {
-      console.log("🎬 Playing video in modal:", videoId);
-      onPlayVideo(videoId, heading);
+    e.preventDefault();
+    e.stopPropagation();
+    if ((type === "photo" || type === "vector") && image && onAddToBoard) return onAddToBoard(image, alt);
+    if (type === "video" && onPlayVideo && url) {
+      // (Simple extract ID logic)
+      const videoId = url.split('v=')[1]?.split('&')[0]; 
+      if (videoId) onPlayVideo(videoId, heading);
+      return;
     }
-    return;
-  }
-
-  // NEW: Handle website modal opening
-  if (type === "website" && onOpenWebsite && url) {
-    console.log("🌐 Opening website in modal:", url);
-    onOpenWebsite(url, heading);
-    return;
-  }
-
-  // Fallback: open in new tab for other types
-  if (url && type !== "video" && type !== "website") {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-};
-
-  const getTypeIcon = () => {
-    switch (type) {
-      case "book":
-        return <Book className="w-4 h-4" />;
-      case "video":
-        return <Video className="w-4 h-4" />;
-      case "photo":
-      case "vector":
-        return <ImageIcon className="w-4 h-4" />;
-      case "website":
-        return <Globe className="w-4 h-4" />;
-      default:
-        return <Book className="w-4 h-4" />;
-    }
+    if (type === "website" && onOpenWebsite && url) return onOpenWebsite(url, heading);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const getTypeStyles = () => {
-    switch (type) {
-      case "book":
-        return {
-          bg: "bg-blue-50",
-          text: "text-blue-700",
-          border: "border-blue-200",
-          gradient: "from-blue-100 to-blue-200",
-        };
-      case "video":
-        return {
-          bg: "bg-red-50",
-          text: "text-red-700",
-          border: "border-red-200",
-          gradient: "from-red-100 to-red-200",
-        };
-      case "photo":
-        return {
-          bg: "bg-green-50",
-          text: "text-green-700",
-          border: "border-green-200",
-          gradient: "from-green-100 to-green-200",
-        };
-      case "vector":
-        return {
-          bg: "bg-purple-50",
-          text: "text-purple-700",
-          border: "border-purple-200",
-          gradient: "from-purple-100 to-purple-200",
-        };
-      case "website":
-        return {
-          bg: "bg-orange-50",
-          text: "text-orange-700",
-          border: "border-orange-200",
-          gradient: "from-orange-100 to-orange-200",
-        };
-      default:
-        return {
-          bg: "bg-gray-50",
-          text: "text-gray-700",
-          border: "border-gray-200",
-          gradient: "from-gray-100 to-gray-200",
-        };
-    }
-  };
+  const Icon = type === 'video' ? Video : type === 'website' ? Globe : type === 'book' ? Book : ImageIcon;
 
-  const getFallbackImage = () => {
-    const styles = getTypeStyles();
-    return (
-      <div
-        className={`w-full h-full bg-gradient-to-br ${styles.gradient} flex items-center justify-center rounded-lg`}
-      >
-        {getTypeIcon()}
-      </div>
-    );
-  };
-
-  const displayImage = image && !imageError ? image : null;
-
-  if (type === "photo" || type === "vector") {
-    return (
-      <div
-        className={`
-          group relative bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg
-          hover:shadow-2xl transition-all duration-300 border border-gray-200/80
-          hover:border-blue-300 overflow-hidden
-          ${(url || onAddToBoard) ? "cursor-pointer hover:scale-[1.02]" : ""}
-        `}
-        onClick={handleClick}
-      >
-        <div className="w-full h-48 relative overflow-hidden">
-          {displayImage ? (
-            <img
-              src={displayImage}
-              alt={alt}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            getFallbackImage()
-          )}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-300" />
-          <div className="absolute top-3 left-3">
-            <span
-              className={`
-                text-xs px-2 py-1 rounded-full backdrop-blur-sm font-medium
-                ${getTypeStyles().text} ${getTypeStyles().bg} border ${getTypeStyles().border}
-                flex items-center gap-1
-              `}
-            >
-              {getTypeIcon()}
-              {type}
-            </span>
-          </div>
-          {onAddToBoard && (
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="bg-blue-600 text-white p-1.5 rounded-full backdrop-blur-sm">
-                <span className="text-xs font-medium">+ Add</span>
-              </div>
-            </div>
-          )}
-          {url && (
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="bg-black/70 text-white p-1.5 rounded-full backdrop-blur-sm">
-                <ExternalLink className="w-3 h-3" />
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="p-3">
-          <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 text-center group-hover:text-blue-600 transition-colors duration-300">
-            {heading}
-          </h3>
-        </div>
-      </div>
-    );
-  }
-
-  const cardContent = (
-    <div
-      className={`
-        group bg-white/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg
-        hover:shadow-2xl transition-all duration-300 border border-gray-200/80
-        hover:border-blue-300 flex gap-4
-        ${url ? "cursor-pointer hover:scale-[1.02]" : ""}
-      `}
+  // VISUALS: Minimalist "Studio" Style
+  return (
+    <div 
       onClick={handleClick}
+      className="group flex flex-col bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-blue-400 hover:shadow-md transition-all cursor-pointer"
     >
-      <div className="flex-shrink-0 w-16 h-16 relative">
-        {displayImage ? (
-          <div className="w-full h-full rounded-xl overflow-hidden border border-gray-200/80">
-            <img
-              src={displayImage}
-              alt={alt}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-              onError={() => setImageError(true)}
-            />
+      {/* Image Preview (if available) */}
+      {(image && !imageError) ? (
+        <div className="relative h-32 w-full overflow-hidden bg-gray-100">
+          <img src={image} alt={alt} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={() => setImageError(true)} />
+          <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md backdrop-blur-sm">
+            <Icon className="w-3 h-3" />
           </div>
-        ) : (
-          <div
-            className={`w-full h-full rounded-xl bg-gradient-to-br ${getTypeStyles().gradient} flex items-center justify-center border ${getTypeStyles().border}`}
-          >
-            {getTypeIcon()}
-          </div>
-        )}
-        {type === "video" && url && (
-          <button
-            className="absolute inset-0 flex items-center justify-center bg-black/50 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClick(e);
-            }}
-          >
-            Play
-          </button>
-        )}
-      </div>
-      <div className="flex-1 min-w-0 flex flex-col justify-center">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-semibold text-gray-900 leading-tight mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors duration-300">
-            {heading}
-          </h3>
-          {url && (
-            <ExternalLink className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex-shrink-0 mt-0.5" />
+          {onAddToBoard && (type === 'photo' || type === 'vector') && (
+            <div className="absolute top-2 right-2 bg-blue-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
+              <Plus className="w-3 h-3" />
+            </div>
           )}
         </div>
-        {body && type === "website" && (
-          <p className="text-xs text-gray-600 line-clamp-2 mb-2">{body}</p>
+      ) : (
+        <div className="h-2 w-full bg-gray-50 border-b border-gray-100" /> 
+      )}
+
+      {/* Content */}
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2">
+          <h4 className="text-sm font-bold text-gray-800 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">{heading}</h4>
+          {url && <ExternalLink className="w-3 h-3 text-gray-300 flex-shrink-0 mt-0.5" />}
+        </div>
+        {body && type === 'website' && (
+          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{body}</p>
         )}
-        <div className="flex items-center justify-between">
-          <span
-            className={`
-              text-xs px-2 py-1 rounded-full font-medium backdrop-blur-sm
-              ${getTypeStyles().text} ${getTypeStyles().bg} border ${getTypeStyles().border}
-              flex items-center gap-1
-            `}
-          >
-            {getTypeIcon()}
+        <div className="mt-2 flex items-center gap-1">
+          <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider bg-gray-50 px-1.5 py-0.5 rounded">
             {type}
           </span>
         </div>
       </div>
     </div>
   );
-
-  if (url && type !== "video") {
-    return (
-      <Link href={url} target="_blank" rel="noopener noreferrer" className="block">
-        {cardContent}
-      </Link>
-    );
-  }
-
-  return cardContent;
 };
 
 export default ResourceCard;
