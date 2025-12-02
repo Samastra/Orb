@@ -14,81 +14,84 @@ export interface Rect {
   height: number;
 }
 
+// Helper: Snap to nearest pixel to avoid float precision errors
+const snap = (n: number) => Math.round(n);
+
 export const getAnchorPoint = (rect: Rect, side: Side): Point => {
   switch (side) {
     case "top":
-      return { x: rect.x + rect.width / 2, y: rect.y };
+      return { x: snap(rect.x + rect.width / 2), y: snap(rect.y) };
     case "right":
-      return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
+      return { x: snap(rect.x + rect.width), y: snap(rect.y + rect.height / 2) };
     case "bottom":
-      return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
+      return { x: snap(rect.x + rect.width / 2), y: snap(rect.y + rect.height) };
     case "left":
-      return { x: rect.x, y: rect.y + rect.height / 2 };
+      return { x: snap(rect.x), y: snap(rect.y + rect.height / 2) };
   }
 };
 
-// 1. FUZZY MATH HELPER (The Curve Fix)
-const isClose = (a: number, b: number) => Math.abs(a - b) < 0.5;
-
-// HELPER: Remove redundant collinear points & duplicates
+// 1. ROBUST SIMPLIFICATION
 const simplifyPoints = (points: number[]): number[] => {
-  // Need at least 2 points (x,y) + (x,y)
   if (points.length < 4) return points;
 
-  // A. Filter out duplicate points (stacked on top of each other)
-  const deduped: number[] = [points[0], points[1]];
-  for (let i = 2; i < points.length; i += 2) {
-    const curX = points[i];
-    const curY = points[i + 1];
-    const prevX = deduped[deduped.length - 2];
-    const prevY = deduped[deduped.length - 1];
-
-    // Only add if distance is significant (> 1px)
-    if (Math.abs(curX - prevX) > 1 || Math.abs(curY - prevY) > 1) {
-      deduped.push(curX, curY);
-    }
-  }
-
-  if (deduped.length < 6) return deduped; // Need 3 points to simplify corners
-
-  // B. Simplify Collinear lines using Fuzzy Math
-  const simplified = [deduped[0], deduped[1]];
-
-  for (let i = 2; i < deduped.length; i += 2) {
-    const curX = deduped[i];
-    const curY = deduped[i + 1];
+  const result: number[] = [];
+  
+  // A. First pass: Copy points but strictly remove identical or "very close" points
+  // We treat anything within 1 pixel as the same point.
+  for (let i = 0; i < points.length; i += 2) {
+    const x = points[i];
+    const y = points[i + 1];
     
-    const prevX = simplified[simplified.length - 2];
-    const prevY = simplified[simplified.length - 1];
-    
-    // Look back one more step
-    const prevPrevX = simplified[simplified.length - 4];
-    const prevPrevY = simplified[simplified.length - 3];
-
-    if (prevPrevX === undefined) {
-      simplified.push(curX, curY);
+    // If it's the first point, just add it
+    if (result.length === 0) {
+      result.push(x, y);
       continue;
     }
 
-    // Check for collinearity using fuzzy logic
-    // Vertical Line Check: All X's are close
-    const isVertical = isClose(prevPrevX, prevX) && isClose(prevX, curX);
-    
-    // Horizontal Line Check: All Y's are close
-    const isHorizontal = isClose(prevPrevY, prevY) && isClose(prevY, curY);
+    // Compare with last added point
+    const lastX = result[result.length - 2];
+    const lastY = result[result.length - 1];
 
-    if (isHorizontal || isVertical) {
-      // Extend the line: Update the middle point to be current
-      simplified[simplified.length - 2] = curX;
-      simplified[simplified.length - 1] = curY;
-    } else {
-      // Turn detected: Add new point
-      simplified.push(curX, curY);
+    // If distance is less than 2px, skip this new point (it's trash geometry)
+    if (Math.abs(x - lastX) < 2 && Math.abs(y - lastY) < 2) {
+        continue;
+    }
+    
+    result.push(x, y);
+  }
+
+  // B. Second pass: Remove Collinear Points (Straight lines broken into pieces)
+  // If A -> B -> C is a straight line, we remove B.
+  if (result.length < 6) return result; // Need at least 3 points to optimize
+
+  const finalPoints: number[] = [result[0], result[1]];
+
+  for (let i = 2; i < result.length - 2; i += 2) {
+    const prevX = finalPoints[finalPoints.length - 2];
+    const prevY = finalPoints[finalPoints.length - 1];
+    
+    const currX = result[i];
+    const currY = result[i + 1];
+    
+    const nextX = result[i + 2];
+    const nextY = result[i + 3];
+
+    // Check perfectly horizontal or vertical alignment
+    // (We use a tiny threshold of 1px to be safe against sub-pixel rendering)
+    const isHorizontal = Math.abs(prevY - currY) < 1 && Math.abs(currY - nextY) < 1;
+    const isVertical = Math.abs(prevX - currX) < 1 && Math.abs(currX - nextX) < 1;
+
+    if (!isHorizontal && !isVertical) {
+      finalPoints.push(currX, currY);
     }
   }
 
-  return simplified;
+  // Always add the very last point
+  finalPoints.push(result[result.length - 2], result[result.length - 1]);
+
+  return finalPoints;
 };
+
 
 export const getOrthogonalPoints = (
   start: Point,
@@ -96,64 +99,80 @@ export const getOrthogonalPoints = (
   startSide: Side,
   endSide: Side,
   padding: number = 40,
-  arrowLength: number = 0 // Default to 0 ensures tip touches edge
+  arrowLength: number = 0
 ): number[] => {
+  const points: number[] = [];
+
+  // Snap Inputs
+  const sx = snap(start.x);
+  const sy = snap(start.y);
+  const ex = snap(end.x);
+  const ey = snap(end.y);
+
+  // 1. Start
+  points.push(sx, sy);
+
+  // 2. Padding Start (Stub)
+  let p1x = sx, p1y = sy;
+  switch (startSide) {
+    case "top":    p1y -= padding; break;
+    case "bottom": p1y += padding; break;
+    case "right":  p1x += padding; break;
+    case "left":   p1x -= padding; break;
+  }
+  points.push(snap(p1x), snap(p1y));
+
+  // 3. Padding End (Target approach)
+  let p2x = ex, p2y = ey;
   
-  // 2. Calculate Target
-  // We remove the retraction logic so the arrow tip touches the edge exactly.
-  // If you want a gap, pass arrowLength > 0.
-  const target = { ...end };
+  // Adjust actual target tip for arrow length
+  let tx = ex, ty = ey;
   if (arrowLength > 0) {
       switch (endSide) {
-          case "top": target.y -= arrowLength; break;
-          case "right": target.x += arrowLength; break;
-          case "bottom": target.y += arrowLength; break;
-          case "left": target.x -= arrowLength; break;
+          case "top": ty -= arrowLength; break;
+          case "right": tx += arrowLength; break;
+          case "bottom": ty += arrowLength; break;
+          case "left": tx -= arrowLength; break;
       }
-  }
-
-  const p1 = { ...start };
-  const p2 = { ...target };
-
-  // 3. Add Padding (The "Stub" coming out of the shape)
-  switch (startSide) {
-    case "top": p1.y -= padding; break;
-    case "right": p1.x += padding; break;
-    case "bottom": p1.y += padding; break;
-    case "left": p1.x -= padding; break;
   }
 
   switch (endSide) {
-    case "top": p2.y -= padding; break;
-    case "right": p2.x += padding; break;
-    case "bottom": p2.y += padding; break;
-    case "left": p2.x -= padding; break;
+    case "top":    p2y -= padding; break;
+    case "bottom": p2y += padding; break;
+    case "right":  p2x += padding; break;
+    case "left":   p2x -= padding; break;
   }
+  
+  // Snap intermediates
+  p2x = snap(p2x);
+  p2y = snap(p2y);
+  tx = snap(tx);
+  ty = snap(ty);
 
-  // 4. Raw Points Calculation
-  const rawPoints: number[] = [start.x, start.y, p1.x, p1.y];
+  // 4. Calculate Midpoints (Manhattan Routing)
+  const isStartVertical = startSide === "top" || startSide === "bottom";
+  const isEndVertical = endSide === "top" || endSide === "bottom";
 
-  const midX = (p1.x + p2.x) / 2;
-  const midY = (p1.y + p2.y) / 2;
-
-  const isHorizontalStart = startSide === "left" || startSide === "right";
-  const isHorizontalEnd = endSide === "left" || endSide === "right";
-
-  if (isHorizontalStart === isHorizontalEnd) {
-      if (isHorizontalStart) {
-          rawPoints.push(midX, p1.y);
-          rawPoints.push(midX, p2.y);
+  if (isStartVertical === isEndVertical) {
+      if (isStartVertical) {
+          const midY = snap((p1y + p2y) / 2);
+          points.push(p1x, midY);
+          points.push(p2x, midY);
       } else {
-          rawPoints.push(p1.x, midY);
-          rawPoints.push(p2.x, midY);
+          const midX = snap((p1x + p2x) / 2);
+          points.push(midX, p1y);
+          points.push(midX, p2y);
       }
   } else {
-      rawPoints.push(p2.x, p1.y);
+      if (isStartVertical) {
+          points.push(p1x, p2y); 
+      } else {
+          points.push(p2x, p1y);
+      }
   }
 
-  rawPoints.push(p2.x, p2.y);
-  rawPoints.push(target.x, target.y);
+  points.push(p2x, p2y);
+  points.push(tx, ty);
 
-  // 5. CLEAN THE POINTS (Fuzzy Math Applied)
-  return simplifyPoints(rawPoints);
+  return simplifyPoints(points);
 };

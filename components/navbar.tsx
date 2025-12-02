@@ -1,117 +1,93 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { Button } from "./ui/button"
-import { useUser } from "@clerk/nextjs"
-import { motion } from "framer-motion"
-import { Command, Zap } from "lucide-react"
-import Image from "next/image"
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import Link from "next/link";
+import { Button } from "./ui/button";
+import { useUser } from "@clerk/nextjs";
+import { motion } from "framer-motion";
+import { Zap, Menu, X } from "lucide-react";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 const Navbar = () => {
-  const { isSignedIn, user } = useUser()
+  const { isSignedIn } = useUser();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <motion.nav 
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="flex items-center justify-between p-6 bg-white/80 backdrop-blur-md border border-white/30 shadow-2xl shadow-blue-500/10 rounded-2xl mx-6 mt-6"
-    >
-      {/* Left Side - Logo & Navigation */}
-      <div className="flex items-center gap-12">
-        {/* Logo */}
+    <header className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+      <motion.nav
+        initial={{ y: -20, opacity: 0, scale: 0.95 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className={cn(
+          "pointer-events-auto flex items-center justify-between",
+          "bg-white/80 backdrop-blur-xl border border-gray-200/50", // Light mode glass
+          "rounded-full px-6 py-3 shadow-lg shadow-gray-200/20",
+          "w-full max-w-5xl"
+        )}
+      >
+        {/* Logo Section */}
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-            <img src="/Asset-1.png" alt="Orblin Logo" width={24} height={24} />
+          <div className="relative w-8 h-8 group-hover:scale-110 transition-transform duration-300">
+             {/* Using your uploaded file */}
+             <Image 
+               src="/Asset1.png" 
+               alt="Orblin Logo" 
+               fill 
+               className="object-contain"
+             />
           </div>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <span className="font-bold text-lg tracking-tight text-gray-900 group-hover:text-blue-600 transition-colors">
             Orblin
-          </h1>
+          </span>
         </Link>
 
-        {/* Navigation Links */}
-        <div className="hidden md:flex items-center gap-8 text-gray-700">
-          <Link 
-            href="/features" 
-            className="hover:text-blue-600 transition-colors duration-300 font-medium relative group"
+        {/* Desktop Nav - Restored your links, removed Pricing/Help */}
+        <div className="hidden md:flex items-center gap-8">
+          <Link
+            href="/features"
+            className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors relative group"
           >
             Features
-            <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300" />
           </Link>
-          <Link 
-            href="/help" 
-            className="hover:text-blue-600 transition-colors duration-300 font-medium relative group"
-          >
-            Help
-            <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300" />
-          </Link>
-          <Link 
-            href="/contact" 
-            className="hover:text-blue-600 transition-colors duration-300 font-medium relative group"
+          <Link
+            href="/contact"
+            className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors relative group"
           >
             Contact
-            <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 group-hover:w-full transition-all duration-300" />
           </Link>
         </div>
-      </div>
 
-      {/* Right Side - Auth Buttons */}
-      <div className="flex items-center gap-4">
-        {isSignedIn ? (
-          <>
-            <Link href="/boards">
-              <Button 
-                variant="outline" 
-                className="border-gray-300 hover:border-blue-300 text-gray-700 hover:text-blue-600 transition-all duration-300"
-              >
-                Explore Boards
-              </Button>
-            </Link>
-            <Link href="/dashboard">
-              <Avatar className="h-10 w-10 rounded-xl border-2 border-gray-200/80 hover:border-blue-500 transition-all duration-300 hover:scale-105 cursor-pointer">
-                <AvatarImage src={user?.imageUrl} alt={user?.fullName || "User"} />
-                <AvatarFallback className="rounded-xl bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 font-medium">
-                  {user?.fullName?.split(" ").map(word => word.charAt(0).toUpperCase()).join("")}
-                </AvatarFallback>
-              </Avatar>
-            </Link>
-          </>
-        ) : (
-          <>
-            <Link href="/boards">
-              <Button 
-                variant="ghost" 
-                className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-300"
-              >
-                Explore Boards
-              </Button>
-            </Link>
-            <Link href="/sign-in">
-              <Button 
-                variant="outline" 
-                className="border-gray-300 hover:border-blue-300 text-gray-700 hover:text-blue-600 transition-all duration-300"
-              >
-                Sign In
-              </Button>
-            </Link>
-            <Link href="/sign-up">
-              <Button 
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-300"
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                Get Started
-              </Button>
-            </Link>
-          </>
-        )}
-      </div>
-    </motion.nav>
-  )
-}
+        {/* Actions */}
+        <div className="hidden md:flex items-center gap-4">
+          <Link href={isSignedIn ? "/boards" : "/sign-in"}>
+            <span className="text-sm font-medium text-gray-600 hover:text-black transition-colors px-2">
+              {isSignedIn ? "Dashboard" : "Log in"}
+            </span>
+          </Link>
+          <Link href={isSignedIn ? "/boards" : "/sign-up"}>
+            <Button
+              className={cn(
+                "rounded-full px-5 h-9 text-xs font-semibold",
+                "bg-gray-900 text-white hover:bg-gray-800 transition-all", // Dark button on light bg
+                "shadow-lg shadow-gray-900/10"
+              )}
+            >
+              Start Thinking <Zap className="w-3 h-3 ml-2" />
+            </Button>
+          </Link>
+        </div>
 
-export default Navbar
+        {/* Mobile Toggle */}
+        <button 
+          className="md:hidden text-gray-600"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          {isMobileMenuOpen ? <X /> : <Menu />}
+        </button>
+      </motion.nav>
+    </header>
+  );
+};
+
+export default Navbar;

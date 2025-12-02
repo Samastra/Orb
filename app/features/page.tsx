@@ -1,290 +1,260 @@
-"use client"
+/* eslint-disable react/no-unescaped-entities */
+"use client";
 
-import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { GlassCard } from "@/components/ui/glass-card"
-import { AnimatedBackground } from "@/components/ui/animated-background"
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import Navbar from "@/components/navbar";
+import Link from "next/link";
 import { 
-  Brain, 
-  Users, 
-  Share2, 
-  Search, 
-  Clock, 
-  Lightbulb,
-  Zap,
-  Shield,
-  Globe,
-  Lock,
-  Sparkles,
-  ArrowRight
-} from "lucide-react"
-import Link from "next/link"
-import Navbar from "@/components/navbar"
+  Brain, Search, Share2, 
+  Zap, Shield, Globe, Sparkles, ArrowRight,
+  Database, CloudLightning, Command, 
+  Video, Maximize, FolderKanban
+} from "lucide-react";
+
+// --- VISUAL ASSETS ---
+
+const ScribbleHighlight = () => (
+  <svg className="absolute -bottom-2 left-0 w-full h-3 text-blue-200 -z-10 opacity-60" viewBox="0 0 200 9" fill="none" preserveAspectRatio="none">
+     <path d="M2.00025 7.00001C30.5003 3.00001 100.001 -2.99999 198.001 5.00002" stroke="currentColor" strokeWidth="8" strokeLinecap="round"/>
+  </svg>
+);
+
+const RichSticker = ({ icon: Icon, color, rotate, className, delay = 0 }: any) => (
+  <motion.div
+    initial={{ scale: 0, rotate: 0 }}
+    animate={{ scale: 1, rotate: rotate }}
+    transition={{ type: "spring", stiffness: 260, damping: 20, delay: delay }}
+    whileHover={{ scale: 1.1, rotate: rotate + 10 }}
+    className={`absolute z-20 flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border-4 border-white ${className}`}
+  >
+    <div className={`w-full h-full rounded-xl flex items-center justify-center ${color}`}>
+      <Icon className="w-8 h-8 text-white fill-current" strokeWidth={2.5} />
+    </div>
+  </motion.div>
+);
+
+const BentoCard = ({ children, className, title, description, icon: Icon, iconColor }: any) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true }}
+    className={`group relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-8 shadow-sm hover:shadow-xl hover:border-blue-200 transition-all duration-300 h-full flex flex-col ${className}`}
+  >
+    <div className="mb-6">
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110 duration-300 ${iconColor}`}>
+        {Icon}
+      </div>
+      <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">{title}</h3>
+      <p className="text-gray-500 leading-relaxed font-medium mb-6">{description}</p>
+    </div>
+    <div className="mt-auto pt-6 border-t border-gray-100">
+      {children}
+    </div>
+  </motion.div>
+);
+
+// --- FEATURE DATA (SOLO FOCUSED) ---
 
 const features = [
   {
-    icon: <Brain className="w-8 h-8 text-white" />,
-    title: "AI-Powered Insights",
-    description: "Get smart suggestions and connections as you brainstorm. Our AI helps you see patterns and opportunities you might have missed.",
-    details: [
-      "Automatic idea connections",
-      "Content recommendations from trusted sources",
-      "Pattern recognition across your boards",
-      "Research suggestions based on your topics"
-    ]
+    icon: <Brain className="w-7 h-7 text-white" />,
+    color: "bg-purple-500",
+    title: "Context-Aware AI",
+    description: "The whiteboard that researches with you. Orblin analyzes your notes and automatically fetches relevant articles, papers, and data.",
+    details: ["Auto-suggested sources", "Relevant content matching", "Research while you type"]
   },
   {
-    icon: <Users className="w-8 h-8 text-white" />,
-    title: "Real-time Collaboration",
-    description: "Work together seamlessly with your team. See changes instantly, chat in context, and build ideas together in real-time.",
-    details: [
-      "Live cursor presence and activity indicators",
-      "Instant updates across all devices",
-      "Built-in comment threads and feedback",
-      "Complete version history and restore points"
-    ]
+    icon: <Globe className="w-7 h-7 text-white" />,
+    color: "bg-blue-500",
+    title: "Live Web Embeds",
+    description: "Stop tab-hopping. Interact with live websites directly on your canvas. Scroll, click, and read without breaking flow.",
+    details: ["Full browser interactivity", "No context switching", "Visual bookmarking"]
   },
   {
-    icon: <Share2 className="w-8 h-8 text-white" />,
+    icon: <Share2 className="w-7 h-7 text-white" />,
+    color: "bg-green-500",
     title: "Public Knowledge Hub",
-    description: "Share your work with the world or explore boards from other creators. Learn from thousands of public brainstorming sessions.",
-    details: [
-      "Publish boards to the community",
-      "Discover trending topics and ideas",
-      "Template library from successful sessions",
-      "Knowledge exchange and inspiration"
-    ]
+    description: "Build in public. Publish your boards to the community or browse thousands of templates from other solo creators for inspiration.",
+    details: ["Publish read-only boards", "Community templates", "Discover trending ideas"]
   },
   {
-    icon: <Search className="w-8 h-8 text-white" />,
+    icon: <Video className="w-7 h-7 text-white" />,
+    color: "bg-red-500",
+    title: "Video Player Mode",
+    description: "Watch tutorials, lectures, or references side-by-side with your notes. The perfect setup for deep learning.",
+    details: ["Picture-in-picture style", "YouTube integration", "Note-taking mode"]
+  },
+  {
+    icon: <Maximize className="w-7 h-7 text-white" />,
+    color: "bg-indigo-500",
+    title: "Infinite Solo Canvas",
+    description: "No pages, no boundaries. Just endless space to map out your brain using shapes, connectors, and sticky notes.",
+    details: ["Pan and zoom freely", "Rich visual tools", "Focus mode"]
+  },
+  {
+    icon: <FolderKanban className="w-7 h-7 text-white" />,
+    color: "bg-orange-500",
     title: "Smart Organization",
-    description: "Never lose an idea again. Orblin automatically organizes your sessions and makes everything searchable and accessible.",
-    details: [
-      "Auto-categorization by topic and type",
-      "Advanced search across all content",
-      "Quick filters and smart tags",
-      "Custom session templates"
-    ]
-  },
-  {
-    icon: <Clock className="w-8 h-8 text-white" />,
-    title: "Always in Sync",
-    description: "Pick up right where you left off. Your boards sync automatically across all devices, so your ideas are always with you.",
-    details: [
-      "Cross-device synchronization",
-      "Offline access and editing",
-      "Automatic cloud backup",
-      "Quick recovery and version control"
-    ]
-  },
-  {
-    icon: <Lightbulb className="w-8 h-8 text-white" />,
-    title: "Visual Thinking Tools",
-    description: "Turn abstract ideas into clear visual plans. Use shapes, connectors, and templates designed for creative thinking.",
-    details: [
-      "Drag & drop interface with precision",
-      "Multiple board types and layouts",
-      "Custom template creation",
-      "Multiple export and sharing options"
-    ]
+    description: "Messy thinkers welcome. Orblin automatically categorizes your research and boards so you can find anything later.",
+    details: ["Auto-tagging", "Global search", "Topic clustering"]
   }
-]
-
-const techFeatures = [
-  {
-    icon: <Shield className="w-6 h-6 text-blue-600" />,
-    title: "Enterprise Security",
-    description: "End-to-end encryption and secure data handling"
-  },
-  {
-    icon: <Globe className="w-6 h-6 text-green-600" />,
-    title: "Global Performance",
-    description: "Fast loading times with worldwide CDN coverage"
-  },
-  {
-    icon: <Lock className="w-6 h-6 text-purple-600" />,
-    title: "Data Privacy",
-    description: "Your data belongs to you. We never sell your information"
-  },
-  {
-    icon: <Sparkles className="w-6 h-6 text-amber-600" />,
-    title: "Regular Updates",
-    description: "Continuous improvements and new features monthly"
-  }
-]
+];
 
 export default function FeaturesPage() {
   return (
-    <main className="min-h-screen relative overflow-hidden">
-      <AnimatedBackground />
-      
+    <main className="min-h-screen bg-white text-gray-900 font-sans selection:bg-blue-100 overflow-x-hidden">
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="relative z-10 pt-20 pb-20 px-4">
-        <div className="max-w-6xl mx-auto text-center space-y-8">
+      {/* --- HERO SECTION --- */}
+      <section className="relative pt-32 pb-24 px-6 overflow-hidden bg-gradient-to-b from-blue-50/40 via-white to-white">
+        
+        {/* Floating Stickers */}
+        <RichSticker 
+          icon={Zap} 
+          color="bg-yellow-400" 
+          rotate={-12} 
+          className="top-40 left-[10%] hidden lg:flex" 
+          delay={0.2}
+        />
+        <RichSticker 
+          icon={Brain} 
+          color="bg-purple-500" 
+          rotate={12} 
+          className="top-32 right-[10%] hidden lg:flex" 
+          delay={0.4}
+        />
+
+        <div className="max-w-4xl mx-auto text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <GlassCard className="inline-flex items-center gap-2 px-4 py-2">
-              <Zap className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-gray-700">
-                Everything You Need to Think Better
-              </span>
-            </GlassCard>
-          </motion.div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-gray-200 shadow-sm text-xs font-semibold text-blue-600 mb-8">
+              <Sparkles className="w-3 h-3" />
+              <span>Built for the Solo Mind</span>
+            </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
-            className="space-y-6"
-          >
-            <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
-              Powerful Features for{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Modern Thinkers
+            <h1 className="relative text-5xl md:text-6xl font-extrabold tracking-tight mb-8 text-gray-900">
+              Your Second Brain,<br className="md:hidden" />
+              <span className="relative inline-block ml-3">
+                <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Visualized.</span>
+                <ScribbleHighlight />
               </span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Orblin brings together the best tools for brainstorming, collaboration, 
-              and organization in one beautiful, intuitive platform.
+            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-medium">
+              We stripped away the team chats and permissions to give you 
+              pure, uninterrupted thinking space.
             </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-          >
-            <Link href="/sign-up">
-              <Button 
-                size="lg" 
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-6 text-lg font-semibold rounded-2xl shadow-2xl shadow-blue-500/25"
-              >
-                <Zap className="w-5 h-5 mr-2" />
-                Start Building Ideas
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
           </motion.div>
         </div>
       </section>
 
-      {/* Main Features Grid */}
-      <section className="relative z-10 py-20 px-4 bg-white/50">
+      {/* --- FEATURES GRID --- */}
+      <section className="pb-32 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
+              <BentoCard
+                key={index}
+                title={feature.title}
+                description={feature.description}
+                icon={feature.icon}
+                iconColor={feature.color}
               >
-                <GlassCard className="p-8 h-full group cursor-pointer">
-                  <div className="space-y-6">
-                    {/* Icon */}
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                      {feature.icon}
-                    </div>
-
-                    {/* Content */}
-                    <div className="space-y-4">
-                      <h3 className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                        {feature.title}
-                      </h3>
-                      
-                      <p className="text-gray-600 leading-relaxed">
-                        {feature.description}
-                      </p>
-
-                      {/* Feature Details */}
-                      <ul className="space-y-2">
-                        {feature.details.map((detail, idx) => (
-                          <li key={idx} className="flex items-center gap-3 text-gray-700 text-sm">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
-                            <span>{detail}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </GlassCard>
-              </motion.div>
+                <ul className="space-y-3">
+                  {feature.details.map((detail, idx) => (
+                    <li key={idx} className="flex items-center gap-3 text-sm font-medium text-gray-600">
+                      <div className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                      {detail}
+                    </li>
+                  ))}
+                </ul>
+              </BentoCard>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Technology Section */}
-      <section className="relative z-10 py-20 px-4">
-        <div className="max-w-4xl mx-auto text-center space-y-12">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="space-y-4"
-          >
-            <h2 className="text-4xl font-bold text-gray-900">
-              Built with Modern Technology
-            </h2>
-            <p className="text-xl text-gray-600">
-              Orblin is built on a robust, scalable infrastructure that ensures 
-              reliability, security, and performance.
+      {/* --- TECH SPECS (Slate Background) --- */}
+      <section className="py-24 px-6 bg-slate-50 border-y border-gray-200">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Solo doesn't mean "Small"</h2>
+            <p className="text-gray-500 max-w-2xl mx-auto">
+              Orblin is built on enterprise-grade infrastructure to handle your most ambitious ideas.
             </p>
-          </motion.div>
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {techFeatures.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                className="text-center space-y-3"
-              >
-                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto">
-                  {feature.icon}
+            {[
+              { icon: Shield, title: "Private by Default", desc: "No team leaks", color: "text-blue-600" },
+              { icon: CloudLightning, title: "Instant Sync", desc: "Phone to Laptop", color: "text-yellow-600" },
+              { icon: Database, title: "Data Export", desc: "You own your data", color: "text-green-600" },
+              { icon: Command, title: "Weekly Updates", desc: "New solo tools", color: "text-purple-600" },
+            ].map((tech, idx) => (
+              <div key={idx} className="text-center group">
+                <div className="w-12 h-12 bg-white rounded-2xl border border-gray-200 flex items-center justify-center mx-auto mb-4 shadow-sm group-hover:scale-110 transition-transform duration-300">
+                  <tech.icon className={`w-6 h-6 ${tech.color}`} />
                 </div>
-                <h3 className="font-semibold text-gray-900">{feature.title}</h3>
-                <p className="text-sm text-gray-600">{feature.description}</p>
-              </motion.div>
+                <h3 className="font-bold text-gray-900 mb-1">{tech.title}</h3>
+                <p className="text-xs text-gray-500">{tech.desc}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="relative z-10 py-20 px-4">
+      {/* --- CTA SECTION --- */}
+      <section className="py-24 px-6 relative overflow-hidden">
         <div className="max-w-4xl mx-auto text-center">
-          <GlassCard className="p-12">
-            <div className="space-y-6">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-                Ready to Transform Your Ideas?
+          <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-[32px] p-12 border border-blue-100 shadow-xl relative overflow-hidden">
+            
+            {/* Background Decorations */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-200/20 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-200/20 rounded-full blur-3xl" />
+            
+            <div className="relative z-10 space-y-8">
+              <h2 className="text-3xl md:text-5xl font-extrabold text-gray-900">
+                Ready to find your flow?
               </h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                Join thousands of creators and teams who are already building 
-                better ideas with Orblin&apos;s powerful features.
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto font-medium">
+                Stop managing browser tabs and start building your ideas. 
+                Join the solo brainstorming revolution.
               </p>
               <Link href="/sign-up">
                 <Button 
-                  size="lg"
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-6 text-lg font-semibold"
+                  size="lg" 
+                  className="bg-gray-900 hover:bg-black text-white px-10 py-7 text-lg font-bold rounded-2xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
                 >
+                  <Zap className="w-5 h-5 mr-2 text-yellow-400" />
                   Get Started Free
                 </Button>
               </Link>
             </div>
-          </GlassCard>
+          </div>
         </div>
       </section>
+
+      {/* --- FOOTER --- */}
+      <footer className="py-12 border-t border-gray-200 text-center text-gray-500 text-sm bg-white">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-md" />
+            <span className="font-bold text-gray-900">Orblin</span>
+          </div>
+          
+          <div className="flex gap-8">
+            <Link href="/privacy" className="hover:text-blue-600 transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-blue-600 transition-colors">Terms</Link>
+            <a href="mailto:support@orblin.cloud" className="hover:text-blue-600 transition-colors">Support</a>
+          </div>
+          
+          <p>© 2025 Orblin Inc.</p>
+        </div>
+      </footer>
     </main>
-  )
+  );
 }
