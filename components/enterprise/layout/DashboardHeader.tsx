@@ -57,7 +57,7 @@ export default function DashboardHeader({
             <Sparkles className="w-3 h-3 text-yellow-500" />
             <span>Daily Spark</span>
           </div>
-          <p className="text-gray-700 font-medium italic text-sm">"{quote}"</p>
+          <p className="text-gray-700 font-medium italic text-sm">&quot;{quote}&quot;</p>
         </div>
 
         {/* Center/Right: Search & Actions */}
