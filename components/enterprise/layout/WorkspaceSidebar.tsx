@@ -2,20 +2,28 @@
 
 import { useState, useEffect } from "react"
 import { 
-  LayoutDashboard, 
+  LayoutGrid, 
   Files, 
-  Users, 
-  Settings, 
-  Search,
   Star,
   Clock,
+  Settings,
   ChevronLeft,
   ChevronRight,
-  Plus
+  Plus,
+  Sparkles,
+  FolderKanban
 } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import { getUserBoardsWithDetails } from "@/lib/actions/board-actions"
 import Link from "next/link"
+
+// --- HAND DRAWN ASSETS ---
+const SidebarScribble = () => (
+  <svg className="absolute top-10 right-4 w-8 h-8 text-blue-400 transform rotate-12 opacity-60 pointer-events-none" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="3">
+    <path d="M10,50 Q40,10 80,50" strokeLinecap="round" />
+    <path d="M80,50 L70,35 M80,50 L65,55" strokeLinecap="round" />
+  </svg>
+);
 
 interface WorkspaceSidebarProps {
   collapsed: boolean
@@ -25,228 +33,167 @@ interface WorkspaceSidebarProps {
 interface Board {
   id: string
   title: string
-  created_at: string
   updated_at: string
 }
 
 export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSidebarProps) {
   const { user } = useUser()
-  const [activeWorkspace, setActiveWorkspace] = useState("personal")
   const [boards, setBoards] = useState<Board[]>([])
   const [recentBoards, setRecentBoards] = useState<Board[]>([])
-  const [loading, setLoading] = useState(true)
 
-  // Fetch user's boards for counts
+  // Fetch logic (Kept your original logic intact)
   useEffect(() => {
     const fetchUserBoards = async () => {
       if (user?.id) {
         try {
-          setLoading(true)
           const userBoards = await getUserBoardsWithDetails(user.id, {
             username: user.username || undefined,
             fullName: user.fullName || undefined,
             imageUrl: user.imageUrl,
             email: user.primaryEmailAddress?.emailAddress
           })
-          
           setBoards(userBoards || [])
-          
-          // Get recent boards (last 5)
           const recent = (userBoards || [])
-            .sort((a: Board, b: Board) => 
-              new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-            )
+            .sort((a: Board, b: Board) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
             .slice(0, 5)
           setRecentBoards(recent)
-          
         } catch (error) {
-          console.error("Failed to fetch user boards for sidebar:", error)
-          setBoards([])
-          setRecentBoards([])
-        } finally {
-          setLoading(false)
+          console.error("Failed to fetch boards:", error)
         }
       }
     }
-
     fetchUserBoards()
   }, [user])
 
-  const workspaces = [
-    { id: "personal", name: "Orblin", type: "personal" },
-    // We'll add teams dynamically when we implement teams
-  ]
-
   const mainNavItems = [
-    { 
-      icon: LayoutDashboard, 
-      label: "Dashboard", 
-      active: true,
-      href: "/dashboard"
-    },
-    { 
-      icon: Files, 
-      label: "All Boards", 
-      count: boards.length,
-      href: "/dashboard"
-    },
-    { 
-      icon: Star, 
-      label: "Favorites", 
-      count: 0, // We'll implement favorites later
-      href: "/dashboard?filter=favorites"
-    },
-    { 
-      icon: Clock, 
-      label: "Recent", 
-      count: recentBoards.length,
-      href: "/dashboard?filter=recent"
-    },
-    { 
-      icon: Users, 
-      label: "Shared with Me",
-      count: 0, // We'll implement sharing later
-      href: "/dashboard?filter=shared"
-    },
+    { icon: LayoutGrid, label: "Studio", href: "/dashboard", active: true },
+    { icon: Files, label: "All Boards", count: boards.length, href: "/dashboard" },
+    { icon: Star, label: "Favorites", count: 0, href: "/dashboard?filter=favorites" },
+    { icon: Clock, label: "Recent", count: recentBoards.length, href: "/dashboard?filter=recent" },
   ]
 
-  // For now, we'll show placeholder teams - we'll implement real teams later
-  const teamNavItems = [
-    { label: "No teams yet", count: 0 },
+  const collectionItems = [
+    { label: "Marketing Ideas", color: "bg-pink-500" },
+    { label: "Product Roadmap", color: "bg-blue-500" },
+    { label: "Random Thoughts", color: "bg-yellow-500" },
   ]
 
   return (
     <div className={`
-      flex flex-col bg-white border-r border-gray-200 transition-all duration-300
-      ${collapsed ? 'w-20' : 'w-80'}
+      relative h-full flex flex-col bg-white border-r border-gray-200 transition-all duration-300 z-30
+      ${collapsed ? 'w-20' : 'w-72'}
     `}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        {!collapsed && (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">O</span>
+      {/* Header / Profile Switcher */}
+      <div className="p-5 flex items-center justify-between">
+        {!collapsed ? (
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-9 h-9 bg-gradient-to-br from-gray-900 to-gray-700 rounded-xl flex items-center justify-center shadow-lg text-white font-bold">
+              {user?.firstName?.[0] || "O"}
             </div>
-            <div>
-              <h2 className="font-semibold text-gray-900">Orblin</h2>
-              <p className="text-xs text-gray-500">Personal Workspace</p>
+            <div className="flex flex-col">
+              <span className="font-bold text-gray-900 text-sm truncate max-w-[140px]">
+                {user?.fullName || "Creator"}
+              </span>
+              <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">
+                Personal Studio
+              </span>
             </div>
           </div>
+        ) : (
+          <div className="w-9 h-9 bg-gradient-to-br from-gray-900 to-gray-700 rounded-xl flex items-center justify-center text-white font-bold mx-auto">
+            {user?.firstName?.[0] || "O"}
+          </div>
         )}
-        <button
-          onClick={onToggle}
-          className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Workspace Switcher */}
-      {!collapsed && (
-        <div className="p-4 border-b border-gray-200">
-          <select 
-            value={activeWorkspace}
-            onChange={(e) => setActiveWorkspace(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            {workspaces.map(workspace => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Search */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <input
-            type="text"
-            placeholder={collapsed ? "Search..." : "Search boards, teams..."}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 px-3 space-y-1 mt-2">
         {mainNavItems.map((item) => (
           <Link
             key={item.label}
             href={item.href}
             className={`
-              flex items-center w-full p-3 rounded-lg text-sm font-medium transition-colors
+              group flex items-center w-full p-2.5 rounded-xl text-sm font-medium transition-all duration-200
               ${item.active 
-                ? 'bg-blue-50 text-blue-700' 
-                : 'text-gray-700 hover:bg-gray-100'
+                ? 'bg-gray-100 text-gray-900 shadow-sm' 
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
               }
               ${collapsed ? 'justify-center' : 'justify-between'}
             `}
           >
             <div className="flex items-center gap-3">
-              <item.icon className="w-5 h-5" />
+              <item.icon className={`w-5 h-5 ${item.active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
               {!collapsed && <span>{item.label}</span>}
             </div>
-            {!collapsed && item.count !== undefined && (
-              <span className={`
-                px-2 py-1 rounded text-xs font-medium
-                ${item.count > 0 
-                  ? 'bg-blue-100 text-blue-700' 
-                  : 'bg-gray-100 text-gray-500'
-                }
-              `}>
+            {!collapsed && item.count !== undefined && item.count > 0 && (
+              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md text-[10px] font-bold">
                 {item.count}
               </span>
             )}
           </Link>
         ))}
+
+        {/* Collections (Simulated Folders) */}
+        {!collapsed && (
+          <div className="pt-8 pb-2">
+            <div className="px-3 mb-2 flex items-center justify-between group">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Collections</h3>
+              <Plus className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 cursor-pointer hover:text-blue-600" />
+            </div>
+            <div className="space-y-0.5">
+              {collectionItems.map((item, i) => (
+                <button key={i} className="flex items-center gap-3 w-full p-2.5 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                  <div className={`w-2 h-2 rounded-full ${item.color}`} />
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </nav>
 
-      {/* Teams Section */}
-      {!collapsed && (
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Teams
-            </h3>
-            <button 
-              className="p-1 hover:bg-gray-100 rounded"
-              title="Create team (coming soon)"
-            >
-              <Plus className="w-4 h-4 text-gray-500" />
-            </button>
-          </div>
-          <div className="space-y-1">
-            {teamNavItems.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between w-full p-2 rounded-lg text-sm text-gray-500"
-              >
-                <span className="italic">{item.label}</span>
-                <span className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-xs">
-                  {item.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200">
-        <Link 
-          href="/settings"
-          className={`
-            flex items-center w-full p-3 rounded-lg text-sm text-gray-700 hover:bg-gray-100 transition-colors
-            ${collapsed ? 'justify-center' : 'justify-start gap-3'}
-          `}
-        >
-          <Settings className="w-5 h-5" />
-          {!collapsed && <span>Settings</span>}
+      {/* New Board Button */}
+      <div className="p-4 relative">
+        {!collapsed && boards.length === 0 && <SidebarScribble />} {/* Sticker pointing to button */}
+        
+        <Link href="/boards/new">
+          <button className={`
+            flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg hover:shadow-blue-500/25
+            ${collapsed ? 'p-3 aspect-square' : 'py-3 px-4'}
+          `}>
+            <Plus className="w-5 h-5" />
+            {!collapsed && <span className="font-semibold">New Board</span>}
+          </button>
         </Link>
       </div>
+
+      {/* Footer / Toggle */}
+      <div className="p-3 border-t border-gray-100 flex items-center justify-between">
+        <Link href="/settings">
+          <button className={`p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors ${collapsed && 'mx-auto'}`}>
+            <Settings className="w-5 h-5" />
+          </button>
+        </Link>
+        
+        {!collapsed && (
+          <button
+            onClick={onToggle}
+            className="p-2 text-gray-300 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+      
+      {/* Collapsed Toggle (Centered) */}
+      {collapsed && (
+        <button
+          onClick={onToggle}
+          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 p-2 text-gray-300 hover:text-gray-600"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      )}
     </div>
   )
 }

@@ -3,593 +3,183 @@
 import { useState, useEffect } from "react"
 import DashboardViewToggle from "./DashboardViewToggle"
 import AdvancedFilters from "./AdvancedFilters"
-import EnterpriseBoardCard from "../cards/EnterpriseBoardCard"
 import { useUser } from "@clerk/nextjs"
-import { 
-  Plus, 
-  Grid3X3, 
-  Users,
-  Zap,
-  Activity,
-  Crown,
-  CheckCircle
-} from "lucide-react"
-import { 
-  getUserBoardsWithDetails, 
-  getBoardStats,
-  searchBoards,
-  getUserBoardsWithFavorites 
-} from "@/lib/actions/board-actions"
+import { Plus, ArrowRight, Calendar, Star, MoreHorizontal, Layout, Lock, Globe } from "lucide-react"
+import { getUserBoardsWithDetails, getUserBoardsWithFavorites, searchBoards } from "@/lib/actions/board-actions"
 import Link from "next/link"
 
-type ViewType = "grid" | "list" | "kanban"
+// --- BENTO BOARD CARD COMPONENT (Inline for simplicity) ---
+const BentoBoardCard = ({ board, onClick, onFavorite }: any) => (
+  <div 
+    onClick={onClick}
+    className="group relative bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-xl hover:border-blue-200 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col h-[220px]"
+  >
+    <div className="flex justify-between items-start mb-4">
+      <div className={`
+        w-10 h-10 rounded-xl flex items-center justify-center transition-colors
+        ${board.category === 'Marketing' ? 'bg-purple-50 text-purple-600' : 
+          board.category === 'Product' ? 'bg-blue-50 text-blue-600' : 
+          'bg-gray-50 text-gray-600'}
+      `}>
+        <Layout className="w-5 h-5" />
+      </div>
+      <button 
+        onClick={(e) => { e.stopPropagation(); onFavorite(board.id, !board.isFavorite); }}
+        className={`p-1.5 rounded-lg transition-colors ${board.isFavorite ? 'text-yellow-400 bg-yellow-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50'}`}
+      >
+        <Star className="w-4 h-4 fill-current" />
+      </button>
+    </div>
 
-interface BoardData {
-  id: string;
-  title?: string;
-  description?: string;
-  category?: string;
-  is_public?: boolean;
-  updated_at?: string;
-  created_at: string;
-  is_favorited?: boolean;
-}
+    <h3 className="font-bold text-gray-900 text-lg mb-1 line-clamp-1 group-hover:text-blue-600 transition-colors">
+      {board.title}
+    </h3>
+    <p className="text-sm text-gray-500 line-clamp-2 mb-auto leading-relaxed">
+      {board.description}
+    </p>
 
-interface StatsData {
-  totalBoards: number;
-  teamMembers: number;
-  activeProjects: number;
-  publicBoards: number;
-}
+    <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between text-xs font-medium text-gray-400">
+      <div className="flex items-center gap-2">
+        {board.isPublic ? (
+          <div className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+            <Globe className="w-3 h-3" /> Public
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full">
+            <Lock className="w-3 h-3" /> Private
+          </div>
+        )}
+      </div>
+      <span className="flex items-center gap-1">
+        <Calendar className="w-3 h-3" />
+        {new Date(board.lastModified).toLocaleDateString()}
+      </span>
+    </div>
+  </div>
+)
 
-interface Board {
-  id: string
-  title: string
-  description?: string
-  category: string
-  isPublic: boolean
-  lastModified: string
-  members: number
-  isFavorite: boolean
-  created_at: string
-}
-
-interface UserSubscription {
-  plan_type: string;
-  payment_status: string;
-  upgraded_at: string | null;
-}
-
-interface MainDashboardProps {
-  searchQuery?: string
-  onSearchChange?: (query: string) => void
-  onUpgradeLifetime?: () => void
-  onUpgradeYearly?: () => void
-}
-
-// Function to check user subscription status
-const checkUserSubscription = async (clerkUserId: string): Promise<UserSubscription | null> => {
-  try {
-    const response = await fetch(`/api/user/subscription?clerk_user_id=${clerkUserId}`);
-    if (response.ok) {
-      return await response.json();
-    }
-    return null;
-  } catch (error) {
-    console.error("Error checking user subscription:", error);
-    return null;
-  }
-};
-
-export default function MainDashboard({ 
-  searchQuery = "", 
-  onSearchChange = () => {},
-  onUpgradeLifetime = () => {},
-  onUpgradeYearly = () => {}
-}: MainDashboardProps) {
+export default function MainDashboard({ searchQuery = "", onSearchChange = () => {} }: any) {
   const { user, isLoaded } = useUser()
-  const [currentView, setCurrentView] = useState<ViewType>("grid")
-  const [boards, setBoards] = useState<Board[]>([])
-  const [filteredBoards, setFilteredBoards] = useState<Board[]>([])
+  const [view, setView] = useState<"grid" | "list">("grid")
+  const [boards, setBoards] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null)
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true)
-  const [stats, setStats] = useState({
-    totalBoards: 0,
-    teamMembers: 0,
-    activeProjects: 0,
-    publicBoards: 0
-  })
 
-  // Fetch user subscription status
+  // Fetch Data (Simplified logic for clarity)
   useEffect(() => {
-    const fetchSubscription = async () => {
-      if (isLoaded && user?.id) {
-        try {
-          const subscription = await checkUserSubscription(user.id);
-          setUserSubscription(subscription);
-        } catch (error) {
-          console.error("Failed to fetch subscription:", error);
-        } finally {
-          setSubscriptionLoading(false);
-        }
-      }
-    };
-
-    fetchSubscription();
-  }, [isLoaded, user]);
-
-  // Fetch real data
-  useEffect(() => {
-    const fetchData = async () => {
-      if (isLoaded && user?.id) {
-        setLoading(true)
-        try {
-          // Fetch boards and stats in parallel
-          const [boardsData, statsData] = await Promise.all([
-            getUserBoardsWithDetails(user.id, {
-              username: user.username || undefined,
-              fullName: user.fullName || undefined,
-              imageUrl: user.imageUrl,
-              email: user.primaryEmailAddress?.emailAddress
-            }),
-            getBoardStats(user.id)
-          ])
-
-          // Transform boards data to match our component
-          const transformedBoards: Board[] = (boardsData || []).map((board: BoardData) => ({
-            id: board.id,
-            title: board.title || "Untitled Board",
-            description: board.description || "Add a description to your board...",
-            category: board.category || "General",
-            isPublic: board.is_public || false,
-            lastModified: board.updated_at || board.created_at,
-            members: 0, // We'll implement teams later
-            isFavorite: false, // We'll implement favorites later
-            created_at: board.created_at
-          }))
-
-          setBoards(transformedBoards)
-          setFilteredBoards(transformedBoards)
-          setStats({
-            totalBoards: statsData.totalBoards,
-            teamMembers: statsData.teamMembers,
-            activeProjects: statsData.activeProjects,
-            publicBoards: statsData.publicBoards
-          })
-
-        } catch (error) {
-          console.error("Failed to fetch dashboard data:", error)
-          // Set empty state on error
-          setBoards([])
-          setFilteredBoards([])
-        } finally {
-          setLoading(false)
-        }
-      }
+    if (isLoaded && user?.id) {
+      setLoading(true)
+      getUserBoardsWithDetails(user.id, {
+        username: user.username || undefined,
+        fullName: user.fullName || undefined,
+        imageUrl: user.imageUrl,
+        email: user.primaryEmailAddress?.emailAddress
+      }).then((data) => {
+        const mapped = (data || []).map((b: any) => ({
+          id: b.id,
+          title: b.title || "Untitled Board",
+          description: b.description || "No description provided.",
+          category: b.category || "General",
+          isPublic: b.is_public || false,
+          lastModified: b.updated_at || b.created_at,
+          isFavorite: b.is_favorited || false,
+        }))
+        setBoards(mapped)
+        setLoading(false)
+      })
     }
-
-    fetchData()
   }, [isLoaded, user])
 
-  // Handle search from parent component
-  useEffect(() => {
-    const handleSearch = async () => {
-      if (!user?.id) return
+  const recentBoard = boards[0]; // The most recently updated board
 
-      if (!searchQuery.trim()) {
-        // If search is empty, show all boards
-        const boardsData = await getUserBoardsWithFavorites(user.id, {
-          username: user.username || undefined,
-          fullName: user.fullName || undefined,
-          imageUrl: user.imageUrl,
-          email: user.primaryEmailAddress?.emailAddress
-        })
-
-        
-        const transformedBoards: Board[] = (boardsData || []).map((board: BoardData) => ({
-          id: board.id,
-          title: board.title || "Untitled Board",
-          description: board.description || "Add a description to your board...",
-          category: board.category || "General",
-          isPublic: board.is_public || false,
-          lastModified: board.updated_at || board.created_at,
-          members: 0,
-          isFavorite: board.is_favorited || false, // Use the real favorite status
-          created_at: board.created_at
-        }))
-        
-        setFilteredBoards(transformedBoards)
-        return
-      }
-
-      // Perform actual search
-      try {
-        const searchResults = await searchBoards(user.id, searchQuery)
-
-        const transformedBoards: Board[] = (searchResults || []).map((board: BoardData) => ({
-          id: board.id,
-          title: board.title || "Untitled Board",
-          description: board.description || "Add a description to your board...",
-          category: board.category || "General",
-          isPublic: board.is_public || false,
-          lastModified: board.updated_at || board.created_at,
-          members: 0,
-          isFavorite: false,
-          created_at: board.created_at
-        }))
-        
-        setFilteredBoards(transformedBoards)
-      } catch (error) {
-        console.error("Search failed:", error)
-      }
-    }
-
-    handleSearch()
-  }, [searchQuery, user])
-
-  const handleFiltersChange = (filters: {
-        status: string[];
-        type: string[];
-        dateRange: string;
-        owner: string;
-        tags: string[];
-      }) => {
-    // For now, we'll implement basic filtering client-side
-    // We can enhance this with server-side filtering later
-    let filtered = boards
-
-    // Status filtering
-    if (filters.status.length > 0) {
-      // We'll implement archived/draft status later
-    }
-
-    // Type filtering
-    if (filters.type.length > 0) {
-      if (filters.type.includes("Public")) {
-        filtered = filtered.filter(board => board.isPublic)
-      }
-      if (filters.type.includes("Private")) {
-        filtered = filtered.filter(board => !board.isPublic)
-      }
-    }
-
-    setFilteredBoards(filtered)
-  }
-
-  const handleFavorite = (boardId: string, newFavoriteState: boolean) => {
-    // Update local state immediately for better UX
-    setBoards(prev => prev.map(board => 
-      board.id === boardId 
-        ? { ...board, isFavorite: newFavoriteState }
-        : board
-    ))
-    setFilteredBoards(prev => prev.map(board => 
-      board.id === boardId 
-        ? { ...board, isFavorite: newFavoriteState }
-        : board
-    ))
-  }
-
-  // Check if user has paid (premium or lifetime)
-  const hasPaid = userSubscription && 
-    (userSubscription.payment_status === 'paid' || 
-     userSubscription.plan_type === 'premium' || 
-     userSubscription.plan_type === 'lifetime');
-
-  if (!isLoaded || loading) {
-    return <DashboardSkeleton />
-  }
+  if (loading) return <div className="p-10 text-center text-gray-400 animate-pulse">Loading your studio...</div>
 
   return (
-    <div className="space-y-6">
-      {/* REMOVED DASHBOARD HEADER - IT'S NOW IN THE LAYOUT */}
+    <div className="space-y-10">
       
-      {/* Quick Stats - REAL DATA */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          icon={<Grid3X3 className="w-5 h-5" />}
-          label="Total Boards"
-          value={stats.totalBoards.toString()}
-          change={`${stats.publicBoards} public`}
-          trend="up"
-        />
-        <StatCard
-          icon={<Users className="w-5 h-5" />}
-          label="Team Members"
-          value={stats.teamMembers.toString()}
-          change={stats.teamMembers === 0 ? "Create a team" : "+2 recently"}
-          trend={stats.teamMembers === 0 ? "neutral" : "up"}
-        />
-        <StatCard
-          icon={<Zap className="w-5 h-5" />}
-          label="Active Projects"
-          value={stats.activeProjects.toString()}
-          change="All boards"
-          trend="neutral"
-        />
-        <StatCard
-          icon={<Activity className="w-5 h-5" />}
-          label="Public Boards"
-          value={stats.publicBoards.toString()}
-          change={`${Math.round((stats.publicBoards / stats.totalBoards) * 100)}% of total`}
-          trend="up"
-        />
-      </div>
+      {/* 1. HERO SECTION: "Jump Back In" */}
+      {recentBoard && !searchQuery && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-px bg-gray-200 flex-1" />
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest px-2">Jump Back In</span>
+            <div className="h-px bg-gray-200 flex-1" />
+          </div>
 
-      {/* Upgrade Banner - Only show if user hasn't paid */}
-      {!hasPaid && !subscriptionLoading && (
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Crown className="w-5 h-5 text-yellow-300" />
-                <h3 className="font-bold text-lg">Unlock Full Access</h3>
-              </div>
-              <p className="text-blue-100 max-w-2xl">
-                Get lifetime access to all Orblin features. Never pay again for unlimited boards, AI features, and premium collaboration tools.
+          <div 
+            onClick={() => window.location.href = `/boards/${recentBoard.id}`}
+            className="group relative w-full h-[280px] bg-white rounded-3xl border border-gray-200 shadow-sm hover:shadow-2xl hover:border-blue-200 transition-all duration-500 cursor-pointer overflow-hidden flex"
+          >
+            {/* Left: Content Info */}
+            <div className="w-1/3 p-8 flex flex-col justify-center relative z-10 bg-white/90 backdrop-blur-sm">
+              <span className="inline-block px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold w-fit mb-4">
+                Last Edited
+              </span>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                {recentBoard.title}
+              </h2>
+              <p className="text-gray-500 line-clamp-2 mb-8">
+                {recentBoard.description}
               </p>
+              <div className="flex items-center gap-2 text-sm font-bold text-blue-600">
+                Continue Working <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button 
-                onClick={onUpgradeLifetime}
-                className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-gray-100 font-semibold transition-colors flex items-center gap-2 justify-center"
-              >
-                <Zap className="w-4 h-4" />
-                Lifetime - $99
-              </button>
-              <button 
-                onClick={onUpgradeYearly}
-                className="px-4 py-2 bg-blue-500/20 text-white border border-blue-400 rounded-lg hover:bg-blue-500/30 font-medium transition-colors"
-              >
-                Yearly - $60
-              </button>
+
+            {/* Right: Visual Preview (Simulated Pattern) */}
+            <div className="w-2/3 h-full bg-[#F9FAFB] relative overflow-hidden">
+              <div className="absolute inset-0 opacity-[0.4]" style={{ backgroundImage: 'radial-gradient(#CBD5E1 2px, transparent 2px)', backgroundSize: '32px 32px' }}></div>
+              {/* Decorative shapes to mimic a board */}
+              <div className="absolute top-10 right-20 w-40 h-40 bg-white border border-gray-200 rounded-xl shadow-lg transform rotate-3 group-hover:rotate-6 transition-transform duration-700" />
+              <div className="absolute top-32 right-40 w-48 h-32 bg-yellow-50 border border-yellow-100 rounded-xl shadow-md transform -rotate-2 group-hover:-rotate-3 transition-transform duration-700" />
             </div>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Premium User Banner - Show if user has paid */}
-      {hasPaid && !subscriptionLoading && (
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl p-6 text-white">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-yellow-300" />
-                <h3 className="font-bold text-lg">
-                  {userSubscription?.plan_type === 'lifetime' ? 'Lifetime Access' : 'Premium Member'}
-                </h3>
-              </div>
-              <p className="text-green-100 max-w-2xl">
-                {userSubscription?.plan_type === 'lifetime' 
-                  ? 'You have lifetime access to all Orblin features! Thank you for your support.' 
-                  : 'You are enjoying all premium features. Thank you for upgrading!'}
-              </p>
-              {userSubscription?.upgraded_at && (
-                <p className="text-green-200 text-sm">
-                  Member since {new Date(userSubscription.upgraded_at).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" />
-              <span className="font-semibold">Active</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Header Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Workspace Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            {stats.totalBoards === 0 
-              ? "Create your first board to get started" 
-              : `Managing ${stats.totalBoards} boards, ${stats.publicBoards} public`
-            }
-            {hasPaid && " • Premium Member"}
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <DashboardViewToggle 
-            view={currentView} 
-            onViewChange={setCurrentView} 
-          />
-          
-          <Link href="/boards/new">
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-              <Plus className="w-4 h-4" />
-              New Board
-            </button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Advanced Filters */}
-      <AdvancedFilters onFiltersChange={handleFiltersChange} />
-
-      {/* Content Area */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        
-        {/* Content Header */}
+      {/* 2. MAIN GRID */}
+      <section>
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              {searchQuery ? `Search results for "${searchQuery}"` : "All Boards"}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              {filteredBoards.length} of {boards.length} boards
-              {searchQuery && ` matching "${searchQuery}"`}
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>Sort by: Last modified</span>
+          <h2 className="text-xl font-bold text-gray-900">All Boards</h2>
+          <div className="flex items-center gap-3">
+            <DashboardViewToggle view={view} onViewChange={(v) => setView(v as any)} />
+            <Link href="/boards/new">
+              <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-black transition-colors shadow-lg hover:shadow-xl">
+                <Plus className="w-4 h-4" /> New Board
+              </button>
+            </Link>
           </div>
         </div>
 
-        {/* Boards Grid - REAL DATA */}
-        {currentView === "grid" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-            {filteredBoards.map((board) => (
-              <EnterpriseBoardCard
-                key={board.id}
-                id={board.id}
-                title={board.title}
-                description={board.description}
-                category={board.category}
-                members={board.members}
-                isPublic={board.isPublic}
-                lastModified={board.lastModified}
-                isFavorite={board.isFavorite}
-                onFavorite={handleFavorite}
+        {/* Filters (Simplified for visual clarity) */}
+        <div className="mb-8">
+          <AdvancedFilters onFiltersChange={() => {}} />
+        </div>
+
+        {boards.length === 0 ? (
+          <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50">
+            <h3 className="text-lg font-bold text-gray-900">Your studio is empty</h3>
+            <p className="text-gray-500 mb-6">Start your first brainstorming session now.</p>
+            <Link href="/boards/new">
+              <button className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:shadow-blue-500/30 transition-all">
+                Create First Board
+              </button>
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+            {boards.map(board => (
+              <BentoBoardCard 
+                key={board.id} 
+                board={board} 
                 onClick={() => window.location.href = `/boards/${board.id}`}
+                onFavorite={(id: string, val: boolean) => {
+                  setBoards(prev => prev.map(b => b.id === id ? { ...b, isFavorite: val } : b))
+                }}
               />
             ))}
           </div>
         )}
-
-        {currentView === "list" && (
-          <div className="space-y-3">
-            {filteredBoards.map((board) => (
-              <div 
-                key={board.id}
-                onClick={() => window.location.href = `/boards/${board.id}`}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-3 h-3 rounded-full ${
-                    board.category === 'Design' ? 'bg-pink-500' :
-                    board.category === 'Development' ? 'bg-blue-500' :
-                    board.category === 'Marketing' ? 'bg-green-500' :
-                    'bg-gray-500'
-                  }`} />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 group-hover:text-blue-600">
-                      {board.title}
-                    </h3>
-                    <p className="text-sm text-gray-600">{board.description}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <span>{board.isPublic ? "Public" : "Private"}</span>
-                  <span>{new Date(board.lastModified).toLocaleDateString()}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Empty States */}
-        {filteredBoards.length === 0 && !loading && (
-          <div className="text-center py-12">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Grid3X3 className="w-12 h-12 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {searchQuery ? "No boards found" : "No boards yet"}
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-sm mx-auto">
-              {searchQuery 
-                ? "Try adjusting your search terms or create a new board"
-                : "Create your first board to start organizing your ideas and collaborating with others."
-              }
-            </p>
-            <Link href="/boards/new">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                Create Your First Board
-              </button>
-            </Link>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Stat Card Component (same as before)
-function StatCard({ icon, label, value, change, trend }: { 
-  icon: React.ReactNode
-  label: string
-  value: string
-  change: string
-  trend: "up" | "down" | "neutral"
-}) {
-  const trendColors = {
-    up: "text-green-600 bg-green-50",
-    down: "text-red-600 bg-red-50", 
-    neutral: "text-gray-600 bg-gray-50"
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-sm transition-shadow">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600 mb-1">{label}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-        </div>
-        <div className={`p-3 rounded-lg ${trendColors[trend]}`}>
-          {icon}
-        </div>
-      </div>
-      <p className={`text-xs font-medium mt-3 ${trendColors[trend]} inline-block px-2 py-1 rounded-full`}>
-        {change}
-      </p>
-    </div>
-  )
-}
-
-// Skeleton Loader (same as before)
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-6">
-      {/* Stats Skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-20"></div>
-                <div className="h-6 bg-gray-200 rounded w-12"></div>
-              </div>
-              <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
-            </div>
-            <div className="h-6 bg-gray-200 rounded w-16 mt-3"></div>
-          </div>
-        ))}
-      </div>
-
-      {/* Content Skeleton */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
-        <div className="flex items-center justify-between mb-6">
-          <div className="space-y-2">
-            <div className="h-6 bg-gray-200 rounded w-48"></div>
-            <div className="h-4 bg-gray-200 rounded w-32"></div>
-          </div>
-          <div className="h-10 bg-gray-200 rounded w-32"></div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="border border-gray-200 rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="h-4 bg-gray-200 rounded w-16"></div>
-                <div className="h-6 bg-gray-200 rounded w-6"></div>
-              </div>
-              <div className="space-y-2">
-                <div className="h-5 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded"></div>
-              </div>
-              <div className="flex items-center justify-between pt-3">
-                <div className="h-4 bg-gray-200 rounded w-20"></div>
-                <div className="h-4 bg-gray-200 rounded w-16"></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      </section>
     </div>
   )
 }

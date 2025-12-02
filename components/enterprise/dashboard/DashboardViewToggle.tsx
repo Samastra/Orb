@@ -1,37 +1,27 @@
 "use client"
 
-import { LayoutGrid, List, Kanban } from "lucide-react"
+import { LayoutGrid, List } from "lucide-react"
 
 interface DashboardViewToggleProps {
-  view: "grid" | "list" | "kanban"
-  onViewChange: (view: "grid" | "list" | "kanban") => void
+  view: "grid" | "list"
+  onViewChange: (view: "grid" | "list") => void
 }
 
 export default function DashboardViewToggle({ view, onViewChange }: DashboardViewToggleProps) {
-  const views = [
-    { id: "grid" as const, label: "Grid", icon: LayoutGrid },
-    { id: "list" as const, label: "List", icon: List },
-    { id: "kanban" as const, label: "Kanban", icon: Kanban }
-  ]
-
   return (
-    <div className="flex items-center bg-gray-100 rounded-lg p-1">
-      {views.map((viewOption) => (
-        <button
-          key={viewOption.id}
-          onClick={() => onViewChange(viewOption.id)}
-          className={`
-            flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all
-            ${view === viewOption.id
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-600 hover:text-gray-900"
-            }
-          `}
-        >
-          <viewOption.icon className="w-4 h-4" />
-          <span>{viewOption.label}</span>
-        </button>
-      ))}
+    <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
+      <button
+        onClick={() => onViewChange("grid")}
+        className={`p-2 rounded-lg transition-all ${view === "grid" ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+      >
+        <LayoutGrid className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => onViewChange("list")}
+        className={`p-2 rounded-lg transition-all ${view === "list" ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}
+      >
+        <List className="w-4 h-4" />
+      </button>
     </div>
   )
 }
