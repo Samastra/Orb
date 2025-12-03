@@ -21,4 +21,6 @@ export interface KonvaShape {
   sides?: number;
   pointerLength?: number;
   pointerWidth?: number;
+  name?: string;
+  isLocked?: boolean;
 }

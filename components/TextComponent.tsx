@@ -1,4 +1,3 @@
-// components/TextComponent.tsx
 "use client";
 import React, { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Text as KonvaText } from "react-konva";
@@ -70,8 +69,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
   ) => {
     const internalRef = useRef<Konva.Text>(null);
 
-    // FIX: Removed '!' assertion. We cast to Konva.Text to satisfy TS, 
-    // but at runtime if it's null, it just passes null to the parent ref callback (which handles it safely).
+    // FIX: Removed [] dependency array. This ensures the ref updates correctly when the node is ready.
     useImperativeHandle(ref, () => internalRef.current as Konva.Text);
 
     const onUpdateRef = useRef(onUpdate);
@@ -93,15 +91,11 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       return `${stylePart} ${weightPart}`.trim() || "normal";
     })();
 
-    // 1. TRANSFORM LOGIC
     const handleTransform = useCallback(() => {
       const node = internalRef.current;
       const tr = node?.getStage()?.findOne('Transformer') as Konva.Transformer;
-      
       if (!node || !tr) return;
-
       const anchor = tr.getActiveAnchor();
-
       if (anchor && ['middle-left', 'middle-right'].includes(anchor)) {
          const scaleX = node.scaleX();
          const newWidth = Math.max(50, node.width() * scaleX);
@@ -111,7 +105,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       }
     }, []);
 
-    // 2. TRANSFORM END LOGIC
     const handleTransformEndInternal = useCallback((e: Konva.KonvaEventObject<Event>) => {
       const node = internalRef.current;
       if (!node) return;
@@ -144,7 +137,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       if (onTransformEnd) onTransformEnd(e);
     }, [onTransformEnd]);
 
-    // --- EDITING LOGIC ---
     useEffect(() => {
       if (!isEditing || !internalRef.current) return;
 
@@ -201,16 +193,11 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       const handleResize = () => {
         textarea.style.height = "auto";
         textarea.style.height = `${textarea.scrollHeight}px`;
-
         const absScale = node.getAbsoluteScale();
         const newHeight = textarea.scrollHeight / absScale.y;
-        
         node.height(newHeight);
-        
         const tr = stage.findOne('Transformer') as Konva.Transformer;
-        if (tr) {
-            tr.forceUpdate();
-        }
+        if (tr) tr.forceUpdate();
         node.getLayer()?.batchDraw();
       };
 
@@ -223,18 +210,13 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
 
       const handleFinish = () => {
           const val = textarea.value;
-          
           const absScale = node.getAbsoluteScale();
           textarea.style.height = "auto";
           textarea.style.height = `${textarea.scrollHeight}px`;
-          
           const buffer = 10; 
           const finalHeight = (textarea.scrollHeight + buffer) / absScale.y;
 
-          onUpdateRef.current({ 
-             text: val,
-             height: finalHeight 
-          });
+          onUpdateRef.current({ text: val, height: finalHeight });
 
           if (val.trim() === "") {
             onDeleteRef.current(id);
@@ -245,37 +227,16 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
 
       const handleKeydown = (e: KeyboardEvent) => {
         e.stopPropagation(); 
-        if (e.key === "Escape") {
-            handleFinish();
-        }
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault(); 
-            handleFinish();
-        }
-      };
-
-      const handleBlur = () => {
-        handleFinish();
+        if (e.key === "Escape") handleFinish();
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleFinish(); }
       };
 
       textarea.addEventListener("keydown", handleKeydown);
       textarea.addEventListener("input", handleResize);
-      textarea.addEventListener("blur", handleBlur);
+      textarea.addEventListener("blur", handleFinish);
 
-      return () => {
-        removeTextarea();
-      };
-
-    }, [
-      isEditing, 
-      id, 
-      fontSize, 
-      fontFamily, 
-      fontWeight, 
-      fontStyle, 
-      align, 
-      fill
-    ]); 
+      return () => { removeTextarea(); };
+    }, [isEditing, id, fontSize, fontFamily, fontWeight, fontStyle, align, fill]); 
 
     return (
         <KonvaText
@@ -304,22 +265,18 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           onDragEnd={onDragEnd}
           onTransform={handleTransform}
           onTransformEnd={handleTransformEndInternal}
-          onClick={(e) => {
-            if (activeTool === "select") onSelect();
+          onClick={(e) => { 
+            if (activeTool === "select" || activeTool === null) onSelect(); 
           }}
-          onTap={(e) => {
-             if (activeTool === "select") onSelect();
+          onTap={(e) => { 
+            if (activeTool === "select" || activeTool === null) onSelect(); 
           }}
-          onDblClick={(e) => {
-             if (!isEditing) onStartEditing();
-          }}
-          onDblTap={(e) => {
-             if (!isEditing) onStartEditing();
-          }}
+          onDblClick={(e) => { if (!isEditing) onStartEditing(); }}
+          onDblTap={(e) => { if (!isEditing) onStartEditing(); }}
           perfectDrawEnabled={false} 
           shadowForStrokeEnabled={false}
           hitStrokeWidth={0} 
-          // FIX: Added safety check for width/height to prevent NaN crashes
+          // FIX: Updated hitFunc to use fillStrokeShape() for custom paths
           hitFunc={(context, shape) => {
             const w = shape.width() || 0;
             const h = shape.height() || 0;

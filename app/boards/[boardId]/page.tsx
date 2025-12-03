@@ -107,6 +107,11 @@ const BoardPage = () => {
     [...konvaShapes, ...reactShapes, ...images, ...stageFrames, ...connections], 
   [konvaShapes, reactShapes, images, stageFrames, connections]);
 
+  // NEW: Filtered list for tools that expect shapes with dimensions (excludes connections)
+  const shapesForTools = useMemo(() => 
+    [...konvaShapes, ...reactShapes, ...images, ...stageFrames], 
+  [konvaShapes, reactShapes, images, stageFrames]);
+
    const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
     stageRef,
     boardState.actions,
@@ -149,7 +154,7 @@ const BoardPage = () => {
     setConnections,
     updateConnection,
     boardState.addShape,
-    allShapes 
+    shapesForTools // FIX: Passing only shapes, not connections
   );
 
 
@@ -226,7 +231,8 @@ const updateAnyShape = useCallback((
     'from', 'to', 'cp1x', 'cp1y', 'cp2x', 'cp2y',
     'cornerRadius',               
     'backgroundColor', 'textColor', 
-    'textDecoration'
+    'textDecoration',
+    'name', 'isLocked'
   ];
 
   const safeUpdates: Record<string, unknown> = {};
