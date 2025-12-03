@@ -6,7 +6,7 @@ import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useParams } from "next/navigation";
-import { ReactShape, Tool, ImageShape } from "@/types/board-types";
+import { ReactShape, Tool, ImageShape, Action } from "@/types/board-types";
 import { defaultStageDimensions } from "@/constants/tool-constants";
 import { Connection } from "@/hooks/useBoardState";
 // Components
@@ -104,8 +104,8 @@ const BoardPage = () => {
   } = boardState;
 
   const allShapes = useMemo(() => 
-    [...konvaShapes, ...reactShapes, ...images, ...stageFrames], 
-  [konvaShapes, reactShapes, images, stageFrames]);
+    [...konvaShapes, ...reactShapes, ...images, ...stageFrames, ...connections], 
+  [konvaShapes, reactShapes, images, stageFrames, connections]);
 
    const { addAction: undoRedoAddAction, undo, redo } = useUndoRedo(
     stageRef,
@@ -349,13 +349,20 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
     };
     
     setReactShapes(prev => [...prev, newTextShape]);
+    
+    // NEW: Add creation to Undo History
+    undoRedoAddAction({
+      type: 'add-react-shape',
+      data: newTextShape,
+      id: shapeId
+    });
+
     setSelectedNodeIds([shapeId]); 
     setEditingId(shapeId); 
-    
     setActiveTool("select"); 
     
     console.log('✅ Text created, swapped to Select Tool');
-  }, [setReactShapes, setSelectedNodeIds, setActiveTool]);
+  }, [setReactShapes, setSelectedNodeIds, setActiveTool, undoRedoAddAction]);
 
   useEffect(() => {
     const loadBoardData = async () => {
@@ -562,13 +569,41 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     setTimeout(handleInteractionEnd, 100); 
   }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd, boardState]);
 
+  // --- FIX: Formatting Toolbar Undo Support ---
   const handleFormattingToolbarUpdate = useCallback((updates: FormattingUpdates) => {
-  if (!selectedNodeIds || selectedNodeIds.length === 0) return;
+    if (!selectedNodeIds || selectedNodeIds.length === 0) return;
 
-      selectedNodeIds.forEach(id => {
-        updateAnyShape(id, updates);
-      });
-    }, [selectedNodeIds, updateAnyShape]);
+    // Create Undo Action BEFORE updating
+    const actions: Action[] = [];
+
+    selectedNodeIds.forEach(id => {
+       const shape = allShapes.find(s => s.id === id);
+       if (shape) {
+           let type = '';
+           if(shape.type === 'text' || shape.type === 'stickyNote') type = 'update-react-shape';
+           else if(shape.type === 'image') type = 'update-image';
+           else if(shape.type === 'stage') type = 'update-stage-frame';
+           else if(shape.type === 'connection') type = 'update-connection';
+           else type = 'update-konva-shape';
+
+           actions.push({
+               type,
+               id,
+               prevData: shape,
+               newData: { ...shape, ...updates }
+           });
+
+           updateAnyShape(id, updates);
+       }
+    });
+
+    // Dispatch as batch if multiple, or single
+    if (actions.length > 0) {
+        if (actions.length === 1) undoRedoAddAction(actions[0]);
+        else undoRedoAddAction({ type: 'batch', actions });
+    }
+
+  }, [selectedNodeIds, updateAnyShape, allShapes, undoRedoAddAction]);
 
   const handleAddShape = useCallback((type: Tool) => {
     if (!stageRef.current) return;
@@ -648,25 +683,15 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     }
   }, [currentBoardId]);
 
+  // --- FIX: Delete Shape Undo Support ---
   const handleDeleteShape = useCallback((id: string) => {
-    console.log('🗑️ Keyboard delete triggered for:', id, {
-      reactShapes: reactShapes.find(s => s.id === id),
-      konvaShapes: konvaShapes.find(s => s.id === id),
-      images: images.find(s => s.id === id),
-      connections: connections.find(s => s.id === id),
-      stageFrames: stageFrames.find(s => s.id === id)
-    });
+    console.log('🗑️ Keyboard delete triggered for:', id);
     
-    const allShapes = [...reactShapes, ...konvaShapes, ...images, ...connections, ...stageFrames];
+    // 1. Find the shape BEFORE deleting it
     const shapeToDelete = allShapes.find(shape => shape.id === id);
     
     if (shapeToDelete) {
-      let actionType: 
-          | 'delete-react-shape' 
-          | 'delete-konva-shape' 
-          | 'delete-image' 
-          | 'delete-connection' 
-          | 'delete-stage-frame';
+      let actionType: string;
 
         if (reactShapes.find(s => s.id === id)) {
           actionType = 'delete-react-shape';
@@ -679,12 +704,21 @@ const getSelectedShapeScreenPosition = useCallback(() => {
         } else if (stageFrames.find(s => s.id === id)) {
           actionType = 'delete-stage-frame';
         } else {
-          console.warn('Unknown shape type for deletion, using delete-konva-shape as fallback');
           actionType = 'delete-konva-shape';
         }
     
+    // 2. Add to Undo History
+    undoRedoAddAction({
+        type: actionType,
+        data: shapeToDelete,
+        id: id,
+        // Special case for connections if needed, though 'data' usually covers it
+        connectionId: actionType === 'delete-connection' ? id : undefined
+    });
+
     console.log('🗑️ Actually deleting shape:', id);
     deleteShape(id);
+
     if (currentBoardId && !isTemporaryBoard && user) {
       console.log("💾 Immediate save for shape deletion:", { id });
       triggerSave({
@@ -700,7 +734,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
       setHasChanges(false); 
     }
   }
-  }, [reactShapes, konvaShapes, images, connections, stageFrames, deleteShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, scale, position]);
+  }, [allShapes, reactShapes, konvaShapes, images, connections, stageFrames, deleteShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, scale, position]);
 
   const handleToolChangeWithAutoCreate = useCallback((tool: Tool | null) => {
     console.log('🔧 Tool change:', tool);
@@ -826,7 +860,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
       setTimeout(handleInteractionEnd, 100);
 
 
-        if (stageFrames.length === 0) {  
+        if (stageFrames.length === 0) {   
     
       }
           
@@ -900,7 +934,6 @@ const getSelectedShapeScreenPosition = useCallback(() => {
           redo={redo}
         />
         
-        {/* UPDATED: Pass calculated screen position to FormattingToolbar */}
         <FormattingToolbar
           selectedShape={selectedShape}
           position={getSelectedShapeScreenPosition()}
@@ -992,6 +1025,8 @@ const getSelectedShapeScreenPosition = useCallback(() => {
           handleShapeMouseEnter={toolHandlers.handleShapeMouseEnter}
           tempConnection={tempConnection}
           isSpacePressed={toolHandlers.isSpacePressed}
+          // ADDED ACTION HANDLER
+          onAction={undoRedoAddAction}
         />
       </div>
       <CreateBoard 

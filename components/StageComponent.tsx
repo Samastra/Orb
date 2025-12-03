@@ -4,11 +4,10 @@ import dynamic from "next/dynamic";
 import Konva from "konva";
 import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, Image, Path, Group } from "react-konva";
 import GridLayer from "@/components/gridLayer"; 
-import { ReactShape, Tool, ImageShape } from "../types/board-types";
+import { ReactShape, Tool, ImageShape, Action } from "../types/board-types";
 import TextComponent from "./TextComponent";
 import { KonvaShape } from "@/hooks/useShapes";
 import { Connection, Side } from "@/hooks/useBoardState";
-// Changed import from getOrthogonalPoints to getOrthogonalPath
 import { getOrthogonalPath, getAnchorPoint, Rect as UtilsRect } from "@/lib/connection-utils";
 import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 
@@ -67,6 +66,9 @@ interface StageComponentProps {
   tempConnection: Connection | null;
   isSpacePressed?: boolean;
   duplicateShape: (direction: 'top' | 'right' | 'bottom' | 'left',shouldConnect?: boolean) => void;
+  
+  // UNDO/REDO Callback
+  onAction?: (action: Action) => void;
 }
 
 // --- HELPER: NORMALIZE RECT ---
@@ -102,47 +104,26 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
     endSide = targetSide;
   }
 
-  // Calculate path data with rounded corners
-  const pathData = getOrthogonalPath(startPoint, endPoint, connection.from.side, endSide, 40, 20); // 20px corner radius
+  const pathData = getOrthogonalPath(startPoint, endPoint, connection.from.side, endSide, 40, 20); 
   
   const strokeColor = selected ? "#3366FF" : (connection.stroke || "#64748B");
   const strokeWidth = selected ? 4 : (connection.strokeWidth || 4);
 
-  // Calculate arrowhead position and rotation
   const arrowLength = 10;
   let arrowX = endPoint.x;
   let arrowY = endPoint.y;
   let arrowRotation = 0;
 
   switch (endSide) {
-    case "top":
-      arrowY -= arrowLength;
-      arrowRotation = 90;
-      break;
-    case "right":
-      arrowX += arrowLength;
-      arrowRotation = 180;
-      break;
-    case "bottom":
-      arrowY += arrowLength;
-      arrowRotation = 270;
-      break;
-    case "left":
-      arrowX -= arrowLength;
-      arrowRotation = 0;
-      break;
+    case "top": arrowY -= arrowLength; arrowRotation = 90; break;
+    case "right": arrowX += arrowLength; arrowRotation = 180; break;
+    case "bottom": arrowY += arrowLength; arrowRotation = 270; break;
+    case "left": arrowX -= arrowLength; arrowRotation = 0; break;
   }
 
   return (
     <Group onClick={onClick} onTap={onClick}>
-      {/* 1. Fat Invisible Path (Click Target) */}
-      <Path
-        data={pathData}
-        stroke="transparent"
-        strokeWidth={30}
-      />
-      
-      {/* 2. Visible Rounded Path */}
+      <Path data={pathData} stroke="transparent" strokeWidth={30} />
       <Path
         data={pathData}
         stroke={strokeColor}
@@ -152,12 +133,10 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
         dash={connection.id === 'temp-connection' ? [5, 5] : undefined}
         listening={false}
       />
-
-      {/* 3. Arrowhead */}
       <Arrow
         x={arrowX}
         y={arrowY}
-        points={[0, 0, arrowLength, 0]} // Simple arrow segment, will be rotated
+        points={[0, 0, arrowLength, 0]} 
         rotation={arrowRotation}
         stroke={strokeColor}
         fill={strokeColor}
@@ -200,7 +179,7 @@ const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick, scale }: any) =
           <Group 
             key={side} 
             x={displayX} 
-            y={displayY}
+            y={displayY} 
             onMouseDown={(e) => {
                e.cancelBubble = true;
                onMouseDown(e, side, pos); 
@@ -266,11 +245,29 @@ const ImageElement = React.memo(React.forwardRef<Konva.Image, any>(({ imageShape
 }));
 ImageElement.displayName = 'ImageElement';
 
-// --- NEW: GENERIC SHAPE RENDERER ---
-const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, updateShape, commonProps, setShapeRef }: any) => {
+// --- GENERIC SHAPE RENDERER ---
+const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, updateShape, commonProps, setShapeRef, onAction }: any) => {
   
   const handleRef = (node: Konva.Node | null) => {
       setShapeRef(item.id, node);
+  };
+
+  // Helper to dispatch action after generic updates (like Text editing)
+  const dispatchUpdateAction = (id: string, newAttrs: any) => {
+      if (!onAction) return; 
+      
+      let type = '';
+      if(item.type === 'text' || item.type === 'stickyNote') type = 'update-react-shape';
+      else if(item.type === 'image') type = 'update-image';
+      else if(item.type === 'stage') type = 'update-stage-frame';
+      else type = 'update-konva-shape';
+
+      onAction({
+          type,
+          id,
+          prevData: item,
+          newData: { ...item, ...newAttrs }
+      });
   };
 
   if (item.__kind === 'stage') {
@@ -291,27 +288,45 @@ const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, u
 
   if (item.__kind === 'react') {
     if (item.type === 'text') {
-      return <TextComponent ref={handleRef} {...commonProps} {...item} isSelected={isSelected} isEditing={isEditing} onStartEditing={() => setEditingId(item.id)} onFinishEditing={() => setEditingId(null)} onUpdate={(attrs) => updateShape(item.id, attrs)} />;
+      return (
+        <TextComponent 
+            ref={handleRef} 
+            {...commonProps} 
+            {...item} 
+            isSelected={isSelected} 
+            isEditing={isEditing} 
+            onStartEditing={() => setEditingId(item.id)} 
+            onFinishEditing={() => setEditingId(null)} 
+            onUpdate={(attrs: any) => {
+                dispatchUpdateAction(item.id, attrs);
+                updateShape(item.id, attrs);
+            }} 
+        />
+      );
     }
     if (item.type === 'stickyNote') {
-      return <EditableStickyNoteComponent ref={handleRef} shapeData={item} isSelected={isSelected} activeTool={null} onSelect={commonProps.onClick} onUpdate={(attrs) => updateShape(item.id, attrs)} {...commonProps} />;
+      return (
+        <EditableStickyNoteComponent 
+            ref={handleRef} 
+            shapeData={item} 
+            isSelected={isSelected} 
+            activeTool={null} 
+            onSelect={commonProps.onClick} 
+            onUpdate={(attrs: any) => {
+                dispatchUpdateAction(item.id, attrs);
+                updateShape(item.id, attrs);
+            }} 
+            {...commonProps} 
+        />
+      );
     }
   }
 
   return null;
-}, (prev, next) => {
-  return (
-    prev.item === next.item &&
-    prev.isSelected === next.isSelected &&
-    prev.isEditing === next.isEditing &&
-    prev.commonProps.draggable === next.commonProps.draggable 
-  );
-});
+}); // REMOVED CUSTOM COMPARISON FUNCTION to prevent rendering bugs
 ShapeRenderer.displayName = "ShapeRenderer";
 
 
-
-// --- NEW COMPONENT: Quick Actions Overlay ---
 const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplicate, scale }: any) => {
   const shape = allShapesMap.get(selectedNodeId);
   if (!shape) return null;
@@ -395,10 +410,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setSelectedNodeIds, setReactShapes, setShapes, setImages,
   setStageFrames, updateShape, setStageInstance,
   editingId, setEditingId, onTextCreate,
-  hoveredNodeId, setHoveredNodeId, handleAnchorMouseDown, handleAnchorClick, tempConnection, isSpacePressed = false
+  hoveredNodeId, setHoveredNodeId, handleAnchorMouseDown, handleAnchorClick, tempConnection, isSpacePressed = false,
+  onAction 
 }) => {
   const shapeRefs = useRef<{ [key: string]: Konva.Node | null }>({});
   const dragStartPos = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const transformStartAttrs = useRef<{ [key: string]: any }>({});
 
   const setShapeRef = useCallback((id: string, node: Konva.Node | null) => {
     if (node) shapeRefs.current[id] = node;
@@ -422,7 +439,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
        const ref = shapeRefs.current[id];
        if (ref) startPositions.set(id, { x: ref.x(), y: ref.y() });
     });
-    startPositions.set(node.id(), { x: node.x(), y: node.y() });
+    if (!startPositions.has(node.id())) {
+        startPositions.set(node.id(), { x: node.x(), y: node.y() });
+    }
     dragStartPos.current = startPositions;
   }, [selectedNodeIds, setSelectedNodeIds]);
 
@@ -444,17 +463,22 @@ const StageComponent: React.FC<StageComponentProps> = ({
    if (trRef.current) trRef.current.getLayer()?.batchDraw();
   }, [selectedNodeIds]);
 
+  // --- MODIFIED: HANDLE DRAG END (With History) ---
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
     const startPos = dragStartPos.current.get(node.id());
     if(!startPos) return;
+
     const dx = node.x() - startPos.x;
     const dy = node.y() - startPos.y;
+
+    // 1. Update React State
     const applyMove = (list: any[], setter: any) => {
-        const affected = list.filter(item => selectedNodeIds.includes(item.id));
+        const affected = list.filter(item => selectedNodeIds.includes(item.id) || item.id === node.id());
         if (affected.length === 0) return;
+        
         setter((prev: any[]) => prev.map(item => {
-            if (selectedNodeIds.includes(item.id)) {
+            if (selectedNodeIds.includes(item.id) || item.id === node.id()) {
                 const myStart = dragStartPos.current.get(item.id);
                 if (myStart) {
                     return { ...item, x: myStart.x + dx, y: myStart.y + dy };
@@ -467,14 +491,63 @@ const StageComponent: React.FC<StageComponentProps> = ({
     applyMove(shapes, setShapes);
     applyMove(images, setImages);
     applyMove(stageFrames, setStageFrames);
+
+    // 2. DISPATCH ACTIONS (Undo/Redo)
+    if (onAction) {
+        const actionsToDispatch: Action[] = [];
+        const affectedIds = new Set([...selectedNodeIds, node.id()]);
+        
+        affectedIds.forEach(id => {
+            const shape = allShapesMap.get(id);
+            const myStart = dragStartPos.current.get(id);
+            const myNode = shapeRefs.current[id]; 
+
+            if (shape && myStart && myNode) {
+                let type = '';
+                if(shape.type === 'text' || shape.type === 'stickyNote') type = 'update-react-shape';
+                else if(shape.type === 'image') type = 'update-image';
+                else if(shape.type === 'stage') type = 'update-stage-frame';
+                else type = 'update-konva-shape';
+
+                const prevData = { ...shape, x: myStart.x, y: myStart.y };
+                const newData = { ...shape, x: myNode.x(), y: myNode.y() };
+
+                actionsToDispatch.push({
+                    type,
+                    id: shape.id,
+                    prevData,
+                    newData
+                });
+            }
+        });
+
+        if (actionsToDispatch.length === 1) {
+            onAction(actionsToDispatch[0]);
+        } else if (actionsToDispatch.length > 1) {
+            onAction({ type: 'batch', actions: actionsToDispatch });
+        }
+    }
+
     dragStartPos.current.clear();
-  }, [selectedNodeIds, reactShapes, shapes, images, stageFrames, setReactShapes, setShapes, setImages, setStageFrames]);
+  }, [selectedNodeIds, reactShapes, shapes, images, stageFrames, setReactShapes, setShapes, setImages, setStageFrames, allShapesMap, onAction]);
+
+  // --- TRANSFORM HANDLERS ---
+  const handleShapeTransformStart = useCallback((e: Konva.KonvaEventObject<Event>) => {
+      const node = e.target;
+      const id = node.id();
+      const shape = allShapesMap.get(id);
+      if (shape) {
+          transformStartAttrs.current[id] = { ...shape };
+      }
+  }, [allShapesMap]);
 
   const handleShapeTransformEnd = useCallback((item: any, e: any) => {
     const node = e.target;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
+    
     node.scaleX(1); node.scaleY(1);
+
     const updates: any = { x: node.x(), y: node.y(), rotation: node.rotation() };
     if (item.type === 'circle') {
       updates.radius = Math.max(5, (node as Konva.Circle).radius() * scaleX);
@@ -485,8 +558,29 @@ const StageComponent: React.FC<StageComponentProps> = ({
       updates.width = Math.max(5, node.width() * scaleX);
       updates.height = Math.max(5, node.height() * scaleY);
     }
+    
     updateShape(item.id, updates);
-  }, [updateShape]);
+
+    if (onAction) {
+        const prevData = transformStartAttrs.current[item.id];
+        if (prevData) {
+            let type = '';
+            if(item.type === 'text' || item.type === 'stickyNote') type = 'update-react-shape';
+            else if(item.type === 'image') type = 'update-image';
+            else if(item.type === 'stage') type = 'update-stage-frame';
+            else type = 'update-konva-shape';
+
+            onAction({
+                type,
+                id: item.id,
+                prevData,
+                newData: { ...prevData, ...updates }
+            });
+            delete transformStartAttrs.current[item.id];
+        }
+    }
+
+  }, [updateShape, onAction]);
 
   useEffect(() => {
     if (!trRef.current) return;
@@ -542,6 +636,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                 setEditingId={setEditingId}
                 updateShape={updateShape}
                 setShapeRef={setShapeRef}
+                onAction={onAction} 
                 commonProps={{
                     id: item.id,
                     draggable: (activeTool === 'select' || activeTool === null) && !isSpacePressed,
@@ -558,7 +653,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
                     },
                     onDragStart: handleDragStart,
                     onDragMove: handleDragMove,
-                    onDragEnd: handleDragEnd,
+                    onDragEnd: handleDragEnd, 
+                    onTransformStart: handleShapeTransformStart, 
                     onTransformEnd: (e: any) => handleShapeTransformEnd(item, e),
                     onMouseEnter: (item.type === 'text' || item.type === 'stickyNote') 
                         ? undefined 

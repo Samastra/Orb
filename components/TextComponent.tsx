@@ -16,7 +16,7 @@ interface TextComponentProps {
   fontStyle?: string;
   align?: "left" | "center" | "right";
   width?: number;
-  height?: number; // <--- FIX 1: Added height to interface
+  height?: number; 
   rotation?: number;
   isSelected: boolean;
   isEditing: boolean;
@@ -49,7 +49,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       fontStyle = "normal",
       align = "left",
       width = 200,
-      height, // <--- FIX 2: Destructure height
+      height, 
       rotation = 0,
       isSelected,
       isEditing,
@@ -70,7 +70,9 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
   ) => {
     const internalRef = useRef<Konva.Text>(null);
 
-    useImperativeHandle(ref, () => internalRef.current!);
+    // FIX: Removed '!' assertion. We cast to Konva.Text to satisfy TS, 
+    // but at runtime if it's null, it just passes null to the parent ref callback (which handles it safely).
+    useImperativeHandle(ref, () => internalRef.current as Konva.Text);
 
     const onUpdateRef = useRef(onUpdate);
     const onFinishEditingRef = useRef(onFinishEditing);
@@ -91,7 +93,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       return `${stylePart} ${weightPart}`.trim() || "normal";
     })();
 
-    // 1. TRANSFORM LOGIC (While Dragging)
+    // 1. TRANSFORM LOGIC
     const handleTransform = useCallback(() => {
       const node = internalRef.current;
       const tr = node?.getStage()?.findOne('Transformer') as Konva.Transformer;
@@ -100,20 +102,16 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
 
       const anchor = tr.getActiveAnchor();
 
-      // For text, we usually only allow width resizing, not height
       if (anchor && ['middle-left', 'middle-right'].includes(anchor)) {
          const scaleX = node.scaleX();
-         
          const newWidth = Math.max(50, node.width() * scaleX);
          node.width(newWidth);
-         
          node.scaleX(1);
          node.scaleY(1);
       }
     }, []);
 
-    // 2. TRANSFORM END LOGIC (On Drop)
-    // 2. TRANSFORM END LOGIC (On Drop)
+    // 2. TRANSFORM END LOGIC
     const handleTransformEndInternal = useCallback((e: Konva.KonvaEventObject<Event>) => {
       const node = internalRef.current;
       if (!node) return;
@@ -121,31 +119,25 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
 
-      // 1. Reset scale
       node.scaleX(1);
       node.scaleY(1);
 
-      // 2. Calculate new visual properties
       const newWidth = Math.max(50, node.width() * scaleX);
       const newFontSize = Math.max(5, node.fontSize() * scaleY);
       
-      // 3. Apply properties temporarily to the node to let Konva measure the text
       node.width(newWidth);
       node.fontSize(newFontSize);
       
-      // 4. CRITICAL FIX: Reset height to 'auto' to get the natural text height
-      // We cast to 'any' because strict TypeScript might not like passing undefined to height setter
       (node as any).height(undefined); 
       
-      const newHeight = node.height(); // Get the freshly calculated natural height
+      const newHeight = node.height();
 
-      // 5. Save everything, including the new height
       onUpdateRef.current({
         x: node.x(),
         y: node.y(),
         rotation: node.rotation(),
         width: newWidth,
-        height: newHeight, // <--- This prevents the vertical snapping/crushing
+        height: newHeight, 
         fontSize: newFontSize, 
       });
       
@@ -213,7 +205,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         const absScale = node.getAbsoluteScale();
         const newHeight = textarea.scrollHeight / absScale.y;
         
-        // Temporarily update node height while editing so transformer grows
         node.height(newHeight);
         
         const tr = stage.findOne('Transformer') as Konva.Transformer;
@@ -237,7 +228,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           textarea.style.height = "auto";
           textarea.style.height = `${textarea.scrollHeight}px`;
           
-          // FIX 3: Add buffer to height to prevent cutoff of descenders (g, y, j)
           const buffer = 10; 
           const finalHeight = (textarea.scrollHeight + buffer) / absScale.y;
 
@@ -258,7 +248,6 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
         if (e.key === "Escape") {
             handleFinish();
         }
-        // Allow Shift+Enter for new lines, Enter to finish
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault(); 
             handleFinish();
@@ -303,7 +292,7 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           opacity={isEditing ? 0 : 1}
           align={align}
           width={width}
-          height={height} // <--- FIX 4: Pass the calculated height to Konva
+          height={height} 
           scaleX={1}
           scaleY={1}
           wrap="word"
@@ -329,7 +318,16 @@ const TextComponent = forwardRef<Konva.Text, TextComponentProps>(
           }}
           perfectDrawEnabled={false} 
           shadowForStrokeEnabled={false}
-          hitStrokeWidth={0}
+          hitStrokeWidth={0} 
+          // FIX: Added safety check for width/height to prevent NaN crashes
+          hitFunc={(context, shape) => {
+            const w = shape.width() || 0;
+            const h = shape.height() || 0;
+            context.beginPath();
+            context.rect(0, 0, w, h);
+            context.closePath();
+            context.fillStrokeShape(shape);
+          }}
         />
     );
   }

@@ -81,6 +81,7 @@ const FormatBtn = React.forwardRef<HTMLButtonElement, FormatBtnProps>(
 );
 FormatBtn.displayName = "FormatBtn";
 
+// --- CONSTANTS ---
 const fonts = [
   { label: "Arial", value: "Arial" },
   { label: "Canva Sans", value: "Canva Sans" },
@@ -149,7 +150,6 @@ interface FormattingToolbarProps {
       offsetY: number;
     };
   } | null;
-  // CHANGED: Now accepts a full bounding box, not just a point
   position: { x: number, y: number, width: number, height: number } | null;
   onChange: (updates: Record<string, unknown>) => void;
   onBringForward: () => void;
@@ -175,6 +175,7 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarBounds, setToolbarBounds] = useState({ width: 0, height: 0 });
 
+  // Update toggle state when shape changes
   useEffect(() => {
     if (!selectedShape) return;
     const activeFormats: string[] = [];
@@ -182,6 +183,7 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     setFormats(activeFormats);
   }, [selectedShape]);
 
+  // Measure toolbar size
   useLayoutEffect(() => {
     if (toolbarRef.current) {
         setToolbarBounds({
@@ -202,7 +204,6 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
 
   if (!isText && !isStickyNote && !isShape && !isImage) return null;
 
-  // ... (Keep existing variable definitions for fontSize, fontFamily, etc.) ...
   const currentFontSize = selectedShape.fontSize || (isStickyNote ? 16 : 20);
   const currentFontFamily = selectedShape.fontFamily || "Arial";
   const currentFillColor = selectedShape.fill || "#000000";
@@ -218,40 +219,39 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     onChange({ textDecoration: vals.includes("underline") ? "underline" : "none" });
   };
 
-  // --- SMART POSITIONING LOGIC ---
-  // Initial Goal: Center horizontal, Place Top
-  const gap = 12; 
-  let safeX = position.x + position.width / 2; // Center of shape
-  let safeY = position.y - gap; // Top of shape
+  // --- REVISED SMART POSITIONING LOGIC ---
+  const GAP = 16; 
+  const HEADER_HEIGHT = 80; // Buffer for the main top toolbar
+  const VIEWPORT_PADDING = 16;
 
-  // We need to know toolbar height to decide placement
-  // If not measured yet, these defaults might be slightly off but it fixes itself in 1 frame
-  const tbHeight = toolbarBounds.height || 50; 
-  const tbWidth = toolbarBounds.width || 300;
-  const halfWidth = tbWidth / 2;
-  const screenPadding = 16;
+  // Defaults
+  let top = position.y - GAP;
+  let left = position.x + position.width / 2;
+  let transform = 'translate(-50%, -100%)'; // Default: Anchor Bottom-Center (Place Above)
 
   if (typeof window !== "undefined") {
-     // 1. Horizontal Clamping (Keep on screen)
-     if (safeX - halfWidth < screenPadding) {
-        safeX = halfWidth + screenPadding;
-     } else if (safeX + halfWidth > window.innerWidth - screenPadding) {
-        safeX = window.innerWidth - halfWidth - screenPadding;
+     const tbHeight = toolbarBounds.height || 50; 
+     const tbWidth = toolbarBounds.width || 300;
+     const halfWidth = tbWidth / 2;
+
+     // 1. Horizontal Clamping (Keep inside screen width)
+     if (left - halfWidth < VIEWPORT_PADDING) {
+       left = halfWidth + VIEWPORT_PADDING;
+     } else if (left + halfWidth > window.innerWidth - VIEWPORT_PADDING) {
+       left = window.innerWidth - halfWidth - VIEWPORT_PADDING;
      }
 
-     // 2. Vertical Smart Flip
-     // Check if placing it on top would clip it off the screen
-     const topEdge = safeY - tbHeight;
-     
-     if (topEdge < screenPadding) {
-        // NOT ENOUGH SPACE ON TOP -> FLIP TO BOTTOM
-        // New Y = Shape Top + Shape Height + Gap + Toolbar Height (since we use transform -100%)
-        // Actually, CSS transform translate(-50%, -100%) means the anchor is the bottom-center of the toolbar.
-        // So if we want it BELOW, we need to adjust the Y calculation.
-        
-        // Let's change the anchor logic slightly for the "Below" case.
-        // It's cleaner to just move the 'top' value down by (ToolbarHeight + ShapeHeight + 2*Gap)
-        safeY = position.y + position.height + gap + tbHeight;
+     // 2. Vertical Collision Logic
+     // Calculate where the top of the toolbar WOULD be if we placed it above
+     const potentialTopEdge = position.y - GAP - tbHeight;
+
+     // If placing it above hits the Header or goes off-screen...
+     if (potentialTopEdge < HEADER_HEIGHT) {
+       // ...Flip to BELOW the shape
+       // New Top = Shape Bottom + Gap
+       // We change transform to 'translate(-50%, 0)' so 'top' refers to the toolbar's top edge
+       top = position.y + position.height + GAP;
+       transform = 'translate(-50%, 0)';
      }
   }
 
@@ -260,18 +260,19 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
       <div 
         ref={toolbarRef}
         style={{ 
-          left: safeX,
-          top: safeY,
-          // Anchored bottom-center relative to 'top/left' styles
-          transform: 'translate(-50%, -100%)', 
+          left: left,
+          top: top,
+          transform: transform, 
           touchAction: 'none',
           opacity: toolbarBounds.width > 0 ? 1 : 0 
         }}
-        className="fixed z-50 flex flex-col items-center gap-2 will-change-transform transition-all duration-100 ease-out"
+        className="fixed z-50 flex flex-col items-center gap-2 will-change-transform transition-all duration-150 ease-out"
+        // Stop clicks from propagating to the stage (prevents deselecting when clicking toolbar)
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-1 bg-white/90 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5 rounded-2xl px-3 py-2 transition-all duration-300">
+        <div className="flex items-center gap-1 bg-white/95 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5 rounded-2xl px-3 py-2">
           
-          {/* ... (Rest of your JSX content remains exactly the same) ... */}
           {isStickyNote && (
             <>
               <DropdownMenu>
