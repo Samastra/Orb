@@ -10,8 +10,9 @@ import {
   Cable,
   Shapes,
   GripHorizontal,
-  Undo2, // Added Undo Icon
-  Redo2  // Added Redo Icon
+  GripVertical, // Added GripVertical icon
+  Undo2,
+  Redo2 
 } from "lucide-react";
 import {
   Tooltip,
@@ -38,8 +39,12 @@ import { shapeOptions } from "../constants/tool-constants";
 
 // --- HELPER COMPONENTS ---
 
-const Divider = () => (
-  <div className="w-full h-[1px] bg-gray-200 my-1 md:w-8 md:h-[1px] md:my-2" />
+// Updated Divider to handle orientation
+const Divider = ({ orientation }: { orientation: 'vertical' | 'horizontal' }) => (
+  <div className={cn(
+    "bg-gray-200",
+    orientation === 'vertical' ? "w-8 h-[1px] my-2" : "w-[1px] h-8 mx-2"
+  )} />
 );
 
 interface ToolbarBtnProps {
@@ -86,7 +91,6 @@ interface ToolbarProps {
   handleApplyStage: () => void;
   compact?: boolean;
   onImageUpload?: (file: File) => void;
-  // FIXED: Added these back to satisfy page.tsx
   undo: () => void;
   redo: () => void;
 }
@@ -109,6 +113,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
   // --- DRAGGABLE LOGIC ---
   const [position, setPosition] = useState({ x: 20, y: 120 });
   const [isDragging, setIsDragging] = useState(false);
+  // NEW: State for Orientation
+  const [orientation, setOrientation] = useState<'vertical' | 'horizontal'>('vertical');
+  
   const dragStartRef = useRef({ x: 0, y: 0 }); 
   const elementStartRef = useRef({ x: 0, y: 0 }); 
 
@@ -142,6 +149,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   }, [isDragging]);
 
   const handleDragStart = (e: React.PointerEvent) => {
+    // Only drag on left click (button 0)
+    if (e.button !== 0) return;
     e.preventDefault();
     setIsDragging(true);
     dragStartRef.current = { x: e.clientX, y: e.clientY };
@@ -157,6 +166,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
     event.target.value = '';
   };
 
+  // NEW: Toggle function
+  const toggleOrientation = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent default context menu
+    setOrientation(prev => prev === 'vertical' ? 'horizontal' : 'vertical');
+  };
+
   return (
     <div 
       style={{ 
@@ -168,19 +183,35 @@ const Toolbar: React.FC<ToolbarProps> = ({
         compact ? "scale-90 origin-left" : ""
       )}
     >
-      <div className="flex flex-col items-center p-2 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5">
+      <div className={cn(
+        "flex items-center p-2 bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5",
+        // Dynamic Flex Direction
+        orientation === 'vertical' ? "flex-col" : "flex-row"
+      )}>
         
         {/* --- DRAG HANDLE --- */}
-        <div 
-          onPointerDown={handleDragStart}
-          className="w-full flex justify-center py-1 mb-1 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors"
-          title="Drag toolbar"
-        >
-          <GripHorizontal className="w-5 h-5" />
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div 
+              onPointerDown={handleDragStart}
+              onContextMenu={toggleOrientation} // Right click to toggle
+              onDoubleClick={toggleOrientation} // Double click to toggle
+              className={cn(
+                "flex justify-center cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors",
+                orientation === 'vertical' ? "w-full py-1 mb-1" : "h-full px-1 mr-1"
+              )}
+            >
+              {/* Dynamic Icon */}
+              {orientation === 'vertical' ? <GripHorizontal className="w-5 h-5" /> : <GripVertical className="w-5 h-5" />}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side={orientation === 'vertical' ? "right" : "bottom"} className="bg-gray-900 text-white border-0 text-xs">
+            Drag to move • Right-click to rotate
+          </TooltipContent>
+        </Tooltip>
 
         {/* --- GROUP 1: POINTERS --- */}
-        <div className="flex flex-col gap-2">
+        <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
           <ToolbarBtn 
             label="Move Tool (V)" 
             icon={MousePointer2} 
@@ -196,10 +227,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
           />
         </div>
 
-        <Divider />
+        <Divider orientation={orientation} />
 
         {/* --- GROUP 2: CREATION --- */}
-        <div className="flex flex-col gap-2">
+        <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
           <ToolbarBtn 
             label="Text" 
             icon={Type} 
@@ -263,10 +294,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </Tooltip>
         </div>
 
-        <Divider />
+        <Divider orientation={orientation} />
 
         {/* --- GROUP 3: DRAWING --- */}
-        <div className="flex flex-col gap-2">
+        <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
           <ToolbarBtn 
             label="Pen" 
             icon={Pen} 
@@ -282,10 +313,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
           />
         </div>
 
-        <Divider />
+        <Divider orientation={orientation} />
 
         {/* --- GROUP 4: ADVANCED / HISTORY --- */}
-        <div className="flex flex-col gap-2">
+        <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
           
            {/* Undo */}
            <ToolbarBtn 
@@ -303,7 +334,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             onClick={redo} 
           />
 
-          <Divider />
+          <Divider orientation={orientation} />
 
           {/* Stage Frame */}
           <Popover>

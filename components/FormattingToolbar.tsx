@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import AdvancedTextControls from "./AdvancedTextControls"; // Assuming this file exists
+import AdvancedTextControls from "./AdvancedTextControls"; 
 import { cn } from "@/lib/utils";
 
-// Unified Lucide Imports
 import { 
   AlignLeft, 
   AlignCenter, 
@@ -22,7 +21,6 @@ import {
   Settings,
   Layers,
   ChevronUp,
-  GripHorizontal,
   Palette,
   Minus
 } from "lucide-react";
@@ -39,10 +37,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
-import ColorPicker from "./ColorPicker"; // Assuming this file exists
-
-// --- HELPER COMPONENTS ---
+import ColorPicker from "./ColorPicker"; 
 
 const Divider = () => (
   <div className="w-[1px] h-6 bg-gray-200 mx-1" />
@@ -53,7 +48,7 @@ interface FormatBtnProps {
   isActive?: boolean;
   icon: React.ElementType;
   label: string;
-  children?: React.ReactNode; // For dropdown arrows or extra text
+  children?: React.ReactNode; 
   className?: string;
 }
 
@@ -84,8 +79,6 @@ const FormatBtn = React.forwardRef<HTMLButtonElement, FormatBtnProps>(
   )
 );
 FormatBtn.displayName = "FormatBtn";
-
-// --- DATA CONSTANTS ---
 
 const fonts = [
   { label: "Arial", value: "Arial" },
@@ -130,8 +123,6 @@ const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56,
 const strokeWidths = [1, 2, 3, 4, 5, 6, 8, 10, 12];
 const borderRadiusValues = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80];
 
-// --- MAIN COMPONENT ---
-
 interface FormattingToolbarProps {
   selectedShape: {
     type?: string;
@@ -157,6 +148,8 @@ interface FormattingToolbarProps {
       offsetY: number;
     };
   } | null;
+  // NEW PROP: Dynamic Position
+  position: { x: number, y: number } | null;
   onChange: (updates: Record<string, unknown>) => void;
   onBringForward: () => void;
   onSendBackward: () => void;
@@ -166,6 +159,7 @@ interface FormattingToolbarProps {
 
 const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   selectedShape,
+  position,
   onChange,
   onBringForward,
   onSendBackward,
@@ -175,45 +169,6 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [formats, setFormats] = useState<string[]>([]);
   
-  // Dragging State
-  const [position, setPosition] = useState({ x: 0, y: 80 }); // Initial Offset from top-center
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, y: 0 });
-  const elementStartRef = useRef({ x: 0, y: 0 });
-
-  // --- DRAG LOGIC ---
-  useEffect(() => {
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isDragging) return;
-      const dx = e.clientX - dragStartRef.current.x;
-      const dy = e.clientY - dragStartRef.current.y;
-      setPosition({
-        x: elementStartRef.current.x + dx,
-        y: elementStartRef.current.y + dy,
-      });
-    };
-    const handlePointerUp = () => {
-      setIsDragging(false);
-      document.body.style.cursor = 'default';
-    };
-    if (isDragging) {
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-    }
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [isDragging]);
-
-  const handleDragStart = (e: React.PointerEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    dragStartRef.current = { x: e.clientX, y: e.clientY };
-    elementStartRef.current = { x: position.x, y: position.y };
-    document.body.style.cursor = 'grabbing';
-  };
-
   useEffect(() => {
     if (!selectedShape) return;
     const activeFormats: string[] = [];
@@ -221,7 +176,7 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     setFormats(activeFormats);
   }, [selectedShape]);
 
-  if (!selectedShape || selectedShape.type === "stage") return null;
+  if (!selectedShape || !position || selectedShape.type === "stage") return null;
 
   const isText = selectedShape.type === "text";
   const isImage = selectedShape.type === "image";
@@ -232,11 +187,8 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
 
   if (!isText && !isStickyNote && !isShape && !isImage) return null;
 
-  // Values
   const currentFontSize = selectedShape.fontSize || (isStickyNote ? 16 : 20);
   const currentFontFamily = selectedShape.fontFamily || "Arial";
-  const currentFontWeight = selectedShape.fontWeight || "400";
-  const currentFontStyle = selectedShape.fontStyle || "normal";
   const currentFillColor = selectedShape.fill || "#000000";
   const currentTextColor = isStickyNote ? (selectedShape.textColor || "#000000") : (selectedShape.fill || "#000000");
   const currentBackgroundColor = isStickyNote ? (selectedShape.backgroundColor || "#ffeb3b") : "#000000";
@@ -245,40 +197,38 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   const currentStrokeWidth = selectedShape.strokeWidth || 0;
   const currentCornerRadius = selectedShape.cornerRadius || 0;
 
-  // Labels
-  const getWeightLabel = (w: string) => FONT_WEIGHTS.find(o => o.value === w)?.label || "Regular";
-  const getStyleLabel = (s: string) => FONT_STYLES.find(o => o.value === s)?.label || "Regular";
-  const getStickyNoteColorLabel = (c: string) => STICKY_NOTE_COLORS.find(o => o.value === c)?.label || "Custom";
-
-  // Handlers
   const handleFormatChange = (vals: string[]) => {
     setFormats(vals);
     onChange({ textDecoration: vals.includes("underline") ? "underline" : "none" });
   };
 
+  // Safe clamping logic to keep toolbar on screen
+  // (Assuming toolbar width ~350px and height ~50px)
+  let safeX = position.x;
+  let safeY = position.y;
+
+  // Simple adjustment: if it's too close to edges
+  if (typeof window !== "undefined") {
+     if (safeX < 180) safeX = 180; // keep left edge on screen
+     if (safeX > window.innerWidth - 180) safeX = window.innerWidth - 180;
+     
+     if (safeY < 60) safeY = position.y + 80; // Flip to bottom if too close to top
+  }
+
   return (
     <TooltipProvider>
       <div 
         style={{ 
-          transform: `translate(calc(-50% + ${position.x}px), ${position.y}px)`,
+          left: safeX,
+          top: safeY,
+          transform: 'translate(-50%, -100%)', // Centered horizontally, anchored to top of shape
+          marginTop: '-12px',
           touchAction: 'none'
         }}
-        className="fixed top-0 left-1/2 z-50 flex flex-col items-center gap-2 will-change-transform"
+        className="fixed z-50 flex flex-col items-center gap-2 will-change-transform"
       >
-        {/* --- MAIN TOOLBAR --- */}
         <div className="flex items-center gap-1 bg-white/90 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5 rounded-2xl px-3 py-2 transition-all duration-300">
           
-          {/* Drag Handle */}
-          <div 
-            onPointerDown={handleDragStart}
-            className="flex items-center justify-center px-1 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500"
-          >
-            <GripHorizontal className="w-4 h-4" />
-          </div>
-
-          <Divider />
-
-          {/* Sticky Note Color */}
           {isStickyNote && (
             <>
               <DropdownMenu>
@@ -305,10 +255,8 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
             </>
           )}
 
-          {/* Typography Controls */}
           {(isText || isStickyNote) && (
             <>
-              {/* Font Family */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <FormatBtn icon={Type} label="Font Family" className="w-24 justify-between">
@@ -326,7 +274,6 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
 
               <Divider />
 
-              {/* Font Weight */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <FormatBtn icon={ArrowUpWideNarrow} label="Weight">
@@ -342,7 +289,6 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Font Style */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <FormatBtn icon={Italic} label="Style">
@@ -360,7 +306,6 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
 
               <Divider />
 
-              {/* Font Size Input */}
               <div className="flex items-center gap-1 bg-gray-50 rounded-lg px-1 border border-transparent hover:border-gray-200 transition-colors">
                  <button onClick={() => onChange({ fontSize: Math.max(1, currentFontSize - 1) })} className="p-1 hover:bg-white rounded-md text-gray-500">
                     <Minus className="w-3 h-3" />
@@ -378,7 +323,6 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
 
               <Divider />
 
-              {/* Alignment */}
               <ToggleGroup type="single" value={currentAlign} onValueChange={(v) => v && onChange({ align: v })} className="gap-0.5">
                  <ToggleGroupItem value="left" size="sm" className="h-7 w-7 p-0 data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600"><AlignLeft className="w-4 h-4" /></ToggleGroupItem>
                  <ToggleGroupItem value="center" size="sm" className="h-7 w-7 p-0 data-[state=on]:bg-blue-50 data-[state=on]:text-blue-600"><AlignCenter className="w-4 h-4" /></ToggleGroupItem>
@@ -391,28 +335,26 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
             </>
           )}
 
-          {/* Color Pickers */}
           <Divider />
           <div className="flex items-center gap-2">
             {isShape && (
-              <ColorPicker value={currentFillColor} onChange={(c) => onChange({ fill: c })} label="Fill" />
+              <ColorPicker value={currentFillColor} onChange={(c: any) => onChange({ fill: c })} label="Fill" />
             )}
             
             {(isText || isStickyNote) && (
                <ColorPicker 
                  value={currentTextColor} 
-                 onChange={(c) => isStickyNote ? onChange({ textColor: c }) : onChange({ fill: c })} 
+                 onChange={(c: any) => isStickyNote ? onChange({ textColor: c }) : onChange({ fill: c })} 
                  label="Text Color" 
                />
             )}
           </div>
 
-          {/* Stroke & Radius */}
           {hasStroke && (
             <>
               <Divider />
               <div className="flex items-center gap-1">
-                <ColorPicker value={currentStroke} onChange={(c) => onChange({ stroke: c })} label="Border" className="border-2 border-white ring-1 ring-gray-200" />
+                <ColorPicker value={currentStroke} onChange={(c: any) => onChange({ stroke: c })} label="Border" className="border-2 border-white ring-1 ring-gray-200" />
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -434,21 +376,20 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
             <>
                <Divider />
                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                 <DropdownMenuTrigger asChild>
                      <FormatBtn icon={CornerDownLeft} label="Radius" className="w-auto px-1">
                         <span className="text-xs ml-1">{currentCornerRadius}</span>
                      </FormatBtn>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="min-w-[3rem]">
+                 </DropdownMenuTrigger>
+                 <DropdownMenuContent className="min-w-[3rem]">
                      {borderRadiusValues.map(r => (
                        <DropdownMenuItem key={r} onSelect={() => onChange({ cornerRadius: r })}>{r}px</DropdownMenuItem>
                      ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                 </DropdownMenuContent>
+               </DropdownMenu>
             </>
           )}
 
-          {/* Settings Toggle */}
           {isText && (
              <>
                <Divider />
@@ -461,7 +402,6 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
              </>
           )}
 
-          {/* Layer Controls */}
           {(isText || isStickyNote || isShape || isImage) && selectedShape.type !== "stage" && (
             <>
               <Divider />
@@ -475,7 +415,6 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
           )}
         </div>
 
-        {/* --- ATTACHED ADVANCED SETTINGS --- */}
         {showAdvanced && isText && (
           <div className="w-full bg-white/90 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5 rounded-xl px-4 py-3 animate-in slide-in-from-top-2">
             <AdvancedTextControls

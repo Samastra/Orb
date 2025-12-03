@@ -6,7 +6,7 @@ import Konva from "konva";
 import { useUser } from "@clerk/nextjs";
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useParams } from "next/navigation";
-import { ReactShape, Tool,ImageShape } from "@/types/board-types";
+import { ReactShape, Tool, ImageShape } from "@/types/board-types";
 import { defaultStageDimensions } from "@/constants/tool-constants";
 import { Connection } from "@/hooks/useBoardState";
 // Components
@@ -17,9 +17,7 @@ import CreateBoard from "@/components/createBoard";
 import { deleteBoard } from "@/lib/actions/board-actions";
 import VideoPlayerModal from '@/components/VideoPlayerModal';
 
-// import QuillTextEditor from "@/components/QuillTextEditor";
-// Hooks
-import {KonvaShape} from "@/hooks/useShapes";
+import { KonvaShape } from "@/hooks/useShapes";
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { useBoardState } from "@/hooks/useBoardState";
 import { useKonvaTools } from "@/hooks/useKonvaTools";
@@ -29,9 +27,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useWebsitePlayer } from '@/hooks/useWebsitePlayer';
 import WebsitePlayerModal from '@/components/WebsitePlayerModal';
 import { useLayoutEffect } from 'react';
-// Utils
 import { fetchBoard } from "@/lib/actions/board-actions";
-// import { useWindowSize } from "@/hooks/useWindowSize";
 import { cn } from "@/lib/utils";
 import { loadBoardElements } from "@/lib/actions/board-elements-actions";
 
@@ -44,7 +40,6 @@ interface ShapeAttributes {
   fill?: string;
   stroke?: string;
   text?: string;
-  // Add other shape properties as needed
 }
 
 interface FormattingUpdates {
@@ -52,12 +47,8 @@ interface FormattingUpdates {
   stroke?: string;
   fontSize?: number;
   fontFamily?: string;
-  // Add other formatting properties
 }
 
-
-
-// Simple debounce without complex types
 const useDebounce = (callback: (...args: unknown[]) => void, delay: number) => {
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -72,52 +63,16 @@ const useDebounce = (callback: (...args: unknown[]) => void, delay: number) => {
   }, [callback, delay]);
 };
 
-// Utility for deep equality comparison
-// Replace the entire areEqual function:
-const areEqual = (obj1: unknown, obj2: unknown): boolean => {
-  if (obj1 === obj2) return true;
-  if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 == null || obj2 == null) {
-    return obj1 === obj2;
-  }
-  
-  const obj1Record = obj1 as Record<string, unknown>;
-  const obj2Record = obj2 as Record<string, unknown>;
-  
-  const keys1 = Object.keys(obj1Record);
-  const keys2 = Object.keys(obj2Record);
-  if (keys1.length !== keys2.length) return false;
-  
-  for (const key of keys1) {
-    if (!keys2.includes(key)) return false;
-    
-    const val1 = obj1Record[key];
-    const val2 = obj2Record[key];
-    
-    if (Array.isArray(val1) && Array.isArray(val2)) {
-      if (val1.length !== val2.length) return false;
-      for (let i = 0; i < val1.length; i++) {
-        if (!areEqual(val1[i], val2[i])) return false;
-      }
-    } else if (!areEqual(val1, val2)) {
-      return false;
-    }
-  }
-  return true;
-};
-
 const BoardPage = () => {
   const params = useParams();
 
-  
   // Refs
   const stageRef = useRef<Konva.Stage | null>(null);
   const trRef = useRef<Konva.Transformer | null>(null);
 
-  
-
- const [editingId, setEditingId] = useState<string | null>(null);
-  const [hasChanges, setHasChanges] = useState(false); // Track if board has unsaved changes
-  const [hasLoaded, setHasLoaded] = useState(false); // Track if board elements have been loaded
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [hasChanges, setHasChanges] = useState(false); 
+  const [hasLoaded, setHasLoaded] = useState(false); 
   const [isInteracting, setIsInteracting] = useState(false);
   const {
     videoId,
@@ -193,7 +148,7 @@ const BoardPage = () => {
     undoRedoAddAction,
     setConnections,
     updateConnection,
-    boardState.addShape, // Pass the RAW addShape from state, not the wrapped handleAddShape
+    boardState.addShape,
     allShapes 
   );
 
@@ -209,7 +164,6 @@ const BoardPage = () => {
         onSave: (text: string) => void;
       } | null>(null);
 
-// Add handler for text editing
 const handleStartTextEditing = useCallback((textProps: {
   position: { x: number; y: number };
   text: string;
@@ -229,19 +183,9 @@ const handleFinishTextEditing = useCallback(() => {
   setEditingText(null);
 }, []);
 
-  // Undo/Redo functionality
- 
-
-  
-
-  // Tool functionality
-
-
   const { user } = useUser();
   const { triggerSave } = useAutoSave(currentBoardId, isTemporaryBoard, user?.id);
 
-  // Debounced triggerSave for interaction end
-          // Replace the debouncedTriggerSave in boards/[boardId]/page.tsx:
         const debouncedTriggerSave = useDebounce((data: unknown) => {
           if (typeof data === 'object' && data !== null) {
             const saveData = data as {
@@ -258,79 +202,61 @@ const handleFinishTextEditing = useCallback(() => {
           }
         }, 10000);
 
- 
-
-  // Track interactions for scaling, dragging, and adding elements
   const handleInteractionStart = useCallback(() => {
   console.log("🖱️ Interaction started (scaling/dragging/adding)");
   setIsInteracting(true);
   setHasChanges(true);
 }, [setIsInteracting]);
 
-  
-
-    // Unified shape updater — replaces debouncedUpdateShape completely
-// Unified shape updater — type-safe version
-// Unified shape updater — simplified type-safe version
 const updateAnyShape = useCallback((
   id: string,
   updates: Partial<ReactShape | KonvaShape | ImageShape | Connection>
 ) => {
   let updated = false;
 
-  // 1. Define ALL properties we want to save to the database
   const allowedKeys = [
     'x', 'y', 'rotation', 'fill', 'stroke', 'strokeWidth',
-    'width', 'height',             // Rects, Images, Text, Sticky
-    'radius',                      // Circles, Triangles
-    'radiusX', 'radiusY',          // Ellipses
-    'points',                      // Arrows
-    'sides',                       // Triangles
-    'pointerLength', 'pointerWidth', // Arrows
-    'fontSize', 'fontFamily', 'text', 'fontWeight', 'fontStyle', 'align', // Text
+    'width', 'height',            
+    'radius',                     
+    'radiusX', 'radiusY',         
+    'points',                     
+    'sides',                      
+    'pointerLength', 'pointerWidth',
+    'fontSize', 'fontFamily', 'text', 'fontWeight', 'fontStyle', 'align', 
     'from', 'to', 'cp1x', 'cp1y', 'cp2x', 'cp2y',
-    'cornerRadius',                      // For Rectangles
-    'backgroundColor', 'textColor',      // For Sticky Notes
+    'cornerRadius',               
+    'backgroundColor', 'textColor', 
     'textDecoration'
   ];
 
-  // 2. Create the safe update object dynamically
   const safeUpdates: Record<string, unknown> = {};
 
   Object.keys(updates).forEach(key => {
     if (allowedKeys.includes(key)) {
-     
        safeUpdates[key] = updates[key as keyof typeof updates];
     }
   });
 
-  // 3. Apply updates to the correct state array
-  
-  // React-managed shapes (text, sticky notes)
   if (reactShapes.some(s => s.id === id)) {
     setReactShapes(prev => prev.map(s => s.id === id ? { ...s, ...safeUpdates } : s));
     updated = true;
   }
 
-  // Konva-managed shapes (rect, circle, arrow, etc)
   if (konvaShapes.some(s => s.id === id)) {
     setKonvaShapes(prev => prev.map(s => s.id === id ? { ...s, ...safeUpdates } : s));
     updated = true;
   }
 
-  // Images
   if (images.some(i => i.id === id)) {
     setImages(prev => prev.map(i => i.id === id ? { ...i, ...safeUpdates } : i));
     updated = true;
   }
 
-  // Stage frames
   if (stageFrames.some(f => f.id === id)) {
     setStageFrames(prev => prev.map(f => f.id === id ? { ...f, ...safeUpdates } : f));
     updated = true;
   }
 
-  // Connections
   if (connections.some(c => c.id === id)) {
     updateConnection(id, safeUpdates);
     updated = true;
@@ -344,42 +270,35 @@ const updateAnyShape = useCallback((
   updateAnyShape(id, attrs);
 }, [updateAnyShape]);
 
-  // Add this function near your other handlers (around line 200-250)
 const copyCleanText = async () => {
   try {
-    // Get all text content from the whiteboard
     const allTextElements = [
       ...reactShapes.filter(shape => shape.type === 'text'),
       ...konvaShapes.filter(shape => shape.type === 'text'),
-      // Add other text sources as needed
     ];
 
-    // Extract and clean text
     const allText = allTextElements
       .map(element => {
         let text = '';
         if ('text' in element) {
           text = element.text as string;
         }
-        // Clean the text - remove HTML tags and unwanted content
         return text
-          .replace(/<[^>]*>/g, '') // Remove HTML tags
-          .replace(/Tip:.*$/g, '') // Remove "Tip: Copy text normally..." lines
-          .replace(/\n\s*\n/g, '\n') // Remove extra blank lines
+          .replace(/<[^>]*>/g, '') 
+          .replace(/Tip:.*$/g, '') 
+          .replace(/\n\s*\n/g, '\n') 
           .trim();
       })
-      .filter(text => text.length > 0) // Remove empty strings
-      .join('\n\n'); // Separate different text elements with blank lines
+      .filter(text => text.length > 0) 
+      .join('\n\n'); 
 
     if (allText.length === 0) {
       alert('No text found on the whiteboard to copy.');
       return;
     }
 
-    // Copy to clipboard
     await navigator.clipboard.writeText(allText);
     
-    // Optional: Show success feedback
     console.log('✅ Clean text copied to clipboard:', allText);
     alert('Clean text copied to clipboard!');
     
@@ -433,16 +352,11 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
     setSelectedNodeIds([shapeId]); 
     setEditingId(shapeId); 
     
-    // CRITICAL FIX: FORCE SWITCH TO SELECT TOOL IMMEDIATELY
     setActiveTool("select"); 
     
     console.log('✅ Text created, swapped to Select Tool');
   }, [setReactShapes, setSelectedNodeIds, setActiveTool]);
 
-    // AUTO-SAVE ON ANY POSITION CHANGE — NEVER MISS A DRAG AGAIN
-
-
-  // Fetch board data and initialize boardInfo
   useEffect(() => {
     const loadBoardData = async () => {
       try {
@@ -463,10 +377,7 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
     loadBoardData();
   }, [params.boardId, showSetupDialog, setShowSetupDialog, setBoardInfo]);
 
-  // FINAL WORKING LOADING CODE — COPY-PASTE THIS EXACTLY
-// In page.tsx - REPLACE the entire useLayoutEffect loading code with this:
 useLayoutEffect(() => {
-    // 1. Safety Checks
     if (hasLoaded || !currentBoardId || isTemporaryBoard) return;
 
     const loadSavedElements = async () => {
@@ -474,50 +385,30 @@ useLayoutEffect(() => {
         console.log("🔄 LOADING BOARD ELEMENTS...");
         const elements = await loadBoardElements(currentBoardId);
 
-        // 2. Handle Camera (View) Setup
         if (stageRef.current) {
           const stage = stageRef.current;
 
-          // CHECK: Do we have saved camera data?
           if (elements.stageState && elements.stageState.scale) {
-            // --- CASE A: EXISTING BOARD (Restore View) ---
             console.log("📥 Restoring saved camera view...");
-            
-            // Update Konva Stage immediately
             stage.scale({ x: elements.stageState.scale, y: elements.stageState.scale });
             stage.position(elements.stageState.position);
-            
-            // Sync React State
             boardState.setScale(elements.stageState.scale);
             boardState.setPosition(elements.stageState.position);
-          
           } else {
-            // --- CASE B: NEW BOARD (Set Default "Helicopter" View) ---
             console.log("🆕 New Board Detected - Applying Default View...");
-
-            const defaultScale = 0.4; // 40% Zoom (Spacious)
-            
-            // Calculate center of the viewport
+            const defaultScale = 0.4; 
             const centerX = stage.width() / 2;
             const centerY = stage.height() / 2;
-
-            // Apply to Konva Stage
             stage.scale({ x: defaultScale, y: defaultScale });
             stage.position({ x: centerX, y: centerY });
-
-            // Sync React State
             boardState.setScale(defaultScale);
             boardState.setPosition({ x: centerX, y: centerY });
           }
-
-          stage.batchDraw(); // Force draw
+          stage.batchDraw(); 
         }
 
-        // 3. Load Shapes (Small delay ensures camera is set first)
         setTimeout(() => {
           console.log("📝 Populating shapes...");
-          
-          // Clear first to be safe
           setReactShapes([]);
           setKonvaShapes([]);
           setStageFrames([]);
@@ -525,7 +416,6 @@ useLayoutEffect(() => {
           setConnections([]);
           setLines([]);
           
-          // Populate from DB
           setReactShapes(elements.reactShapes || []);
           setKonvaShapes(elements.konvaShapes || []);
           setStageFrames(elements.stageFrames || []);
@@ -539,7 +429,7 @@ useLayoutEffect(() => {
 
       } catch (error) {
         console.error("❌ LOAD FAILED:", error);
-        setHasLoaded(true); // Prevent infinite loading state
+        setHasLoaded(true); 
       }
     };
 
@@ -557,9 +447,7 @@ useLayoutEffect(() => {
     setLines
   ]);
 
-  // In page.tsx - Add this right after the loading useLayoutEffect
 useEffect(() => {
-  // Force stage to update when camera changes
   if (stageRef.current) {
     const stage = stageRef.current;
     stage.scale({ x: scale, y: scale });
@@ -570,7 +458,6 @@ useEffect(() => {
 }, [scale, position]);
 
 
-  // Cleanup
   useEffect(() => {
   const currentTrRef = trRef.current;
   return () => {
@@ -581,12 +468,9 @@ useEffect(() => {
   };
 }, []);
 
-  // Memoize selected shape - UPDATED FOR MULTI-SELECT
   const selectedShape = useMemo(() => {
     if (!selectedNodeIds || selectedNodeIds.length === 0) return null;
     
-    // For multi-select, return the first selected shape for backward compatibility
-    // You might want to update your FormattingToolbar to handle multiple shapes
     const firstSelectedId = selectedNodeIds[0];
     
     const reactShape = reactShapes.find((s) => s.id === firstSelectedId);
@@ -602,7 +486,42 @@ useEffect(() => {
     return connectionShape || null;
   }, [selectedNodeIds, reactShapes, konvaShapes, images, connections]);
 
-  // Zoom functions with interaction tracking
+  // --- NEW: Calculate Screen Position for Formatting Toolbar ---
+  const getSelectedShapeScreenPosition = useCallback(() => {
+    if (!selectedShape) return null;
+    
+    // Default world coordinates
+    let x = (selectedShape as any).x || 0;
+    let y = (selectedShape as any).y || 0;
+    let w = (selectedShape as any).width || 0;
+    
+    // Adjust for centered shapes like Circle/Ellipse
+    if (selectedShape.type === 'circle') {
+       const r = (selectedShape as any).radius || 0;
+       x -= r; 
+       y -= r;
+       w = r * 2;
+    } else if (selectedShape.type === 'ellipse') {
+       const rx = (selectedShape as any).radiusX || 0;
+       const ry = (selectedShape as any).radiusY || 0;
+       x -= rx;
+       y -= ry;
+       w = rx * 2;
+    }
+
+    // Convert World (x, y) to Screen (screenX, screenY)
+    // Formula: screen = world * scale + pan
+    const screenX = x * scale + position.x;
+    const screenY = y * scale + position.y;
+    const scaledWidth = w * scale;
+
+    // Return the "Top-Center" point of the shape on screen
+    return {
+        x: screenX + scaledWidth / 2,
+        y: screenY
+    };
+  }, [selectedShape, scale, position]);
+
   const handleZoomIn = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
@@ -617,7 +536,7 @@ useEffect(() => {
     
     console.log("🔍 Zooming in:", { oldScale, newScale });
     boardState.setScale(newScale);
-    setTimeout(handleInteractionEnd, 100); // End interaction after a short delay
+    setTimeout(handleInteractionEnd, 100); 
   }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd,boardState]);
 
   const handleZoomOut = useCallback(() => {
@@ -634,16 +553,9 @@ useEffect(() => {
     
     console.log("🔍 Zooming out:", { oldScale, newScale });
     boardState.setScale(newScale);
-    setTimeout(handleInteractionEnd, 100); // End interaction after a short delay
+    setTimeout(handleInteractionEnd, 100); 
   }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd, boardState]);
 
-  // Replace the useDebounce call:
-
-
-  // Handler for StageComponent (no immediate save)
-
-
-  // Formatting toolbar update (no immediate save) - UPDATED FOR MULTI-SELECT
   const handleFormattingToolbarUpdate = useCallback((updates: FormattingUpdates) => {
   if (!selectedNodeIds || selectedNodeIds.length === 0) return;
 
@@ -652,16 +564,12 @@ useEffect(() => {
       });
     }, [selectedNodeIds, updateAnyShape]);
 
-  // Shape creation with immediate save
   const handleAddShape = useCallback((type: Tool) => {
     if (!stageRef.current) return;
     const stage = stageRef.current;
 
     handleInteractionStart();
 
-    // 1. LIVE CALCULATION (The Fix)
-    // We calculate exactly where the center of your screen is in "World Coordinates"
-    // Formula: (ScreenHalfWidth - CameraPanX) / ZoomLevel
     const center = {
       x: (stage.width() / 2 - stage.x()) / stage.scaleX(),
       y: (stage.height() / 2 - stage.y()) / stage.scaleY(),
@@ -669,8 +577,6 @@ useEffect(() => {
 
     console.log("🎯 Live Center Calculation:", center);
     
-    // 2. PASS TO STATE
-    // Pass this calculated center as the 3rd argument
     addShape(type, undoRedoAddAction, center); 
 
     if (type === 'stickyNote' || type === 'text') {
@@ -716,7 +622,7 @@ useEffect(() => {
               scale,
               position,
             }, true);
-            setHasChanges(false); // Reset after immediate save
+            setHasChanges(false); 
           }
         }
         setTimeout(handleInteractionEnd, 100);
@@ -727,7 +633,6 @@ useEffect(() => {
     }
   }, [addImage, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
 
-  // Close without save
   const handleCloseWithoutSave = useCallback(async () => {
     try {
       await deleteBoard(currentBoardId);
@@ -737,7 +642,6 @@ useEffect(() => {
     }
   }, [currentBoardId]);
 
-  // Enhanced delete function - UPDATED FOR MULTI-SELECT
   const handleDeleteShape = useCallback((id: string) => {
     console.log('🗑️ Keyboard delete triggered for:', id, {
       reactShapes: reactShapes.find(s => s.id === id),
@@ -769,7 +673,6 @@ useEffect(() => {
         } else if (stageFrames.find(s => s.id === id)) {
           actionType = 'delete-stage-frame';
         } else {
-          // If it's an unknown shape type, log error and use a safe fallback
           console.warn('Unknown shape type for deletion, using delete-konva-shape as fallback');
           actionType = 'delete-konva-shape';
         }
@@ -788,26 +691,17 @@ useEffect(() => {
         scale,
         position,
       }, true);
-      setHasChanges(false); // Reset after immediate save
+      setHasChanges(false); 
     }
   }
   }, [reactShapes, konvaShapes, images, connections, stageFrames, deleteShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, scale, position]);
 
-  // Enhanced tool change handler
   const handleToolChangeWithAutoCreate = useCallback((tool: Tool | null) => {
     console.log('🔧 Tool change:', tool);
     toolHandlers.handleToolChange(tool);
     setActiveTool(tool);
-    
-    // if (tool === 'text' || tool === 'stickyNote') {
-    //   setTimeout(() => {
-    //     console.log('📝 Auto-creating shape from keyboard shortcut:', tool);
-    //     handleAddShape(tool);
-    //   }, 100);
-    // }
   }, [toolHandlers.handleToolChange, setActiveTool, handleAddShape,toolHandlers]);
 
-  // Calculate viewport center
   const calculateViewportCenter = useCallback(() => {
     if (!stageRef.current) return { x: 100, y: 100 };
     
@@ -839,7 +733,7 @@ useEffect(() => {
         scale,
         position,
       }, true);
-      setHasChanges(false); // Reset after immediate save
+      setHasChanges(false); 
     }
     setTimeout(handleInteractionEnd, 100);
   }, [calculateViewportCenter, addImage, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
@@ -850,13 +744,11 @@ useEffect(() => {
   const stage = stageRef.current;
   const allFrames = [...stageFrames, ...konvaShapes.filter(s => s.type === 'stage')];
 
-  // If no frames yet, just zoom out a bit for comfort
   if (allFrames.length === 0) {
     boardState.setScale(0.7);
     return;
   }
 
-  // Find bounding box of all stage frames
   let minX = Infinity, minY = Infinity;
   let maxX = -Infinity, maxY = -Infinity;
 
@@ -873,17 +765,16 @@ useEffect(() => {
   const contentWidth = maxX - minX;
   const contentHeight = maxY - minY;
 
-  const padding = 200; // pixels of breathing room on each side
+  const padding = 200; 
   const availableWidth = stage.width() - 2 * padding;
   const availableHeight = stage.height() - 2 * padding;
 
   const scaleX = availableWidth / contentWidth;
   const scaleY = availableHeight / contentHeight;
-  const newScale = Math.min(scaleX, scaleY, 0.9); // never zoom in past 90%
+  const newScale = Math.min(scaleX, scaleY, 0.9); 
 
-  const finalScale = Math.max(newScale, 0.3); // don’t go too tiny
+  const finalScale = Math.max(newScale, 0.3); 
 
-  // Center the content
   const centerX = minX + contentWidth / 2;
   const centerY = minY + contentHeight / 2;
 
@@ -896,7 +787,6 @@ useEffect(() => {
   console.log("Auto-fit applied:", { finalScale: finalScale.toFixed(2), frames: allFrames.length });
 }, [stageRef, stageFrames, konvaShapes, boardState]);
 
-  // Stage dimensions
   const handleApplyStage = useCallback(() => {
     console.log('🎯 Creating stage frame:', tempDimensions);
     
@@ -924,13 +814,13 @@ useEffect(() => {
           scale,
           position,
         }, true);
-        setHasChanges(false); // Reset after immediate save
+        setHasChanges(false); 
       }
       setTempDimensions(defaultStageDimensions);
       setTimeout(handleInteractionEnd, 100);
 
 
-        if (stageFrames.length === 0) {  // ← this will be 0 before addStageFrame runs
+        if (stageFrames.length === 0) {  
     
       }
           
@@ -939,17 +829,10 @@ useEffect(() => {
     }
   }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction,autoFitContent, calculateViewportCenter, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
 
-
-
-  // Inside BoardPage component, after your other useCallbacks
-
-
-  // Keyboard shortcuts - UPDATED FOR MULTI-SELECT
-
   const keyboardShortcuts = useKeyboardShortcuts({
-    selectedNodeIds, // FIXED: Now matches the updated interface
+    selectedNodeIds, 
     deleteShape: handleDeleteShape,
-    setSelectedNodeIds, // FIXED: Now matches the updated interface
+    setSelectedNodeIds, 
     activeTool,
     setActiveTool: (tool: Tool | null) => {
       console.log('🔧 Keyboard tool change:', tool);
@@ -966,7 +849,7 @@ useEffect(() => {
 
   return (
     <>
-      <div className="relative w-screen h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
+      <div className="relative w-screen h-screen bg-slate-50">
         <BoardHeader
             boardInfo={boardInfo}
             isTemporaryBoard={isTemporaryBoard}
@@ -994,8 +877,8 @@ useEffect(() => {
               });
             }}
             onCopyCleanText={copyCleanText}
-            scale={scale}        // ← Add this
-            position={position}  // ← Add this
+            scale={scale}        
+            position={position}  
           />
         <Toolbar
           activeTool={activeTool}
@@ -1010,8 +893,11 @@ useEffect(() => {
           undo={undo}
           redo={redo}
         />
+        
+        {/* UPDATED: Pass calculated screen position to FormattingToolbar */}
         <FormattingToolbar
           selectedShape={selectedShape}
+          position={getSelectedShapeScreenPosition()}
           onChange={handleFormattingToolbarUpdate}
           onBringForward={bringForward}
           onSendBackward={sendBackward}
@@ -1047,7 +933,7 @@ useEffect(() => {
           </button>
           </div>
           <div className="w-px h-6 bg-gray-300/80"></div>
-         
+          
         </div>
         <StageComponent
           key={`stage-${stageKey}`}
@@ -1122,21 +1008,6 @@ useEffect(() => {
         isOpen={isWebsiteOpen}
         onClose={closeWebsite}
       />
-
-         {/* {editingText && (
-      <QuillTextEditor
-        isOpen={editingText.isEditing}
-        position={editingText.position}
-        initialText={editingText.text}
-        fontSize={editingText.fontSize}
-        fontFamily={editingText.fontFamily}
-        color={editingText.color}
-        width={editingText.width}
-        onSave={editingText.onSave}
-        onCancel={handleFinishTextEditing}
-      />
-    )} */}
-
     </>
   );
 };
