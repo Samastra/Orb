@@ -206,7 +206,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             </div>
           </TooltipTrigger>
           <TooltipContent side={orientation === 'vertical' ? "right" : "bottom"} className="bg-gray-900 text-white border-0 text-xs">
-            Drag to move • Right-click to rotate
+            Drag to move • Double-click to change orientation
           </TooltipContent>
         </Tooltip>
 

@@ -66,7 +66,7 @@ interface StageComponentProps {
   handleShapeMouseEnter: (id: string) => void;
   tempConnection: Connection | null;
   isSpacePressed?: boolean;
-  duplicateShape: (direction: 'top' | 'right' | 'bottom' | 'left') => void;
+  duplicateShape: (direction: 'top' | 'right' | 'bottom' | 'left',shouldConnect?: boolean) => void;
 }
 
 // --- HELPER: NORMALIZE RECT ---
@@ -346,7 +346,7 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
             fill="transparent"
             onClick={(e) => {
                e.cancelBubble = true;
-               onDuplicate(action.dir);
+               onDuplicate(action.dir,true);
             }}
             onMouseEnter={(e) => {
                const container = e.target.getStage()?.container();

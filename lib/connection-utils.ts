@@ -69,7 +69,7 @@ const createRoundedPath = (points: number[], radius: number): string => {
 
     // Line to the start of the curve
     path += ` L ${startX} ${startY}`;
-    // Quadratic Bezier curve to the end of the curve, using corner as control point
+    // Quadratic Bezier curve to the end of the curve
     path += ` Q ${currX} ${currY} ${endX} ${endY}`;
   }
 

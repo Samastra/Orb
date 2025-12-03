@@ -589,12 +589,12 @@ const deleteShape = useCallback(
   [reactShapes, konvaShapes, images, connections, stageFrames]
 );
 
-    const duplicateShape = useCallback((direction: 'top' | 'right' | 'bottom' | 'left') => {
-    // 1. Get currently selected shape (only support single selection for now)
-    const shapeId = selectedNodeIds[selectedNodeIds.length - 1]; // Use the last selected
+    const duplicateShape = useCallback((direction: 'top' | 'right' | 'bottom' | 'left', shouldConnect: boolean = false) => {
+    // 1. Get currently selected shape
+    const shapeId = selectedNodeIds[selectedNodeIds.length - 1]; 
     if (!shapeId) return;
 
-    // 2. Find the shape object in any of the arrays
+    // 2. Find the shape object
     const shape: any =
       konvaShapes.find(s => s.id === shapeId) ||
       reactShapes.find(s => s.id === shapeId) ||
@@ -603,30 +603,25 @@ const deleteShape = useCallback(
 
     if (!shape) return;
 
-    // 3. Calculate Dimensions for Offset
+    // 3. Calculate Dimensions & Offset
     let w = shape.width || 100;
     let h = shape.height || 100;
     
-    // Normalize dimensions for Center-based shapes (Circle/Ellipse)
-    // We want the visible width/height
+    // Normalize dimensions for Center-based shapes
     if (shape.type === 'circle') {
        const r = shape.radius || 50;
-       w = r * 2; 
-       h = r * 2;
+       w = r * 2; h = r * 2;
     } else if (shape.type === 'ellipse') {
        const rx = shape.radiusX || 80;
        const ry = shape.radiusY || 50;
-       w = rx * 2; 
-       h = ry * 2;
+       w = rx * 2; h = ry * 2;
     }
 
-    const GAP = 50; // Distance between shapes
+    const GAP = 200; // Increased gap for connector space
     let shiftX = 0;
     let shiftY = 0;
 
-    // 4. Calculate Shift Vector
-    // Note: This logic works for both Center-based and Top-Left based shapes
-    // because we are shifting by the full dimension + gap.
+    // Calculate Shift
     if (direction === 'right') shiftX = w + GAP;
     if (direction === 'left') shiftX = -(w + GAP);
     if (direction === 'bottom') shiftY = h + GAP;
@@ -635,15 +630,13 @@ const deleteShape = useCallback(
     const newX = shape.x + shiftX;
     const newY = shape.y + shiftY;
 
-    // 5. Create New Shape Data
-    // We append a timestamp to ensure unique IDs
+    // 4. Create New Shape
     const newId = `${shape.type}-${Date.now()}`;
     const newShape = { ...shape, id: newId, x: newX, y: newY };
 
-    console.log(`🚀 Duplicating ${shape.type} to ${direction}`);
+    console.log(`🚀 Spawning ${shape.type} to ${direction}`);
 
-    // 6. Add to State & History
-    // We handle this manually to ensure immediate state update for "Rapid Fire" feel
+    // Add to state
     if (shape.type === 'image') {
         setImages(prev => [...prev, newShape]);
         setActions(prev => [...prev, { type: 'add-image', data: newShape }]);
@@ -658,7 +651,36 @@ const deleteShape = useCallback(
          setActions(prev => [...prev, { type: 'add-konva-shape', shapeType: shape.type, data: newShape }]);
     }
 
-    // 7. RAPID FIRE: Switch selection to the new shape immediately
+    // 5. AUTO-CONNECT (The Killer Feature)
+    if (shouldConnect) {
+        const connectionId = `conn-${Date.now()}`;
+        
+        // Determine sides based on direction
+        let startSide: Side = 'right';
+        let endSide: Side = 'left';
+        
+        if (direction === 'right') { startSide = 'right'; endSide = 'left'; }
+        if (direction === 'left')  { startSide = 'left'; endSide = 'right'; }
+        if (direction === 'bottom'){ startSide = 'bottom'; endSide = 'top'; }
+        if (direction === 'top')   { startSide = 'top'; endSide = 'bottom'; }
+
+        // We use the shape centers/edges to calculate connection points roughly, 
+        // but since we are linking Nodes by ID, the stage component will handle the exact anchor logic!
+        const newConnection: Connection = {
+            id: connectionId,
+            type: 'connection',
+            from: { nodeId: shape.id, side: startSide, x: 0, y: 0 }, // coords updated by stage
+            to: { nodeId: newId, side: endSide, x: 0, y: 0 },
+            stroke: "#64748B",
+            strokeWidth: 4,
+            draggable: false,
+        };
+
+        setConnections(prev => [...prev, newConnection]);
+        setActions(prev => [...prev, { type: 'add-connection', data: newConnection }]);
+    }
+
+    // 6. Switch selection to the new shape so the user can keep typing/spawning
     setSelectedNodeIds([newId]);
 
   }, [selectedNodeIds, konvaShapes, reactShapes, images, stageFrames]);
