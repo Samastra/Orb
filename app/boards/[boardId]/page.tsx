@@ -357,12 +357,11 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
     setReactShapes(prev => [...prev, newTextShape]);
     
     // NEW: Add creation to Undo History
-    // FIX: Match Action type definition by adding shapeType and removing extra id
     undoRedoAddAction({
       type: 'add-react-shape',
       shapeType: 'text', // Added this
       data: newTextShape
-      // Removed 'id'
+      // Removed 'id' to fix type error
     });
 
     setSelectedNodeIds([shapeId]); 
@@ -587,13 +586,14 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     selectedNodeIds.forEach(id => {
        const shape = allShapes.find(s => s.id === id);
        if (shape) {
-           let type = '';
+           // FIX: Explicitly type the variable so TS knows it's a valid Action type
+           let type: Action['type'] = 'update-konva-shape'; 
+           
            if(shape.type === 'text' || shape.type === 'stickyNote') type = 'update-react-shape';
            else if(shape.type === 'image') type = 'update-image';
            else if(shape.type === 'stage') type = 'update-stage-frame';
            else if(shape.type === 'connection') type = 'update-connection';
-           else type = 'update-konva-shape';
-
+           
            actions.push({
                type,
                id,
@@ -699,7 +699,8 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     const shapeToDelete = allShapes.find(shape => shape.id === id);
     
     if (shapeToDelete) {
-      let actionType: string;
+      // FIX: Explicitly type actionType using Action['type']
+      let actionType: Action['type'] = 'delete-konva-shape';
 
         if (reactShapes.find(s => s.id === id)) {
           actionType = 'delete-react-shape';
@@ -711,8 +712,6 @@ const getSelectedShapeScreenPosition = useCallback(() => {
           actionType = 'delete-connection';
         } else if (stageFrames.find(s => s.id === id)) {
           actionType = 'delete-stage-frame';
-        } else {
-          actionType = 'delete-konva-shape';
         }
     
     // 2. Add to Undo History
