@@ -487,13 +487,14 @@ useEffect(() => {
   }, [selectedNodeIds, reactShapes, konvaShapes, images, connections]);
 
   // --- NEW: Calculate Screen Position for Formatting Toolbar ---
-  const getSelectedShapeScreenPosition = useCallback(() => {
+const getSelectedShapeScreenPosition = useCallback(() => {
     if (!selectedShape) return null;
     
     // Default world coordinates
     let x = (selectedShape as any).x || 0;
     let y = (selectedShape as any).y || 0;
     let w = (selectedShape as any).width || 0;
+    let h = (selectedShape as any).height || 0; // Capture Height
     
     // Adjust for centered shapes like Circle/Ellipse
     if (selectedShape.type === 'circle') {
@@ -501,24 +502,29 @@ useEffect(() => {
        x -= r; 
        y -= r;
        w = r * 2;
+       h = r * 2; // Circle height
     } else if (selectedShape.type === 'ellipse') {
        const rx = (selectedShape as any).radiusX || 0;
        const ry = (selectedShape as any).radiusY || 0;
        x -= rx;
        y -= ry;
        w = rx * 2;
+       h = ry * 2; // Ellipse height
     }
 
-    // Convert World (x, y) to Screen (screenX, screenY)
-    // Formula: screen = world * scale + pan
+    // Convert World Rect to Screen Rect
+    // screen = world * scale + pan
     const screenX = x * scale + position.x;
     const screenY = y * scale + position.y;
-    const scaledWidth = w * scale;
+    const screenW = w * scale;
+    const screenH = h * scale;
 
-    // Return the "Top-Center" point of the shape on screen
+    // Return the full Screen Bounding Box
     return {
-        x: screenX + scaledWidth / 2,
-        y: screenY
+        x: screenX,
+        y: screenY,
+        width: screenW,
+        height: screenH
     };
   }, [selectedShape, scale, position]);
 
@@ -903,6 +909,11 @@ useEffect(() => {
           onSendBackward={sendBackward}
           onBringToFront={bringToFront}
           onSendToBack={sendToBack}
+          onDelete={() => {
+            if (selectedNodeIds.length > 0) {
+              handleDeleteShape(selectedNodeIds[0]);
+            }
+          }}
         />
 
        

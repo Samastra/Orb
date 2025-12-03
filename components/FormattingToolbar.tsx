@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -22,7 +22,8 @@ import {
   Layers,
   ChevronUp,
   Palette,
-  Minus
+  Minus,
+  Trash2 
 } from "lucide-react";
 
 import {
@@ -148,13 +149,14 @@ interface FormattingToolbarProps {
       offsetY: number;
     };
   } | null;
-  // NEW PROP: Dynamic Position
-  position: { x: number, y: number } | null;
+  // CHANGED: Now accepts a full bounding box, not just a point
+  position: { x: number, y: number, width: number, height: number } | null;
   onChange: (updates: Record<string, unknown>) => void;
   onBringForward: () => void;
   onSendBackward: () => void;
   onBringToFront: () => void;
   onSendToBack: () => void;
+  onDelete: () => void;
 }
 
 const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
@@ -165,16 +167,29 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
   onSendBackward,
   onBringToFront,
   onSendToBack,
+  onDelete
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [formats, setFormats] = useState<string[]>([]);
   
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarBounds, setToolbarBounds] = useState({ width: 0, height: 0 });
+
   useEffect(() => {
     if (!selectedShape) return;
     const activeFormats: string[] = [];
     if (selectedShape.textDecoration === "underline") activeFormats.push("underline");
     setFormats(activeFormats);
   }, [selectedShape]);
+
+  useLayoutEffect(() => {
+    if (toolbarRef.current) {
+        setToolbarBounds({
+            width: toolbarRef.current.offsetWidth,
+            height: toolbarRef.current.offsetHeight
+        });
+    }
+  }, [selectedShape, showAdvanced]); 
 
   if (!selectedShape || !position || selectedShape.type === "stage") return null;
 
@@ -187,6 +202,7 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
 
   if (!isText && !isStickyNote && !isShape && !isImage) return null;
 
+  // ... (Keep existing variable definitions for fontSize, fontFamily, etc.) ...
   const currentFontSize = selectedShape.fontSize || (isStickyNote ? 16 : 20);
   const currentFontFamily = selectedShape.fontFamily || "Arial";
   const currentFillColor = selectedShape.fill || "#000000";
@@ -202,33 +218,60 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
     onChange({ textDecoration: vals.includes("underline") ? "underline" : "none" });
   };
 
-  // Safe clamping logic to keep toolbar on screen
-  // (Assuming toolbar width ~350px and height ~50px)
-  let safeX = position.x;
-  let safeY = position.y;
+  // --- SMART POSITIONING LOGIC ---
+  // Initial Goal: Center horizontal, Place Top
+  const gap = 12; 
+  let safeX = position.x + position.width / 2; // Center of shape
+  let safeY = position.y - gap; // Top of shape
 
-  // Simple adjustment: if it's too close to edges
+  // We need to know toolbar height to decide placement
+  // If not measured yet, these defaults might be slightly off but it fixes itself in 1 frame
+  const tbHeight = toolbarBounds.height || 50; 
+  const tbWidth = toolbarBounds.width || 300;
+  const halfWidth = tbWidth / 2;
+  const screenPadding = 16;
+
   if (typeof window !== "undefined") {
-     if (safeX < 180) safeX = 180; // keep left edge on screen
-     if (safeX > window.innerWidth - 180) safeX = window.innerWidth - 180;
+     // 1. Horizontal Clamping (Keep on screen)
+     if (safeX - halfWidth < screenPadding) {
+        safeX = halfWidth + screenPadding;
+     } else if (safeX + halfWidth > window.innerWidth - screenPadding) {
+        safeX = window.innerWidth - halfWidth - screenPadding;
+     }
+
+     // 2. Vertical Smart Flip
+     // Check if placing it on top would clip it off the screen
+     const topEdge = safeY - tbHeight;
      
-     if (safeY < 60) safeY = position.y + 80; // Flip to bottom if too close to top
+     if (topEdge < screenPadding) {
+        // NOT ENOUGH SPACE ON TOP -> FLIP TO BOTTOM
+        // New Y = Shape Top + Shape Height + Gap + Toolbar Height (since we use transform -100%)
+        // Actually, CSS transform translate(-50%, -100%) means the anchor is the bottom-center of the toolbar.
+        // So if we want it BELOW, we need to adjust the Y calculation.
+        
+        // Let's change the anchor logic slightly for the "Below" case.
+        // It's cleaner to just move the 'top' value down by (ToolbarHeight + ShapeHeight + 2*Gap)
+        safeY = position.y + position.height + gap + tbHeight;
+     }
   }
 
   return (
     <TooltipProvider>
       <div 
+        ref={toolbarRef}
         style={{ 
           left: safeX,
           top: safeY,
-          transform: 'translate(-50%, -100%)', // Centered horizontally, anchored to top of shape
-          marginTop: '-12px',
-          touchAction: 'none'
+          // Anchored bottom-center relative to 'top/left' styles
+          transform: 'translate(-50%, -100%)', 
+          touchAction: 'none',
+          opacity: toolbarBounds.width > 0 ? 1 : 0 
         }}
-        className="fixed z-50 flex flex-col items-center gap-2 will-change-transform"
+        className="fixed z-50 flex flex-col items-center gap-2 will-change-transform transition-all duration-100 ease-out"
       >
         <div className="flex items-center gap-1 bg-white/90 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/20 ring-1 ring-black/5 rounded-2xl px-3 py-2 transition-all duration-300">
           
+          {/* ... (Rest of your JSX content remains exactly the same) ... */}
           {isStickyNote && (
             <>
               <DropdownMenu>
@@ -413,6 +456,15 @@ const FormattingToolbar: React.FC<FormattingToolbarProps> = ({
               </div>
             </>
           )}
+
+          <Divider />
+          <FormatBtn 
+            icon={Trash2} 
+            label="Delete" 
+            onClick={onDelete} 
+            className="text-red-500 hover:bg-red-50 hover:text-red-600"
+          />
+
         </div>
 
         {showAdvanced && isText && (
