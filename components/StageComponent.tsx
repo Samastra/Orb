@@ -479,6 +479,11 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const dy = node.y() - startPos.y;
     selectedNodeIds.forEach(id => {
       if (id === node.id()) return;
+      
+      // NEW: Check if part of the multi-selection is locked, if so, skip moving it
+      const shape = allShapesMap.get(id);
+      if (shape?.isLocked) return;
+
       const otherNode = shapeRefs.current[id];
       const otherStart = dragStartPos.current.get(id);
       if (otherNode && otherStart) {
@@ -487,7 +492,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
       }
     });
    if (trRef.current) trRef.current.getLayer()?.batchDraw();
-  }, [selectedNodeIds]);
+  }, [selectedNodeIds, allShapesMap]);
 
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
@@ -502,6 +507,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
         if (affected.length === 0) return;
         setter((prev: any[]) => prev.map(item => {
             if (selectedNodeIds.includes(item.id) || item.id === node.id()) {
+                // NEW: Ensure we don't update state for locked items in a selection
+                if (item.isLocked) return item;
+
                 const myStart = dragStartPos.current.get(item.id);
                 if (myStart) {
                     return { ...item, x: myStart.x + dx, y: myStart.y + dy };
@@ -520,6 +528,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
         const affectedIds = new Set([...selectedNodeIds, node.id()]);
         affectedIds.forEach(id => {
             const shape = allShapesMap.get(id);
+            // NEW: Skip locked items for undo history
+            if (shape?.isLocked) return;
+
             const myStart = dragStartPos.current.get(id);
             const myNode = shapeRefs.current[id]; 
             if (shape && myStart && myNode) {

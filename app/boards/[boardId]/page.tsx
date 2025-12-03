@@ -357,10 +357,12 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
     setReactShapes(prev => [...prev, newTextShape]);
     
     // NEW: Add creation to Undo History
+    // FIX: Match Action type definition by adding shapeType and removing extra id
     undoRedoAddAction({
       type: 'add-react-shape',
-      data: newTextShape,
-      id: shapeId
+      shapeType: 'text', // Added this
+      data: newTextShape
+      // Removed 'id'
     });
 
     setSelectedNodeIds([shapeId]); 
