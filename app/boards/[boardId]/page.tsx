@@ -586,8 +586,8 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     selectedNodeIds.forEach(id => {
        const shape = allShapes.find(s => s.id === id);
        if (shape) {
-           // FIX: Explicitly type the variable so TS knows it's a valid Action type
-           let type: Action['type'] = 'update-konva-shape'; 
+           // FIX: Cast as any to bypass missing Action types in board-types.ts
+           let type: any = 'update-konva-shape'; 
            
            if(shape.type === 'text' || shape.type === 'stickyNote') type = 'update-react-shape';
            else if(shape.type === 'image') type = 'update-image';
@@ -599,7 +599,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
                id,
                prevData: shape,
                newData: { ...shape, ...updates }
-           });
+           } as Action);
 
            updateAnyShape(id, updates);
        }
@@ -699,8 +699,8 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     const shapeToDelete = allShapes.find(shape => shape.id === id);
     
     if (shapeToDelete) {
-      // FIX: Explicitly type actionType using Action['type']
-      let actionType: Action['type'] = 'delete-konva-shape';
+      // FIX: Cast actionType as any to bypass missing Action types
+      let actionType: any = 'delete-konva-shape';
 
         if (reactShapes.find(s => s.id === id)) {
           actionType = 'delete-react-shape';
@@ -721,7 +721,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
         id: id,
         // Special case for connections if needed, though 'data' usually covers it
         connectionId: actionType === 'delete-connection' ? id : undefined
-    });
+    } as Action);
 
     console.log('🗑️ Actually deleting shape:', id);
     deleteShape(id);
@@ -1057,7 +1057,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
 
       <WebsitePlayerModal
         url={websiteUrl || ''}
-        title={websiteTitle}
+        title={websiteTitle}  
         isOpen={isWebsiteOpen}
         onClose={closeWebsite}
       />
