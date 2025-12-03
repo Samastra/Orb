@@ -1,15 +1,16 @@
 import Konva from "konva";
 import { KonvaShape } from '@/hooks/useShapes';
-import { Connection } from '@/hooks/useBoardState'; // ADD THIS IMPORT
-// IN types/board-types.ts - ADD THIS EXPORT
+// Export Connection so other files can use it easily
 export type { Connection } from '@/hooks/useBoardState';
+import { Connection } from '@/hooks/useBoardState';
+
 // ---------- Action Types ----------
 export type Action =
   | { type: "add"; node: Konva.Shape | Konva.Group }
   | { type: "add-react-shape"; shapeType: string; data: ReactShape }
   | { type: "add-line"; line: { tool: 'brush' | 'eraser', points: number[] } }
   | { type: "add-konva-shape"; shapeType: Tool; data: KonvaShape }
-  | { type: "delete-konva-shape"; data: KonvaShape }
+  | { type: "delete-konva-shape"; data: KonvaShape; id: string }
   | {
       type: "update";
       id: string;
@@ -17,19 +18,21 @@ export type Action =
       newAttrs: Konva.NodeConfig;
     }
   | { type: "delete"; node: Konva.Shape | Konva.Group }
-  | { type: "delete-react-shape"; data: any }
-  | { type: "delete-line"; lineIndex: number }
+  | { type: "delete-react-shape"; data: ReactShape; id: string }
+  | { type: "delete-line"; lineIndex: number; data: { tool: 'brush' | 'eraser', points: number[] } }
   | { type: "add-stage-with-text"; stageGroup: Konva.Group; textShape: ReactShape }
   | { type: "update-react-shape"; id: string; prevData: ReactShape; newData: ReactShape }
   | { type: "update-konva-shape"; id: string; prevData: KonvaShape; newData: KonvaShape }
   | { type: "add-stage-frame"; data: KonvaShape }
-  | { type: "delete-stage-frame"; data: KonvaShape }
+  | { type: "update-stage-frame"; id: string; prevData: KonvaShape; newData: KonvaShape }
+  | { type: "delete-stage-frame"; data: KonvaShape; id: string }
   | { type: "add-image"; data: ImageShape }
-  | { type: "delete-image"; data: ImageShape }
-  | { type: "add-connection"; data: Connection } // ADD THIS
-  | { type: "delete-connection"; connectionId: string } // ADD THIS
-  | { type: "update-connection"; id: string; prevData: Connection; newData: Connection }; // ADD THIS
-   
+  | { type: "update-image"; id: string; prevData: ImageShape; newData: ImageShape }
+  | { type: "delete-image"; data: ImageShape; id: string }
+  | { type: "add-connection"; data: Connection }
+  | { type: "delete-connection"; connectionId: string; data?: Connection; id?: string }
+  | { type: "update-connection"; id: string; prevData: Connection; newData: Connection }
+  | { type: "batch"; actions: Action[] }; // THE MISSING PIECE
 
 // ---------- Tool Types ----------
 export type Tool =
@@ -50,6 +53,14 @@ export type Tool =
   | "image";
 
 // ---------- Shape Types ----------
+export interface BaseShape {
+  id: string;
+  x: number;
+  y: number;
+  rotation?: number;
+  draggable?: boolean;
+}
+
 export interface ImageShape extends BaseShape {
   type: 'image';
   width: number;
@@ -60,18 +71,6 @@ export interface ImageShape extends BaseShape {
   originalWidth?: number;
   originalHeight?: number;
   aspectRatio?: number;
-}
-
-// In board-types.ts, update the ReactShape interface to fix type compatibility:
-
-
-// Add to board-types.ts
-export interface BaseShape {
-  id: string;
-  x: number;
-  y: number;
-  rotation?: number;
-  draggable?: boolean;
 }
 
 export type ReactShape = BaseShape & {
@@ -100,6 +99,7 @@ export type ReactShape = BaseShape & {
   };
   zIndex?: number;
 };
+
 // ---------- Board State Types ----------
 export type BoardState = {
   scale: number;
@@ -126,8 +126,8 @@ export type BoardState = {
   boardInfo: { title: string; category: string };
   images: ImageShape[];
   setImages: React.Dispatch<React.SetStateAction<ImageShape[]>>;
-  connections: Connection[]; // ADD THIS
-  setConnections: React.Dispatch<React.SetStateAction<Connection[]>>; // ADD THIS
+  connections: Connection[];
+  setConnections: React.Dispatch<React.SetStateAction<Connection[]>>;
 };
 
 // ---------- Tool Handlers Types ----------

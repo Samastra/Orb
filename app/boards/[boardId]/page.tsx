@@ -586,14 +586,14 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     selectedNodeIds.forEach(id => {
        const shape = allShapes.find(s => s.id === id);
        if (shape) {
-           // FIX: Cast as any to bypass missing Action types in board-types.ts
-           let type: any = 'update-konva-shape'; 
+           let type: Action['type'] = 'update-konva-shape'; 
            
            if(shape.type === 'text' || shape.type === 'stickyNote') type = 'update-react-shape';
            else if(shape.type === 'image') type = 'update-image';
            else if(shape.type === 'stage') type = 'update-stage-frame';
            else if(shape.type === 'connection') type = 'update-connection';
            
+           // We cast specifically to bypass typescript conditional inference issues, but the types exist now
            actions.push({
                type,
                id,
@@ -699,8 +699,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     const shapeToDelete = allShapes.find(shape => shape.id === id);
     
     if (shapeToDelete) {
-      // FIX: Cast actionType as any to bypass missing Action types
-      let actionType: any = 'delete-konva-shape';
+      let actionType: Action['type'] = 'delete-konva-shape';
 
         if (reactShapes.find(s => s.id === id)) {
           actionType = 'delete-react-shape';
@@ -719,7 +718,6 @@ const getSelectedShapeScreenPosition = useCallback(() => {
         type: actionType,
         data: shapeToDelete,
         id: id,
-        // Special case for connections if needed, though 'data' usually covers it
         connectionId: actionType === 'delete-connection' ? id : undefined
     } as Action);
 

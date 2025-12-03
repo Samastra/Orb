@@ -25,13 +25,7 @@ export const useUndoRedo = (
 ) => {
 
   // --- HELPER: APPLY ACTION ---
-  // This executes a single action on the state. 
-  // We use this for both Undo (reverting) and Redo (applying).
   const dispatchBoardAction = useCallback((action: Action, mode: 'undo' | 'redo') => {
-    const drawLayer = stageRef.current?.findOne(".draw-layer") as Konva.Layer;
-    
-    // For Undo: We want to restore 'prevData'. For Redo: We want 'newData'.
-    // Note: 'add' and 'delete' logic is flipped between undo/redo.
     
     switch (action.type) {
       // --- BATCH ACTIONS (Figma-style grouping) ---
@@ -84,7 +78,9 @@ export const useUndoRedo = (
       case "delete-connection":
         {
           const isDelete = mode === 'redo';
-          const item = action.data; // The deleted item data
+          // We look for 'data' in the action. 
+          // Note: In board-types.ts we ensured these actions have 'data' property
+          const item = (action as any).data; 
           
           const setterMap: Record<string, any> = {
             'delete-react-shape': setReactShapes,
@@ -97,7 +93,9 @@ export const useUndoRedo = (
 
           if (isDelete) {
             // Actually delete
-            setter((prev: any[]) => prev.filter((s: any) => s.id !== item.id));
+            // Use 'id' from action if available, or item.id
+            const targetId = (action as any).id || item.id;
+            setter((prev: any[]) => prev.filter((s: any) => s.id !== targetId));
           } else {
             // Restore (Undo delete)
             setter((prev: any[]) => [...prev, item]);
@@ -112,7 +110,10 @@ export const useUndoRedo = (
            // Restore line at specific index
            setLines(prev => {
              const newLines = [...prev];
-             newLines.splice(action.lineIndex, 0, action.data);
+             // Ensure data exists before splicing
+             if(action.data) {
+                newLines.splice(action.lineIndex, 0, action.data);
+             }
              return newLines;
            });
         }
@@ -151,7 +152,6 @@ export const useUndoRedo = (
   const addAction = useCallback((action: Action) => {
     console.log('💾 Saving action:', action.type);
     setActions(prev => {
-       // Optional: Cap history size to 50
        const newHistory = [...prev, action];
        if (newHistory.length > 50) return newHistory.slice(newHistory.length - 50);
        return newHistory;
