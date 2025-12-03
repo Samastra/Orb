@@ -3,12 +3,13 @@ import React, { useRef, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Konva from "konva";
 import { Layer, Transformer, Line, Rect, Circle, Ellipse, Arrow, Image, Path, Group } from "react-konva";
-import GridLayer from "@/components/gridLayer"; // Ensure this path is correct
+import GridLayer from "@/components/gridLayer"; 
 import { ReactShape, Tool, ImageShape } from "../types/board-types";
 import TextComponent from "./TextComponent";
 import { KonvaShape } from "@/hooks/useShapes";
 import { Connection, Side } from "@/hooks/useBoardState";
-import { getOrthogonalPoints, getAnchorPoint, Rect as UtilsRect } from "@/lib/connection-utils";
+// Changed import from getOrthogonalPoints to getOrthogonalPath
+import { getOrthogonalPath, getAnchorPoint, Rect as UtilsRect } from "@/lib/connection-utils";
 import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 
 // --- DYNAMIC IMPORT ---
@@ -101,33 +102,70 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
     endSide = targetSide;
   }
 
-  // PASS 10 as the last argument to retract the line by 10px (Arrowhead size)
-  const points = getOrthogonalPoints(startPoint, endPoint, connection.from.side, endSide, 40, 10);
+  // Calculate path data with rounded corners
+  const pathData = getOrthogonalPath(startPoint, endPoint, connection.from.side, endSide, 40, 20); // 20px corner radius
   
   const strokeColor = selected ? "#3366FF" : (connection.stroke || "#64748B");
+  const strokeWidth = selected ? 4 : (connection.strokeWidth || 4);
+
+  // Calculate arrowhead position and rotation
+  const arrowLength = 10;
+  let arrowX = endPoint.x;
+  let arrowY = endPoint.y;
+  let arrowRotation = 0;
+
+  switch (endSide) {
+    case "top":
+      arrowY -= arrowLength;
+      arrowRotation = 90;
+      break;
+    case "right":
+      arrowX += arrowLength;
+      arrowRotation = 180;
+      break;
+    case "bottom":
+      arrowY += arrowLength;
+      arrowRotation = 270;
+      break;
+    case "left":
+      arrowX -= arrowLength;
+      arrowRotation = 0;
+      break;
+  }
 
   return (
     <Group onClick={onClick} onTap={onClick}>
       {/* 1. Fat Invisible Path (Click Target) */}
-      <Arrow 
-        points={points} 
-        stroke="transparent" 
-        strokeWidth={30} // Even fatter hit area
-        cornerRadius={30} 
+      <Path
+        data={pathData}
+        stroke="transparent"
+        strokeWidth={30}
       />
       
-      {/* 2. Visible Curve with Arrowhead */}
-      <Arrow
-        points={points}
+      {/* 2. Visible Rounded Path */}
+      <Path
+        data={pathData}
         stroke={strokeColor}
-        strokeWidth={selected ? 4 : (connection.strokeWidth || 4)}
-        fill={strokeColor}
-        cornerRadius={20}       // <--- 30px Radius for BIG curves
-        pointerLength={10}      // <--- Arrowhead Length
-        pointerWidth={10}
+        strokeWidth={strokeWidth}
         lineCap="round"
         lineJoin="round"
         dash={connection.id === 'temp-connection' ? [5, 5] : undefined}
+        listening={false}
+      />
+
+      {/* 3. Arrowhead */}
+      <Arrow
+        x={arrowX}
+        y={arrowY}
+        points={[0, 0, arrowLength, 0]} // Simple arrow segment, will be rotated
+        rotation={arrowRotation}
+        stroke={strokeColor}
+        fill={strokeColor}
+        strokeWidth={strokeWidth}
+        pointerLength={arrowLength}
+        pointerWidth={arrowLength}
+        lineCap="round"
+        lineJoin="round"
         listening={false}
       />
     </Group>
@@ -135,19 +173,22 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
 });
 OrthogonalConnection.displayName = "OrthogonalConnection";
 
-const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick }: any) => {
+const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick, scale }: any) => {
   if (!shape) return null;
 
   const rect = getNormalizedRect(shape);
   const sides: Side[] = ["top", "right", "bottom", "left"];
-  const OFFSET = 15; // <--- PUSH DOTS OUTWARD
+  
+  const OFFSET = 15 / scale; 
+  const HIT_RADIUS = 40 / scale;
+  const VISIBLE_RADIUS = 9 / scale;
+  const STROKE_WIDTH = 3 / scale;
 
   return (
     <Group>
       {sides.map(side => {
         const pos = getAnchorPoint(rect, side);
         
-        // Apply Offset
         let displayX = pos.x;
         let displayY = pos.y;
         if (side === 'top') displayY -= OFFSET;
@@ -162,7 +203,7 @@ const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick }: any) => {
             y={displayY}
             onMouseDown={(e) => {
                e.cancelBubble = true;
-               onMouseDown(e, side, pos); // Pass original pos logic, but visual is offset
+               onMouseDown(e, side, pos); 
             }}
             onClick={(e) => onClick(e, side)}
             onTap={(e) => onClick(e, side)}
@@ -175,15 +216,12 @@ const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick }: any) => {
                 if(stage) stage.container().style.cursor = "default";
             }}
           >
-            {/* Massive Hit Area */}
-            <Circle radius={30} fill="transparent" />
-            
-            {/* Visible Dot */}
+            <Circle radius={HIT_RADIUS} fill="transparent" />
             <Circle 
-               radius={6} 
+               radius={VISIBLE_RADIUS} 
                fill="#ffffff" 
                stroke="#3366FF" 
-               strokeWidth={2} 
+               strokeWidth={STROKE_WIDTH} 
                shadowBlur={4} 
                shadowColor="rgba(0,0,0,0.15)"
                listening={false} 
@@ -200,7 +238,6 @@ AnchorOverlay.displayName = "AnchorOverlay";
 const ImageElement = React.memo(React.forwardRef<Konva.Image, any>(({ imageShape, ...props }, ref) => {
   const [image, setImage] = React.useState<HTMLImageElement | null>(null);
   
-  // Use a ref to prevent re-creating the image object on every render
   useEffect(() => {
     if (!imageShape.src) return;
     const img = new window.Image();
@@ -230,12 +267,10 @@ const ImageElement = React.memo(React.forwardRef<Konva.Image, any>(({ imageShape
 ImageElement.displayName = 'ImageElement';
 
 // --- NEW: GENERIC SHAPE RENDERER ---
-// This component decides what to render and is memoized to prevent re-renders of untouched shapes
 const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, updateShape, commonProps, setShapeRef }: any) => {
   
-  // Attach ref
   const handleRef = (node: Konva.Node | null) => {
-     setShapeRef(item.id, node);
+      setShapeRef(item.id, node);
   };
 
   if (item.__kind === 'stage') {
@@ -265,14 +300,10 @@ const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, u
 
   return null;
 }, (prev, next) => {
-  // CUSTOM COMPARISON FOR PERFORMANCE
-  // Only re-render if the item data changed, or selection/editing state changed for THIS item
   return (
     prev.item === next.item &&
     prev.isSelected === next.isSelected &&
     prev.isEditing === next.isEditing &&
-    // Optimization: Ignore commonProps functions, assuming they are stable or we don't care if they change 
-    // (unless you need to update handlers dynamically)
     prev.commonProps.draggable === next.commonProps.draggable 
   );
 });
@@ -281,21 +312,20 @@ ShapeRenderer.displayName = "ShapeRenderer";
 
 
 // --- NEW COMPONENT: Quick Actions Overlay ---
-const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplicate }: any) => {
+const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplicate, scale }: any) => {
   const shape = allShapesMap.get(selectedNodeId);
   if (!shape) return null;
 
-  // 1. Calculate Bounds
-  // We reuse the normalization logic to get the visual box
   const rect = getNormalizedRect(shape);
   const { x, y, width, height } = rect;
 
-  // 2. Button Configuration
-  const GAP = 20; // Distance from shape edge
-  const BUTTON_SIZE = 24;
+  const GAP = 35 / scale; 
+  const BUTTON_SIZE = 28 / scale;
+  const VISIBLE_RADIUS = 12 / scale;
   const HALF_BTN = BUTTON_SIZE / 2;
+  const ICON_SIZE = 5 / scale;
+  const STROKE_WIDTH = 2 / scale;
 
-  // Positions for 4 buttons (Top, Right, Bottom, Left)
   const actions = [
     { dir: 'top',    x: x + width / 2,         y: y - GAP },
     { dir: 'right',  x: x + width + GAP,       y: y + height / 2 },
@@ -309,9 +339,8 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
         <Group
           key={action.dir}
           x={action.x}
-          y={action.dir === 'top' || action.dir === 'bottom' ? action.y - HALF_BTN : action.y - HALF_BTN} // Center adjustment
+          y={action.dir === 'top' || action.dir === 'bottom' ? action.y - HALF_BTN : action.y - HALF_BTN}
         >
-          {/* Hit Area (Invisible, larger for easier clicking) */}
           <Circle
             radius={BUTTON_SIZE}
             fill="transparent"
@@ -322,31 +351,31 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
             onMouseEnter={(e) => {
                const container = e.target.getStage()?.container();
                if(container) container.style.cursor = "pointer";
-               // Visual Hover Effect: Find the visible circle sibling
-               const circle = (e.target.getParent() as Konva.Group)?.findOne('.visible-btn');
-               if(circle) circle.to({ opacity: 1, scaleX: 1.2, scaleY: 1.2, duration: 0.1 });
+               const group = e.target.getParent() as Konva.Group;
+               group?.findOne('.visible-btn')?.to({ scaleX: 1.2, scaleY: 1.2, duration: 0.1 });
+               group?.findOne('.plus-icon')?.to({ scaleX: 1.2, scaleY: 1.2, duration: 0.1 });
             }}
             onMouseLeave={(e) => {
                const container = e.target.getStage()?.container();
                if(container) container.style.cursor = "default";
-               const circle = (e.target.getParent() as Konva.Group)?.findOne('.visible-btn');
-               if(circle) circle.to({ opacity: 0.5, scaleX: 1, scaleY: 1, duration: 0.1 });
+               const group = e.target.getParent() as Konva.Group;
+               group?.findOne('.visible-btn')?.to({ scaleX: 1, scaleY: 1, duration: 0.1 });
+               group?.findOne('.plus-icon')?.to({ scaleX: 1, scaleY: 1, duration: 0.1 });
             }}
           />
           
-          {/* Visible Button */}
           <Circle
             name="visible-btn"
-            radius={8}
-            fill="#3366FF" // Your Brand Blue
-            opacity={0.0} // Hidden by default, or 0.5 if you want them always faint
-            listening={false} // Let the hit area handle events
+            radius={VISIBLE_RADIUS}
+            fill="#3366FF"
+            opacity={1} 
+            listening={false}
           />
           
-          {/* Plus Icon (Mocked with Lines) - Only visible on hover? 
-              Actually, let's keep it simple: A Blue Dot that grows is very "Figma"
-              If you want a '+' sign, we can add Lines, but a dot is cleaner.
-          */}
+          <Group name="plus-icon" listening={false}>
+             <Line points={[-ICON_SIZE, 0, ICON_SIZE, 0]} stroke="white" strokeWidth={STROKE_WIDTH} listening={false} />
+             <Line points={[0, -ICON_SIZE, 0, ICON_SIZE]} stroke="white" strokeWidth={STROKE_WIDTH} listening={false} />
+          </Group>
         </Group>
       ))}
     </Group>
@@ -376,84 +405,56 @@ const StageComponent: React.FC<StageComponentProps> = ({
     else delete shapeRefs.current[id];
   }, []);
 
-  // Removed the global "useEffect batchDraw" - React-Konva handles this better alone.
-
-  // --- MEMOIZE ALL SHAPES MAP ---
-  // Create a single lookup map for connections (Optimization)
   const allShapesMap = useMemo(() => {
     const map = new Map();
     [...shapes, ...reactShapes, ...images, ...stageFrames].forEach(s => map.set(s.id, s));
     return map;
   }, [shapes, reactShapes, images, stageFrames]);
 
-  // --- OPTIMIZED DRAGGING (UNCONTROLLED) ---
   const handleDragStart = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
     if (!node) return;
-    
-    // If dragging a node that isn't selected, select it (unless holding shift/ctrl)
     if (!selectedNodeIds.includes(node.id())) {
        setSelectedNodeIds([node.id()]);
     }
-
-    // Capture start positions for ALL selected nodes
     const startPositions = new Map<string, {x:number, y:number}>();
-    
-    // We need to look up the current nodes from refs to get "real" positions
     selectedNodeIds.forEach(id => {
        const ref = shapeRefs.current[id];
        if (ref) startPositions.set(id, { x: ref.x(), y: ref.y() });
     });
-    
-    // Ensure the dragged node is also captured (might be redundant but safe)
     startPositions.set(node.id(), { x: node.x(), y: node.y() });
-    
     dragStartPos.current = startPositions;
   }, [selectedNodeIds, setSelectedNodeIds]);
 
   const handleDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-    // 🚀 PERFORMANCE CRITICAL: Direct DOM Manipulation
-    // We do NOT call setShapes/setReactShapes here. We just move the nodes.
     const node = e.target;
     const startPos = dragStartPos.current.get(node.id());
-    
     if (!startPos) return;
-
     const dx = node.x() - startPos.x;
     const dy = node.y() - startPos.y;
-
-    // Move all OTHER selected nodes by the same delta
     selectedNodeIds.forEach(id => {
       if (id === node.id()) return;
       const otherNode = shapeRefs.current[id];
       const otherStart = dragStartPos.current.get(id);
-      
       if (otherNode && otherStart) {
         otherNode.x(otherStart.x + dx);
         otherNode.y(otherStart.y + dy);
       }
     });
-
-   if (trRef.current) trRef.current.getLayer()?.batchDraw();// Only redraw the layer, not React render
+   if (trRef.current) trRef.current.getLayer()?.batchDraw();
   }, [selectedNodeIds]);
 
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-    // SYNC BACK TO REACT STATE
     const node = e.target;
     const startPos = dragStartPos.current.get(node.id());
     if(!startPos) return;
-
     const dx = node.x() - startPos.x;
     const dy = node.y() - startPos.y;
-
-    // Helper to update specific list
     const applyMove = (list: any[], setter: any) => {
         const affected = list.filter(item => selectedNodeIds.includes(item.id));
         if (affected.length === 0) return;
-
         setter((prev: any[]) => prev.map(item => {
             if (selectedNodeIds.includes(item.id)) {
-                // Careful: use the stored start pos to ensure precision
                 const myStart = dragStartPos.current.get(item.id);
                 if (myStart) {
                     return { ...item, x: myStart.x + dx, y: myStart.y + dy };
@@ -462,30 +463,19 @@ const StageComponent: React.FC<StageComponentProps> = ({
             return item;
         }));
     };
-
     applyMove(reactShapes, setReactShapes);
     applyMove(shapes, setShapes);
     applyMove(images, setImages);
     applyMove(stageFrames, setStageFrames);
-    
     dragStartPos.current.clear();
   }, [selectedNodeIds, reactShapes, shapes, images, stageFrames, setReactShapes, setShapes, setImages, setStageFrames]);
 
-  // --- TRANSFORM HANDLER ---
   const handleShapeTransformEnd = useCallback((item: any, e: any) => {
     const node = e.target;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
-    
-    // Reset scale to 1 and bake into width/height/radius
     node.scaleX(1); node.scaleY(1);
-    
-    const updates: any = {
-        x: node.x(),
-        y: node.y(),
-        rotation: node.rotation(),
-    };
-
+    const updates: any = { x: node.x(), y: node.y(), rotation: node.rotation() };
     if (item.type === 'circle') {
       updates.radius = Math.max(5, (node as Konva.Circle).radius() * scaleX);
     } else if (item.type === 'ellipse') {
@@ -495,28 +485,20 @@ const StageComponent: React.FC<StageComponentProps> = ({
       updates.width = Math.max(5, node.width() * scaleX);
       updates.height = Math.max(5, node.height() * scaleY);
     }
-    
     updateShape(item.id, updates);
   }, [updateShape]);
 
-  // --- TRANSFORMER ATTACHMENT ---
   useEffect(() => {
     if (!trRef.current) return;
     if (selectedNodeIds.length === 0) {
       trRef.current.nodes([]);
       return;
     }
-    
-    const nodes = selectedNodeIds
-      .map(id => shapeRefs.current[id])
-      .filter((n): n is Konva.Node => !!n);
-      
+    const nodes = selectedNodeIds.map(id => shapeRefs.current[id]).filter((n): n is Konva.Node => !!n);
     trRef.current.nodes(nodes);
     trRef.current.getLayer()?.batchDraw();
   }, [selectedNodeIds, shapes, reactShapes, images, stageFrames]); 
 
-  // --- PREPARE RENDER LISTS ---
-  // We strictly separate the lists to avoid recreating objects unnecessarily
   const combinedShapes = useMemo(() => [
     ...stageFrames.map(s => ({ ...s, __kind: 'stage' })),
     ...shapes.map(s => ({ ...s, __kind: 'konva' })),
@@ -545,13 +527,11 @@ const StageComponent: React.FC<StageComponentProps> = ({
         onWheel={handleWheel}
         onClick={handleStageClick} onTap={handleStageClick}
         ref={(node) => { if (node) { stageRef.current = node; setStageInstance(node); } }}
-        className="bg-white cursor-move"
+        className="bg-slate-50"
         onMouseDown={handleMouseDown} onMouseUp={handleMouseUp} onMouseMove={handleMouseMove}
         onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchMove={handleTouchMove}
       >
-        {/* GRID LAYER - Static, doesn't need to re-render with shapes */}
         <GridLayer stage={stageInstance} />
-        
         <Layer name="draw-layer">
           {combinedShapes.map((item: any) => (
              <ShapeRenderer 
@@ -577,8 +557,8 @@ const StageComponent: React.FC<StageComponentProps> = ({
                         setEditingId(null);
                     },
                     onDragStart: handleDragStart,
-                    onDragMove: handleDragMove, // The new optimized handler
-                    onDragEnd: handleDragEnd,   // The new optimized handler
+                    onDragMove: handleDragMove,
+                    onDragEnd: handleDragEnd,
                     onTransformEnd: (e: any) => handleShapeTransformEnd(item, e),
                     onMouseEnter: (item.type === 'text' || item.type === 'stickyNote') 
                         ? undefined 
@@ -588,7 +568,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
              />
           ))}
 
-          {/* CONNECTIONS */}
           {connections.map(conn => (
             <OrthogonalConnection 
                 key={conn.id} 
@@ -600,7 +579,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
             />
           ))}
 
-          {/* TEMP CONNECTION */}
           {tempConnection && (
             <OrthogonalConnection 
                 connection={tempConnection} 
@@ -609,16 +587,15 @@ const StageComponent: React.FC<StageComponentProps> = ({
             />
           )}
 
-          {/* ANCHORS (Only show when hovering and tool is connect) */}
           {hoveredNodeId && activeTool === "connect" && allShapesMap.has(hoveredNodeId) && (
             <AnchorOverlay 
                 shape={allShapesMap.get(hoveredNodeId)}
+                scale={scale}
                 onMouseDown={(e: any, side: Side, pos: any) => handleAnchorMouseDown(e, hoveredNodeId, side, pos)}
                 onClick={(e: any, side: Side) => handleAnchorClick(e, hoveredNodeId, side)}
             />
           )}
           
-          {/* BRUSH LINES */}
           {lines.map((line, i) => (
             <Line 
                 key={i} 
@@ -629,46 +606,38 @@ const StageComponent: React.FC<StageComponentProps> = ({
                 lineCap="round" 
                 lineJoin="round" 
                 globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'} 
-                listening={false} // Optimization: Lines don't need hit detection usually
+                listening={false}
             />
           ))}
 
-          {/* 1. Calculate if we should hide anchors */}
           {(() => {
             const selectedNode = selectedNodeIds.length === 1 ? allShapesMap.get(selectedNodeIds[0]) : null;
-            // Hide anchors for Sticky Notes and Stage Frames
             const shouldHideAnchors = selectedNode && (selectedNode.type === 'stickyNote' || selectedNode.type === 'stage');
-
             return (
               <Transformer 
                 ref={trRef}
-                
-                // --- LOGIC: HIDE ANCHORS ---
                 resizeEnabled={!shouldHideAnchors}
-                rotateEnabled={!shouldHideAnchors} // Remove this line if you still want them to rotate!
-                
-                // --- VISUALS: FIGMA STYLE UI ---
-                borderStroke="#3366FF"        // Brand Blue
-                borderStrokeWidth={1.5}       // Crisp thin line
-                anchorSize={11}               // Smaller, cleaner handles
-                anchorCornerRadius={6}        // Circular/Rounded handles (Very modern)
-                anchorStroke="#3366FF"        // Blue border on handles
-                anchorFill="#FFFFFF"          // White center
+                rotateEnabled={!shouldHideAnchors}
+                borderStroke="#3366FF"
+                borderStrokeWidth={1.5}
+                anchorSize={11}
+                anchorCornerRadius={6}
+                anchorStroke="#3366FF"
+                anchorFill="#FFFFFF"
                 anchorStrokeWidth={1.5}
-                rotationSnaps={[0, 90, 180, 270]} // Snap to clean angles
-                padding={8}                   // Little breathing room between shape and border
-                ignoreStroke={true}           // keeps calculations accurate
+                rotationSnaps={[0, 90, 180, 270]}
+                padding={8}
+                ignoreStroke={true}
               />
             );
           })()}
 
-
-          {/* NEW: Quick Actions (Only show if exactly 1 item selected) */}
           {selectedNodeIds.length === 1 && !isSpacePressed && (
              <QuickActionsOverlay 
                 selectedNodeId={selectedNodeIds[0]} 
                 allShapesMap={allShapesMap} 
-                onDuplicate={duplicateShape} // Pass the prop here
+                scale={scale}
+                onDuplicate={duplicateShape}
              />
           )}
 

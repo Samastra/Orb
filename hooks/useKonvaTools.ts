@@ -1,12 +1,14 @@
+// hooks/useKonvaTools.ts
 import { useRef, useCallback, useEffect, useState } from "react";
 import Konva from "konva";
 import { Tool, Action, ReactShape, ImageShape } from "../types/board-types";
 import { Connection, Side } from "./useBoardState";
 import { getAnchorPoint, Rect } from "@/lib/connection-utils"; 
 import { KonvaShape } from "./useShapes";
+import { getRichCursor } from "@/lib/cursor-config"; 
 
 const SNAP_THRESHOLD_SIDES: Side[] = ["top", "right", "bottom", "left"];
-const THROTTLE_MS = 16; // ~60 FPS
+const THROTTLE_MS = 16; 
 
 // Helper: Get Pointer Position relative to stage (accounts for zoom/pan)
 function getRelativePointerPosition(stage: Konva.Stage) {
@@ -113,16 +115,6 @@ export const useKonvaTools = (
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
-  // --- CURSOR MANAGEMENT ---
-  const getCursorForTool = useCallback((tool: Tool | null, mode: "brush" | "eraser") => {
-    switch (tool) {
-      case "connect": return "crosshair"; 
-      case "select": return "default";
-      case "pen": return mode === "eraser" ? "cell" : "crosshair";
-      default: return "default";
-    }
-  }, []);
-
   // --- DRAG PERMISSIONS ---
   const updateDraggables = useCallback(() => {
     const stage = stageRef.current;
@@ -143,18 +135,38 @@ export const useKonvaTools = (
     updateDraggables();
   }, [updateDraggables, activeTool, isSpacePressed]);
 
+  // --- NEW: CURSOR SYNC EFFECT ---
+  // Syncs cursor whenever tool or spacebar state changes
+  useEffect(() => {
+    if (!stageRef.current) return;
+    const stage = stageRef.current;
+    
+    // Calculate cursor based on current state
+    const cursor = getRichCursor(activeTool, drawingMode, isSpacePressed, isPanning.current);
+    
+    // Apply to stage container
+    stage.container().style.cursor = cursor;
+    
+  }, [activeTool, drawingMode, isSpacePressed, isPanning.current]);
+
   // --- KEYBOARD SHORTCUTS ---
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === ' ' && isTextInputFocused()) return;
       if (e.key === ' ') {
-        setIsSpacePressed(true); 
-        e.preventDefault();
-        if (stageRef.current) {
-            stageRef.current.container().style.cursor = 'grab';
-            // Disable dragging immediately when space is pressed
-            const layer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
-            if(layer) layer.find(".selectable-shape").forEach(s => s.draggable(false));
+        // Prevent key repeat triggering state updates repeatedly
+        if (!isSpacePressed) {
+            setIsSpacePressed(true); 
+            e.preventDefault();
+            
+            if (stageRef.current) {
+                // RICH CURSOR: Panning (Grab)
+                stageRef.current.container().style.cursor = getRichCursor(activeTool, drawingMode, true, false);
+                
+                // Disable dragging immediately when space is pressed
+                const layer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
+                if(layer) layer.find(".selectable-shape").forEach(s => s.draggable(false));
+            }
         }
       }
     };
@@ -163,9 +175,13 @@ export const useKonvaTools = (
       if (e.key === ' ') {
         setIsSpacePressed(false);
         isPanning.current = false;
+        
         if (stageRef.current) {
-            stageRef.current.container().style.cursor = getCursorForTool(activeTool, drawingMode);
+            // RICH CURSOR: Restore Tool Cursor
+            stageRef.current.container().style.cursor = getRichCursor(activeTool, drawingMode, false, false);
+            
             const layer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
+            // Re-enable draggable immediately
             if(layer) layer.find(".selectable-shape").forEach(s => s.draggable(true));
         }
       }
@@ -176,7 +192,7 @@ export const useKonvaTools = (
       window.removeEventListener('keydown', handleGlobalKeyDown);
       window.removeEventListener('keyup', handleGlobalKeyUp);
     };
-  }, [activeTool, drawingMode, getCursorForTool, stageRef]);
+  }, [activeTool, drawingMode, stageRef, isSpacePressed]); // Added isSpacePressed to dependencies
 
   // --- PANNING ---
   const handlePanningMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -186,15 +202,20 @@ export const useKonvaTools = (
     isPanning.current = true;
     const pointerPos = stage.getPointerPosition();
     if (pointerPos) lastPointerPosition.current = pointerPos;
-    stage.container().style.cursor = 'grabbing';
+    
+    // RICH CURSOR: Grabbing (Closed Hand)
+    stage.container().style.cursor = getRichCursor(activeTool, drawingMode, true, true);
     e.cancelBubble = true;
-  }, [stageRef, isSpacePressed]);
+  }, [stageRef, isSpacePressed, activeTool, drawingMode]);
 
   const handlePanningMouseUp = useCallback(() => {
     if (!isSpacePressed) return;
     isPanning.current = false;
-    if (stageRef.current) stageRef.current.container().style.cursor = 'grab';
-  }, [stageRef, isSpacePressed]);
+    // RICH CURSOR: Grab (Open Hand)
+    if (stageRef.current) {
+        stageRef.current.container().style.cursor = getRichCursor(activeTool, drawingMode, true, false);
+    }
+  }, [stageRef, isSpacePressed, activeTool, drawingMode]);
 
   const handlePanningMouseMove = useCallback(() => {
     if (!isSpacePressed || !isPanning.current) return;
