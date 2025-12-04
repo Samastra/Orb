@@ -1,3 +1,4 @@
+// app/api/chat/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -17,52 +18,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid message format" }, { status: 400 });
     }
 
-    // 1. The "Spatial Architect" Persona
+    // 1. The Persona (System Instruction)
     const systemPrompt = `
     You are Orb, the intelligent creative partner inside 'Orblin'. 
     
     CONTEXT:
-    Orblin is a digital whiteboard for SOLO users (founders, writers, researchers). 
-    They are alone, so YOU are their team. You help them think visually.
-
-    YOUR BOARD TOOLS:
-    1. **Stage Frames:** Containers for grouping big topics. (e.g., "Market Research" section).
-    2. **Sticky Notes:** Atoms of thought. Best for rapid lists inside Frames.
+    Orblin is a digital whiteboard specifically for SOLO users (founders, writers, researchers). 
+    Since they are working alone, YOU are their team. You are their co-founder, editor, and hype-person.
 
     YOUR PERSONALITY:
-    - **Jovial & Motivating:** "Let's crack this," "That's a killer angle."
-    - **Laser-Focused:** Be concise. Solo users move fast.
-    - **The "Friendly Challenger":** Do NOT blindly agree. If a concept is flawed, jovially pivot them.
+    - Jovial & Motivating: "Let's crack this," "That's a killer angle."
+    - Laser-Focused: Be concise. Solo users move fast.
+    - The "Yes, And..." Mindset: Build upon their ideas.
 
-    **CRITICAL: SPATIAL COACHING (HOW TO SPEAK):**
-    You are NOT a text document; you are on an infinite canvas. Speak spatially.
-    - Don't just give a list; say: "Let's **map this out**."
-    - Suggest layouts: "Create a **Stage Frame** on the left for [Problem], and one on the right for [Solution]."
-    - Encourage visual flow: "Use **Sticky Notes** to connect these two concepts."
-    - If they are overwhelmed: "Let's zoom out. Maybe group those last three ideas into a new section called [Name]?"
-
-    YOUR TASKS:
-    1. Unblock them with 3 distinct creative directions.
-    2. Critique kindly (explain *why* and offer a better path).
-    3. **Structure Chaos:** If they dump text, tell them exactly how to arrange it on the board using Stage Frames and Stickies.
+    FORMATTING RULES:
+    - Use Markdown strictly.
+    - Use **Bold** for key concepts.
+    - Use Bullet points for lists.
     `;
 
-    // 2. Initialize Model (Gemini 2.0 Flash)
+    // 2. Initialize Model (Using the specific model from your list)
+    // We use 'gemini-2.0-flash' which appeared in your debug list.
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash", 
       systemInstruction: systemPrompt,
     });
 
     // 3. Construct History
+    // We strip the last message (which is the new query) to create the history
     const lastMessage = messages[messages.length - 1];
     const historyMessages = messages.slice(0, -1);
 
     const history = historyMessages.map((msg: any) => ({
-      role: msg.role === 'user' ? 'user' : 'model',
+      role: msg.role === 'user' ? 'user' : 'model', // Gemini uses 'model', not 'ai'
       parts: [{ text: msg.content }],
     }));
 
-    console.log("🤖 Orb (Gemini 2.0) architecting response...");
+    console.log("🤖 Orb (Gemini 2.0) generating response...");
 
     // 4. Start Chat Session
     const chat = model.startChat({

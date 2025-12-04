@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import ResourceList from "@/components/ResourceList";
 import SaveBoardModal from "@/components/save-modal-board";
-import ChatModal from "@/components/ChatModal";
+import FloatingChatPanel from "@/components/FloatingChatPanel"; // CHANGED: New Import
 import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal";
 import CreateBoard from "@/components/createBoard"; 
 import { useUser } from "@clerk/nextjs";
@@ -67,11 +67,14 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   onCopyCleanText,
 }) => {
   const { user } = useUser();
+  
+  // CHANGED: We now use isChatOpen to toggle the FloatingPanel, not a modal
   const [isChatOpen, setIsChatOpen] = useState(false);
+  
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isEditBoardModalOpen, setIsEditBoardModalOpen] = useState(false); 
   
-  // AI / Scanning State
+  // AI / Scanning State (For the Context Engine/ResourceList)
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [hasResults, setHasResults] = useState(false);
@@ -203,20 +206,31 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                <HeaderIconButton icon={Copy} onClick={onCopyCleanText} title="Copy text" />
             )}
             
-            {/* THE AI TOGGLE BUTTON */}
+            {/* THE CONTEXT ENGINE TOGGLE */}
             <HeaderIconButton 
               icon={Sparkles} 
               active={isAIPanelOpen}
               badge={hasResults && !isAIPanelOpen}
               onClick={() => {
                 setIsAIPanelOpen(!isAIPanelOpen);
+                if (isChatOpen) setIsChatOpen(false); // Close Chat if open
                 setHasResults(false);
               }} 
-              title="AI Context"
+              title="Context Engine"
               className={isAIPanelOpen ? "text-blue-600 bg-blue-50" : "text-gray-500 hover:text-blue-600"}
             />
 
-            <HeaderIconButton icon={MessageSquare} onClick={() => setIsChatOpen(true)} title="Chat" />
+            {/* THE NEW CHAT TOGGLE */}
+            <HeaderIconButton 
+              icon={MessageSquare} 
+              active={isChatOpen}
+              onClick={() => {
+                setIsChatOpen(!isChatOpen);
+                if (isAIPanelOpen) setIsAIPanelOpen(false); // Close Context Engine if open
+              }} 
+              title="Chat Assistant" 
+              className={isChatOpen ? "text-blue-600 bg-blue-50" : "text-gray-500 hover:text-blue-600"}
+            />
           </div>
 
           {isTemporaryBoard && (
@@ -240,8 +254,9 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
         </div>
       </header>
 
-      {/* 3. THE FLOATING AI PANEL (FIXED POSITION) */}
+      {/* 3. FLOATING PANELS */}
       <AnimatePresence>
+        {/* Context Engine Panel (Resources) */}
         {isAIPanelOpen && (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -271,11 +286,15 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
             </div>
           </motion.div>
         )}
+
+        {/* New Floating Chat Panel */}
+        {isChatOpen && (
+          <FloatingChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        )}
       </AnimatePresence>
       
       {/* Modals */}
       <SaveBoardModal isOpen={showSaveModal} onClose={() => setShowSaveModal(false)} tempBoardId={currentBoardId} boardElements={boardElements || { reactShapes: [], konvaShapes: [], stageFrames: [], images: [], connections: [] }} />
-      <ChatModal isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
       <ShareBoardModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} boardId={currentBoardId} boardTitle={boardInfo.title} />
       <CreateBoard open={isEditBoardModalOpen} onOpenChange={setIsEditBoardModalOpen} boardId={currentBoardId} initialData={boardInfo} onBoardUpdate={(u) => { onBoardUpdate?.(u); setIsEditBoardModalOpen(false); }} />
     </>
