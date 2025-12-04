@@ -1094,6 +1094,9 @@ const handleAddShape = useCallback((type: Tool) => {
           handleMouseUp={toolHandlers.handleMouseUp}
           handleMouseMove={toolHandlers.handleMouseMove}
           handleTouchStart={toolHandlers.handleTouchStart}
+          guides={toolHandlers.guides}
+          getSnappedPosition={toolHandlers.getSnappedPosition}
+          clearGuides={toolHandlers.clearGuides}
           handleTouchEnd={toolHandlers.handleTouchEnd}
           handleTouchMove={toolHandlers.handleTouchMove}
           setSelectedNodeIds={setSelectedNodeIds}

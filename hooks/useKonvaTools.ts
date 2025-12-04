@@ -1,11 +1,12 @@
 // hooks/useKonvaTools.ts
-import { useRef, useCallback, useEffect, useState, useMemo } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import Konva from "konva";
 import { Tool, Action, ReactShape, ImageShape } from "../types/board-types";
 import { Connection, Side } from "./useBoardState";
 import { getAnchorPoint, Rect } from "@/lib/connection-utils"; 
 import { KonvaShape } from "./useShapes";
 import { getRichCursor } from "@/lib/cursor-config"; 
+import { useSnapGuides } from "./useSnapGuides"; // 1. IMPORT THIS
 
 const SNAP_THRESHOLD_SIDES: Side[] = ["top", "right", "bottom", "left"];
 const THROTTLE_MS = 16; 
@@ -34,7 +35,6 @@ const isTextInputFocused = (): boolean => {
 function isPointInLineBBox(point: {x: number, y: number}, linePoints: number[], threshold: number): boolean {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     
-    // Fast loop to find bounds
     for (let i = 0; i < linePoints.length; i += 2) {
         const x = linePoints[i];
         const y = linePoints[i+1];
@@ -44,7 +44,6 @@ function isPointInLineBBox(point: {x: number, y: number}, linePoints: number[], 
         if (y > maxY) maxY = y;
     }
     
-    // Check bounds with threshold
     return (
         point.x >= minX - threshold &&
         point.x <= maxX + threshold &&
@@ -53,7 +52,7 @@ function isPointInLineBBox(point: {x: number, y: number}, linePoints: number[], 
     );
 }
 
-// Detailed Geometry Check (Only runs if BBox check passes)
+// Detailed Geometry Check
 function isPointNearLine(point: { x: number; y: number }, linePoints: number[], threshold: number = 10): boolean {
   for (let i = 0; i < linePoints.length - 2; i += 2) {
     const x1 = linePoints[i];
@@ -111,12 +110,16 @@ export const useKonvaTools = (
   const selectionStart = useRef({ x: 0, y: 0 });
   const selectionRect = useRef<Konva.Rect | null>(null);
   const lastFrameTime = useRef<number>(0);
-  const shapesRef = useRef(allShapes);
+  
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
+  // 2. INITIALIZE SNAP GUIDES
+  const { guides, getSnappedPosition, clearGuides } = useSnapGuides();
 
-  // This updates the ref silently without triggering a re-render of the handlers
+  // 3. PERFORMANCE FIX: shapesRef
+  // We keep a ref to allShapes so we don't need to rebuild handlers on every render
+  const shapesRef = useRef(allShapes);
   useEffect(() => {
     shapesRef.current = allShapes;
   }, [allShapes]);
@@ -128,7 +131,6 @@ export const useKonvaTools = (
     const drawLayer = stage.findOne(".draw-layer") as Konva.Layer;
     if (!drawLayer) return;
     
-    // Enable drag only if: Select Tool (or null) AND Spacebar is NOT pressed
     const enableDrag = (activeTool === "select" || activeTool === null) && !isSpacePressed;
     
     const shapes = drawLayer.find(".selectable-shape");
@@ -319,7 +321,6 @@ export const useKonvaTools = (
           const isInBBox = isPointInLineBBox(currentPoint, line.points, threshold + 5);
           if (isInBBox && isPointNearLine(currentPoint, line.points, threshold)) {
             erasedLineIndices.push(index);
-            // FIX: Pass the 'data' (the line being deleted) so Undo can restore it
             addAction({ type: "delete-line", lineIndex: index, data: line });
           } else {
             linesToKeep.push(line);
@@ -455,8 +456,8 @@ export const useKonvaTools = (
     setTempConnection(temp);
   }, [setIsConnecting, setConnectionStart, setTempConnection]);
 
-  // --- CONNECTION MOUSE MOVE ---
- const handleConnectionMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+  // --- CONNECTION MOUSE MOVE (OPTIMIZED with shapesRef) ---
+  const handleConnectionMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isConnecting || !connectionStart || !tempConnection) return;
     
     const now = Date.now();
@@ -473,8 +474,8 @@ export const useKonvaTools = (
     let endNodeId: string | null = null;
     let endSide: Side | undefined = undefined;
 
-    // ⚡ FIX: Read from ref instead of dependency
-    const currentShapes = shapesRef.current; 
+    // ⚡ USE shapesRef.current (Fixes Re-renders)
+    const currentShapes = shapesRef.current;
 
     for (let i = 0; i < currentShapes.length; i++) {
         const s = currentShapes[i];
@@ -502,8 +503,7 @@ export const useKonvaTools = (
         }
     }
     setTempConnection({ ...tempConnection, to: { nodeId: endNodeId, side: endSide, x: endX, y: endY } });
-  // ⚡ FIX: Removed 'allShapes' from dependency array
-  }, [isConnecting, connectionStart, tempConnection, stageRef, setTempConnection]);
+  }, [isConnecting, connectionStart, tempConnection, stageRef, setTempConnection]); // Removed 'allShapes' dependency
 
   const handleConnectionMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isConnecting || !tempConnection || !connectionStart) return;
@@ -525,13 +525,14 @@ export const useKonvaTools = (
     setTempConnection(null);
   }, [isConnecting, tempConnection, connectionStart, setConnections, addAction, setIsConnecting, setConnectionStart, setTempConnection]);
 
+  // --- ANCHOR CLICK (OPTIMIZED with shapesRef) ---
   const handleAnchorClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>, nodeId: string, side: Side) => {
     e.cancelBubble = true;
     e.evt.stopPropagation();
     
-    // ⚡ FIX: Read from ref
+    // ⚡ USE shapesRef.current (Fixes Re-renders)
     const sourceShape = shapesRef.current.find(s => s.id === nodeId);
-    
+
     if (!sourceShape) return;
     const gap = 150;
     let newX = (sourceShape as any).x;
@@ -552,8 +553,7 @@ export const useKonvaTools = (
     if (sourceShape.type === 'stickyNote') type = 'stickyNote';
     if (sourceShape.type === 'circle') type = 'circle';
     addShape(type, addAction, { x: newX, y: newY });
-  // ⚡ FIX: Removed 'allShapes' from dependency array
-  }, [addShape, addAction]);
+  }, [addShape, addAction]); // Removed 'allShapes' dependency
 
   const handleShapeMouseEnter = useCallback((id: string) => {
     if (!isConnecting) setHoveredNodeId(id);
@@ -596,6 +596,12 @@ export const useKonvaTools = (
     isSpacePressed,
     handleTouchStart: (e: any) => { if(activeTool === 'pen') handleDrawingMouseDown(e) },
     handleTouchEnd: (e: any) => { if(activeTool === 'pen') handleDrawingMouseUp() },
-    handleTouchMove: (e: any) => { if(activeTool === 'pen') handleDrawingMouseMove(e) }
+    handleTouchMove: (e: any) => { if(activeTool === 'pen') handleDrawingMouseMove(e) },
+    
+    // 4. EXPORT GUIDES & SNAP UTILS (For StageComponent)
+    guides,
+    clearGuides,
+    getSnappedPosition,
+    shapesRef // Expose ref if needed, but primarily for internal optimization
   };
 };
