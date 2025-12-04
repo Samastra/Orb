@@ -16,7 +16,7 @@ import StageComponent from "@/components/StageComponent";
 import CreateBoard from "@/components/createBoard";
 import { deleteBoard } from "@/lib/actions/board-actions";
 import VideoPlayerModal from '@/components/VideoPlayerModal';
-
+import { generateLayoutFromText,findSafePosition } from "@/lib/layout-engine";
 import { KonvaShape } from "@/hooks/useShapes";
 import { useVideoPlayer } from '@/hooks/useVideoPlayer';
 import { useBoardState } from "@/hooks/useBoardState";
@@ -613,42 +613,55 @@ const getSelectedShapeScreenPosition = useCallback(() => {
 
   }, [selectedNodeIds, updateAnyShape, allShapes, undoRedoAddAction]);
 
-  const handleAddShape = useCallback((type: Tool) => {
-    if (!stageRef.current) return;
-    const stage = stageRef.current;
+const handleAddShape = useCallback((type: Tool) => {
+  if (!stageRef.current) return;
+  const stage = stageRef.current;
 
-    handleInteractionStart();
+  handleInteractionStart();
 
-    const center = {
-      x: (stage.width() / 2 - stage.x()) / stage.scaleX(),
-      y: (stage.height() / 2 - stage.y()) / stage.scaleY(),
-    };
+  // 1. Calculate raw center
+  const rawCenter = {
+    x: (stage.width() / 2 - stage.x()) / stage.scaleX(),
+    y: (stage.height() / 2 - stage.y()) / stage.scaleY(),
+  };
 
-    console.log("🎯 Live Center Calculation:", center);
-    
-    addShape(type, undoRedoAddAction, center); 
+  // 2. Find a SAFE spot nearby
+  // We assume a standard size of 100x100 for the check, or 200x150 for stickies
+  const checkWidth = type === 'stickyNote' ? 200 : 100;
+  const checkHeight = type === 'stickyNote' ? 150 : 100;
 
-    if (type === 'stickyNote' || type === 'text') {
-        setActiveTool("select");
-    }
+  const allExisting = [...konvaShapes, ...reactShapes, ...stageFrames, ...images];
 
+  // Calculate top-left from center to start the check
+  const startCheckPos = {
+      x: rawCenter.x - (checkWidth / 2),
+      y: rawCenter.y - (checkHeight / 2)
+  };
 
-    if (currentBoardId && !isTemporaryBoard && user) {
-      triggerSave({
-        reactShapes,
-        konvaShapes,
-        stageFrames,
-        images,
-        connections,
-        lines,
-        scale,
-        position,
-      }, true);
-      setHasChanges(false);
-    }
-    setTimeout(handleInteractionEnd, 100);
-  }, [stageRef, scale, position, addShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, handleInteractionStart, handleInteractionEnd]);
-  
+  const safePos = findSafePosition(startCheckPos, checkWidth, checkHeight, allExisting);
+
+  // 3. Re-center based on the safe top-left corner (because addShape expects center)
+  const finalCenter = {
+      x: safePos.x + (checkWidth / 2),
+      y: safePos.y + (checkHeight / 2)
+  };
+
+  console.log("🎯 Smart Spawn at:", finalCenter);
+
+  addShape(type, undoRedoAddAction, finalCenter); 
+
+  if (type === 'stickyNote' || type === 'text') {
+      setActiveTool("select");
+  }
+
+  if (currentBoardId && !isTemporaryBoard && user) {
+    triggerSave({
+      reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position,
+    }, true);
+    setHasChanges(false);
+  }
+  setTimeout(handleInteractionEnd, 100);
+}, [stageRef, scale, position, addShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, handleInteractionStart, handleInteractionEnd]);
   
   const handleImageUpload = useCallback(async (file: File) => {
     try {
@@ -837,15 +850,42 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     
     if (tempDimensions.width > 0 && tempDimensions.height > 0) {
       handleInteractionStart();
-      const viewportCenter = calculateViewportCenter();
+      
+      // 1. Get current Viewport Center
+      const rawCenter = calculateViewportCenter();
+      
+      // 2. Define top-left based on center
+      const startPos = {
+          x: rawCenter.x - (tempDimensions.width / 2),
+          y: rawCenter.y - (tempDimensions.height / 2)
+      };
+
+      // 3. FIND SAFE POSITION (The Fix)
+      // We pass ALL existing shapes to ensure we don't overlap anything
+      const allExisting = [...konvaShapes, ...reactShapes, ...stageFrames, ...images];
+      
+      const safePos = findSafePosition(
+          startPos, 
+          tempDimensions.width, 
+          tempDimensions.height, 
+          allExisting
+      );
+
+      // 4. Calculate the center of that SAFE position (because addStageFrame expects center or calculates it)
+      // Actually, addStageFrame uses a centerPosition arg. Let's pass the calculated SAFE center.
+      const safeCenter = {
+          x: safePos.x + (tempDimensions.width / 2),
+          y: safePos.y + (tempDimensions.height / 2)
+      };
       
       const stageFrameId = addStageFrame(
         tempDimensions.width, 
         tempDimensions.height, 
         undoRedoAddAction,
-        viewportCenter
+        safeCenter // Pass the collision-aware center
       );
-      console.log('✅ Stage frame created:', stageFrameId);
+      
+      console.log('✅ Stage frame created at safe pos:', safePos);
       
       if (currentBoardId && !isTemporaryBoard && user) {
         console.log("💾 Immediate save for stage frame");
@@ -863,17 +903,13 @@ const getSelectedShapeScreenPosition = useCallback(() => {
       }
       setTempDimensions(defaultStageDimensions);
       setTimeout(handleInteractionEnd, 100);
-
-
-        if (stageFrames.length === 0) {   
-    
-      }
           
     } else {
       console.log('❌ Invalid stage dimensions');
     }
-  }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction,autoFitContent, calculateViewportCenter, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
+  }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction, calculateViewportCenter, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
 
+  
   const keyboardShortcuts = useKeyboardShortcuts({
     selectedNodeIds, 
     deleteShape: handleDeleteShape,
@@ -892,6 +928,53 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     isEditingText: false,
   });
 
+  // --- UPDATED: AI Layout Handler ---
+  const handleAddAIContent = useCallback((text: string) => {
+    handleInteractionStart();
+    const center = calculateViewportCenter();
+    
+    // 1. Gather all obstacles
+    const existingShapes = [
+        ...konvaShapes, 
+        ...reactShapes, 
+        ...stageFrames, 
+        ...images
+    ];
+
+    // 2. Pass them to the engine
+    const layout = generateLayoutFromText(text, center, existingShapes);
+    
+    if (!layout) {
+      alert("I couldn't find a list in that message to convert!");
+      setTimeout(handleInteractionEnd, 100);
+      return;
+    }
+
+    console.log("✨ Generating Smart Layout:", layout);
+
+    // 3. Add to State
+    setStageFrames(prev => [...prev, layout.stageFrame]);
+    setReactShapes(prev => [...prev, ...layout.stickyNotes]);
+
+    undoRedoAddAction({
+      type: 'batch',
+      actions: [
+        { type: 'add-stage-frame', data: layout.stageFrame },
+        ...layout.stickyNotes.map(note => ({ 
+          type: 'add-react-shape', 
+          shapeType: 'stickyNote', 
+          data: note 
+        } as Action))
+      ]
+    });
+
+    if (currentBoardId && !isTemporaryBoard && user) {
+        setHasChanges(true);
+    }
+    
+    setTimeout(handleInteractionEnd, 100);
+  }, [calculateViewportCenter, handleInteractionStart, handleInteractionEnd, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, setStageFrames, setReactShapes, konvaShapes, reactShapes, stageFrames, images]); // Added dependencies
+  
   return (
     <>
       <div className="relative w-screen h-screen bg-slate-50">
@@ -901,6 +984,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
             currentBoardId={currentBoardId}
             showSaveModal={showSaveModal}
             setShowSaveModal={setShowSaveModal}
+            onAddAIContent={handleAddAIContent}
             handleCloseWithoutSave={handleCloseWithoutSave}
             onAddImageFromRecommendations={handleAddImageFromRecommendations}
             stageRef={stageRef}

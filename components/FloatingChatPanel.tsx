@@ -1,9 +1,11 @@
-// components/FloatingChatPanel.tsx
 "use client";
 
 import React, { useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Send, Sparkles, User, Copy, RefreshCw, Bot, AlertCircle, Trash2 } from "lucide-react";
+import { 
+  X, Send, Sparkles, User, Copy, RefreshCw, 
+  Bot, AlertCircle, Trash2 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ReactMarkdown from "react-markdown";
@@ -13,17 +15,27 @@ import { Message } from "@/hooks/useOrbChat";
 interface FloatingChatPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  // New Props from the Hook
+  // State from Parent (useOrbChat)
   messages: Message[];
   input: string;
   setInput: (val: string) => void;
   isLoading: boolean;
   onSend: () => void;
   onClear: () => void;
+  // The "Magic Render" Handler
+  onAddToBoard?: (text: string) => void;
 }
 
 const FloatingChatPanel: React.FC<FloatingChatPanelProps> = ({ 
-  isOpen, onClose, messages, input, setInput, isLoading, onSend, onClear 
+  isOpen, 
+  onClose, 
+  messages, 
+  input, 
+  setInput, 
+  isLoading, 
+  onSend, 
+  onClear,
+  onAddToBoard 
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -60,16 +72,23 @@ const FloatingChatPanel: React.FC<FloatingChatPanelProps> = ({
           </div>
         </div>
         <div className="flex gap-1">
-          <button onClick={onClear} className="p-2 hover:bg-red-50 hover:text-red-500 rounded-full text-gray-400 transition-colors" title="Clear Chat">
+          <button 
+            onClick={onClear} 
+            className="p-2 hover:bg-red-50 hover:text-red-500 rounded-full text-gray-400 transition-colors" 
+            title="Clear Chat"
+          >
             <Trash2 className="w-4 h-4" />
           </button>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* CHAT AREA (Replaced ScrollArea with standard div to fix your error) */}
+      {/* CHAT AREA */}
       <div 
         ref={scrollRef} 
         className="flex-1 overflow-y-auto p-4 space-y-6 bg-gray-50/30 scroll-smooth"
@@ -81,7 +100,7 @@ const FloatingChatPanel: React.FC<FloatingChatPanelProps> = ({
             </div>
             <h4 className="text-sm font-semibold text-gray-700">Hey Partner!</h4>
             <p className="text-xs text-gray-500 mt-1 max-w-[200px]">
-              I&apos;m here to brainstorm, critique, and help you build. What are we working on?
+              I'm here to brainstorm, critique, and help you build. What are we working on?
             </p>
           </div>
         )}
@@ -93,12 +112,26 @@ const FloatingChatPanel: React.FC<FloatingChatPanelProps> = ({
             animate={{ opacity: 1, y: 0 }}
             className={cn("flex gap-3", msg.role === "user" ? "flex-row-reverse" : "flex-row")}
           >
-            <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1", msg.role === "user" ? "bg-gray-900" : "bg-blue-100")}>
+            {/* Avatar */}
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1", 
+              msg.role === "user" ? "bg-gray-900" : "bg-blue-100"
+            )}>
               {msg.role === "user" ? <User className="w-4 h-4 text-white" /> : <Sparkles className="w-4 h-4 text-blue-600" />}
             </div>
-            <div className={cn("relative group max-w-[85%] text-sm px-4 py-3 rounded-2xl", msg.role === "user" ? "bg-gray-900 text-white rounded-tr-sm" : "bg-white border border-gray-200 text-gray-700 rounded-tl-sm shadow-sm")}>
+
+            {/* Bubble */}
+            <div className={cn(
+              "relative group max-w-[85%] text-sm px-4 py-3 rounded-2xl", 
+              msg.role === "user" 
+                ? "bg-gray-900 text-white rounded-tr-sm" 
+                : "bg-white border border-gray-200 text-gray-700 rounded-tl-sm shadow-sm"
+            )}>
               {msg.role === "error" ? (
-                <div className="flex items-center gap-2 text-red-600"><AlertCircle className="w-4 h-4" /><span>{msg.content}</span></div>
+                <div className="flex items-center gap-2 text-red-600">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{msg.content}</span>
+                </div>
               ) : (
                 <div className="prose prose-sm max-w-none dark:prose-invert">
                   <ReactMarkdown components={{
@@ -109,10 +142,27 @@ const FloatingChatPanel: React.FC<FloatingChatPanelProps> = ({
                     }}>{msg.content}</ReactMarkdown>
                 </div>
               )}
+
+              {/* Action Buttons (AI Only) */}
               {msg.role === "ai" && (
-                <button onClick={() => handleCopy(msg.content)} className="absolute -bottom-5 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600">
-                  <Copy className="w-3 h-3" /> Copy
-                </button>
+                <div className="flex gap-2 absolute -bottom-6 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => handleCopy(msg.content)}
+                    className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-gray-600 bg-white/50 px-2 py-1 rounded-full border border-gray-100 backdrop-blur-sm"
+                  >
+                    <Copy className="w-3 h-3" /> Copy
+                  </button>
+                  
+                  {/* ✨ THE MAGIC BUTTON ✨ */}
+                  {onAddToBoard && (
+                    <button
+                      onClick={() => onAddToBoard(msg.content)}
+                      className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-full border border-blue-100 backdrop-blur-sm font-medium transition-all hover:shadow-sm"
+                    >
+                      <Sparkles className="w-3 h-3" /> Add to Board
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </motion.div>
@@ -120,7 +170,9 @@ const FloatingChatPanel: React.FC<FloatingChatPanelProps> = ({
 
         {isLoading && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><Sparkles className="w-4 h-4 text-blue-600" /></div>
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+            </div>
             <div className="bg-white border border-gray-200 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-1">
               <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
               <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
@@ -141,9 +193,20 @@ const FloatingChatPanel: React.FC<FloatingChatPanelProps> = ({
             className="border-none bg-transparent focus-visible:ring-0 shadow-none px-3 text-sm h-10 resize-none"
             autoComplete="off"
           />
-          <Button onClick={onSend} disabled={!input.trim() || isLoading} size="icon" className={cn("h-9 w-9 rounded-lg shrink-0 transition-all", input.trim() ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md" : "bg-gray-200 text-gray-400")}>
+          <Button 
+            onClick={onSend} 
+            disabled={!input.trim() || isLoading} 
+            size="icon" 
+            className={cn(
+              "h-9 w-9 rounded-lg shrink-0 transition-all", 
+              input.trim() ? "bg-blue-600 hover:bg-blue-700 text-white shadow-md" : "bg-gray-200 text-gray-400"
+            )}
+          >
             {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
           </Button>
+        </div>
+        <div className="text-center mt-2">
+           <p className="text-[10px] text-gray-400">AI can make mistakes. Check important info.</p>
         </div>
       </div>
     </motion.div>

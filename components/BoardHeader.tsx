@@ -47,6 +47,7 @@ interface BoardHeaderProps {
   };
   onBoardUpdate?: (updates: { title: string; category: string }) => void;
   onOpenWebsite?: (url: string, title: string) => void;
+  onAddAIContent?: (text: string) => void;
   onCopyCleanText?: () => Promise<void>;
   scale: number;
   position: { x: number; y: number };
@@ -66,6 +67,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   onOpenWebsite,
   onBoardUpdate,
   onCopyCleanText,
+  onAddAIContent,
 }) => {
   const { user } = useUser();
   
@@ -308,6 +310,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
             isLoading={chatState.isLoading}
             onSend={chatState.handleSend}
             onClear={chatState.clearChat}
+            onAddToBoard={onAddAIContent}
           />
         )}
       </AnimatePresence>
