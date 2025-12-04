@@ -328,7 +328,8 @@ export const useKonvaTools = (
           const isInBBox = isPointInLineBBox(currentPoint, line.points, threshold + 5);
           if (isInBBox && isPointNearLine(currentPoint, line.points, threshold)) {
             erasedLineIndices.push(index);
-            addAction({ type: "delete-line", lineIndex: index });
+            // FIX: Pass the deleted line as data for undo/redo
+            addAction({ type: "delete-line", lineIndex: index, data: line });
           } else {
             linesToKeep.push(line);
           }

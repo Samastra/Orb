@@ -100,7 +100,8 @@ const StageFrameNode = React.memo(({ item, commonProps, setShapeRef, updateShape
     groupRef.current = node;
   };
 
-  const handleToggleLock = (e: Konva.KonvaEventObject<MouseEvent>) => {
+  // FIX 1: Allow any Konva Event (Mouse or Touch)
+  const handleToggleLock = (e: Konva.KonvaEventObject<any>) => {
     e.cancelBubble = true;
     const newLockedState = !item.isLocked;
     updateShape(item.id, { isLocked: newLockedState });
@@ -352,12 +353,16 @@ const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, u
 
   const dispatchUpdateAction = (id: string, newAttrs: any) => {
       if (!onAction) return; 
-      let type = '';
+      
+      // FIX 2: Explicitly type the action type variable
+      let type: Action['type'] = 'update-konva-shape';
+      
       if(item.type === 'text' || item.type === 'stickyNote') type = 'update-react-shape';
       else if(item.type === 'image') type = 'update-image';
       else if(item.type === 'stage') type = 'update-stage-frame';
       else type = 'update-konva-shape';
-      onAction({ type, id, prevData: item, newData: { ...item, ...newAttrs } });
+      
+      onAction({ type, id, prevData: item, newData: { ...item, ...newAttrs } } as any);
   };
 
   if (item.__kind === 'stage') {
@@ -534,14 +539,17 @@ const StageComponent: React.FC<StageComponentProps> = ({
             const myStart = dragStartPos.current.get(id);
             const myNode = shapeRefs.current[id]; 
             if (shape && myStart && myNode) {
-                let type = '';
+                // FIX 3: Explicitly type 'type' variable
+                let type: Action['type'] = 'update-konva-shape';
+                
                 if(shape.type === 'text' || shape.type === 'stickyNote') type = 'update-react-shape';
                 else if(shape.type === 'image') type = 'update-image';
                 else if(shape.type === 'stage') type = 'update-stage-frame';
                 else type = 'update-konva-shape';
+                
                 const prevData = { ...shape, x: myStart.x, y: myStart.y };
                 const newData = { ...shape, x: myNode.x(), y: myNode.y() };
-                actionsToDispatch.push({ type, id: shape.id, prevData, newData });
+                actionsToDispatch.push({ type, id: shape.id, prevData, newData } as any);
             }
         });
         if (actionsToDispatch.length === 1) onAction(actionsToDispatch[0]);
@@ -576,12 +584,12 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (onAction) {
         const prevData = transformStartAttrs.current[item.id];
         if (prevData) {
-            let type = '';
+            let type: Action['type'] = 'update-konva-shape';
             if(item.type === 'text' || item.type === 'stickyNote') type = 'update-react-shape';
             else if(item.type === 'image') type = 'update-image';
             else if(item.type === 'stage') type = 'update-stage-frame';
             else type = 'update-konva-shape';
-            onAction({ type, id: item.id, prevData, newData: { ...prevData, ...updates } });
+            onAction({ type, id: item.id, prevData, newData: { ...prevData, ...updates } } as any);
             delete transformStartAttrs.current[item.id];
         }
     }
