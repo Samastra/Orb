@@ -1,5 +1,5 @@
 // hooks/useKonvaTools.ts
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect, useState, useMemo } from "react";
 import Konva from "konva";
 import { Tool, Action, ReactShape, ImageShape } from "../types/board-types";
 import { Connection, Side } from "./useBoardState";
@@ -135,16 +135,12 @@ export const useKonvaTools = (
     updateDraggables();
   }, [updateDraggables, activeTool, isSpacePressed]);
 
-  // --- NEW: CURSOR SYNC EFFECT ---
-  // Syncs cursor whenever tool or spacebar state changes
+  // --- CURSOR SYNC EFFECT ---
   useEffect(() => {
     if (!stageRef.current) return;
     const stage = stageRef.current;
     
-    // Calculate cursor based on current state
     const cursor = getRichCursor(activeTool, drawingMode, isSpacePressed, isPanning.current);
-    
-    // Apply to stage container
     stage.container().style.cursor = cursor;
     
   }, [activeTool, drawingMode, isSpacePressed, isPanning.current]);
@@ -154,16 +150,12 @@ export const useKonvaTools = (
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === ' ' && isTextInputFocused()) return;
       if (e.key === ' ') {
-        // Prevent key repeat triggering state updates repeatedly
         if (!isSpacePressed) {
             setIsSpacePressed(true); 
             e.preventDefault();
             
             if (stageRef.current) {
-                // RICH CURSOR: Panning (Grab)
                 stageRef.current.container().style.cursor = getRichCursor(activeTool, drawingMode, true, false);
-                
-                // Disable dragging immediately when space is pressed
                 const layer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
                 if(layer) layer.find(".selectable-shape").forEach(s => s.draggable(false));
             }
@@ -177,11 +169,8 @@ export const useKonvaTools = (
         isPanning.current = false;
         
         if (stageRef.current) {
-            // RICH CURSOR: Restore Tool Cursor
             stageRef.current.container().style.cursor = getRichCursor(activeTool, drawingMode, false, false);
-            
             const layer = stageRef.current.findOne(".draw-layer") as Konva.Layer;
-            // Re-enable draggable immediately
             if(layer) layer.find(".selectable-shape").forEach(s => s.draggable(true));
         }
       }
@@ -192,7 +181,7 @@ export const useKonvaTools = (
       window.removeEventListener('keydown', handleGlobalKeyDown);
       window.removeEventListener('keyup', handleGlobalKeyUp);
     };
-  }, [activeTool, drawingMode, stageRef, isSpacePressed]); // Added isSpacePressed to dependencies
+  }, [activeTool, drawingMode, stageRef, isSpacePressed]);
 
   // --- PANNING ---
   const handlePanningMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -202,8 +191,6 @@ export const useKonvaTools = (
     isPanning.current = true;
     const pointerPos = stage.getPointerPosition();
     if (pointerPos) lastPointerPosition.current = pointerPos;
-    
-    // RICH CURSOR: Grabbing (Closed Hand)
     stage.container().style.cursor = getRichCursor(activeTool, drawingMode, true, true);
     e.cancelBubble = true;
   }, [stageRef, isSpacePressed, activeTool, drawingMode]);
@@ -211,7 +198,6 @@ export const useKonvaTools = (
   const handlePanningMouseUp = useCallback(() => {
     if (!isSpacePressed) return;
     isPanning.current = false;
-    // RICH CURSOR: Grab (Open Hand)
     if (stageRef.current) {
         stageRef.current.container().style.cursor = getRichCursor(activeTool, drawingMode, true, false);
     }
@@ -222,7 +208,6 @@ export const useKonvaTools = (
     const stage = stageRef.current;
     if (!stage) return;
     
-    // Throttle Panning
     const now = Date.now();
     if (now - lastFrameTime.current < 8) return; 
     lastFrameTime.current = now;
@@ -328,7 +313,7 @@ export const useKonvaTools = (
           const isInBBox = isPointInLineBBox(currentPoint, line.points, threshold + 5);
           if (isInBBox && isPointNearLine(currentPoint, line.points, threshold)) {
             erasedLineIndices.push(index);
-            // FIX: Pass the deleted line as data for undo/redo
+            // FIX: Pass the 'data' (the line being deleted) so Undo can restore it
             addAction({ type: "delete-line", lineIndex: index, data: line });
           } else {
             linesToKeep.push(line);
@@ -457,16 +442,15 @@ export const useKonvaTools = (
       type: "connection",
       from: { nodeId, side, x: anchorPos.x, y: anchorPos.y },
       to: { nodeId: null, side: undefined, x: anchorPos.x, y: anchorPos.y },
-      stroke: "#64748B", // <--- SLATE GRAY (Professional look)
+      stroke: "#64748B",
       strokeWidth: 4,
       draggable: false
     };
     setTempConnection(temp);
   }, [setIsConnecting, setConnectionStart, setTempConnection]);
 
-  // --- UPDATED: Phantom Line Logic with Halo Buffer ---
+  // --- CONNECTION MOUSE MOVE ---
   const handleConnectionMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    // Fail fast
     if (!isConnecting || !connectionStart || !tempConnection) return;
     
     const now = Date.now();
@@ -486,64 +470,29 @@ export const useKonvaTools = (
     for (let i = 0; i < allShapes.length; i++) {
         const s = allShapes[i];
         if (s.id === connectionStart.nodeId) continue; 
-        
-        // Skip unconnectable shapes
         if (s.type === 'text' || s.type === 'stickyNote') continue;
 
-        // Get Dimensions
         let x = (s as any).x;
         let y = (s as any).y;
         let w = (s as any).width || 100;
         let h = (s as any).height || 100;
 
-        // Normalize Circle/Ellipse
-        if (s.type === 'circle') {
-            const r = (s as any).radius || 50;
-            x -= r; y -= r; w = r * 2; h = r * 2;
-        } else if (s.type === 'ellipse') {
-            const rx = (s as any).radiusX || 80;
-            const ry = (s as any).radiusY || 50;
-            x -= rx; y -= ry; w = rx * 2; h = ry * 2;
-        }
+        if (s.type === 'circle') { const r = (s as any).radius || 50; x -= r; y -= r; w = r * 2; h = r * 2; } 
+        else if (s.type === 'ellipse') { const rx = (s as any).radiusX || 80; const ry = (s as any).radiusY || 50; x -= rx; y -= ry; w = rx * 2; h = ry * 2; }
 
-        // --- NEW HALO LOGIC ---
-        // We add a BUFFER zone (e.g., 25px) around the shape.
-        // If the mouse is inside this expanded box, we show the anchors.
         const BUFFER = 25; 
-
-        if (
-            pos.x >= x - BUFFER && 
-            pos.x <= x + w + BUFFER && 
-            pos.y >= y - BUFFER && 
-            pos.y <= y + h + BUFFER
-        ) {
+        if (pos.x >= x - BUFFER && pos.x <= x + w + BUFFER && pos.y >= y - BUFFER && pos.y <= y + h + BUFFER) {
             const rect: Rect = { x, y, width: w, height: h };
             let minDist = Infinity;
-            
-            // Find closest anchor
             for (const side of SNAP_THRESHOLD_SIDES) {
                 const p = getAnchorPoint(rect, side);
-                
-                // Distance to actual anchor point
                 const distSq = (p.x - pos.x) ** 2 + (p.y - pos.y) ** 2;
-                
-                if (distSq < minDist) { 
-                    minDist = distSq; 
-                    endX = p.x; 
-                    endY = p.y; 
-                    endNodeId = s.id; 
-                    endSide = side; 
-                }
+                if (distSq < minDist) { minDist = distSq; endX = p.x; endY = p.y; endNodeId = s.id; endSide = side; }
             }
-            break; // Found a target
+            break; 
         }
     }
-    
-    // Update temp connection
-    setTempConnection({
-      ...tempConnection,
-      to: { nodeId: endNodeId, side: endSide, x: endX, y: endY }
-    });
+    setTempConnection({ ...tempConnection, to: { nodeId: endNodeId, side: endSide, x: endX, y: endY } });
   }, [isConnecting, connectionStart, tempConnection, stageRef, allShapes, setTempConnection]);
 
   const handleConnectionMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -554,7 +503,7 @@ export const useKonvaTools = (
         type: "connection",
         from: { ...connectionStart },
         to: { ...tempConnection.to },
-        stroke: "#64748B", // <--- SLATE GRAY (Professional look)
+        stroke: "#64748B",
         strokeWidth: 4,
         draggable: false
       };
@@ -596,7 +545,6 @@ export const useKonvaTools = (
     if (!isConnecting) setHoveredNodeId(id);
   }, [isConnecting]);
 
-  // --- GLOBAL MOUSE HANDLERS ---
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     handlePanningMouseDown(e);
     if (activeTool === "select" && !isSpacePressed) handleSelectionStart(e);
@@ -604,12 +552,7 @@ export const useKonvaTools = (
   }, [activeTool, handleDrawingMouseDown, handlePanningMouseDown, handleSelectionStart, isSpacePressed]);
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    // 🚀 PERFORMANCE CRITICAL: Pan Guard
-    if (isPanning.current) {
-        handlePanningMouseMove();
-        return;
-    }
-    
+    if (isPanning.current) { handlePanningMouseMove(); return; }
     if (isSelecting.current) handleSelectionMove(e);
     if (activeTool === "pen") handleDrawingMouseMove(e);
     handleConnectionMouseMove(e); 
