@@ -187,7 +187,7 @@
     const pillWidth = Math.max(80, frameName.length * 9) + 30; 
     
     return (
-      <Group
+    <Group
         ref={handleRef}
         x={item.x}
         y={item.y}
@@ -210,7 +210,18 @@
               <Path data={item.isLocked ? LOCK_ICON_PATH : UNLOCK_ICON_PATH} fill={item.isLocked ? "#ef4444" : "#94a3b8"} scaleX={0.7} scaleY={0.7} x={4} y={2} />
           </Group>
         </Group>
-        <Rect width={item.width} height={item.height} fill={item.fill || "#ffffff"} stroke={item.isLocked ? "#ef4444" : (item.stroke || "#e2e8f0")} strokeWidth={item.isLocked ? 3 : (item.strokeWidth || 2)} cornerRadius={item.cornerRadius || 0} shadowBlur={item.isLocked ? 0 : 5} shadowColor="rgba(0,0,0,0.05)" shadowOffsetY={4} />
+        
+        {/* --- PERFORMANCE FIX: REMOVED SHADOWS, ADDED CRISP STROKE --- */}
+        <Rect 
+          width={item.width} 
+          height={item.height} 
+          fill={item.fill || "#ffffff"} 
+          // Changed default stroke to #cbd5e1 (Slate-300) for better visibility without shadow
+          stroke={item.isLocked ? "#ef4444" : (item.stroke || "#cbd5e1")} 
+          strokeWidth={item.isLocked ? 3 : (item.strokeWidth || 2)} 
+          cornerRadius={item.cornerRadius || 0} 
+          // Removed shadowBlur, shadowColor, shadowOffsetY
+        />
       </Group>
     );
   });
