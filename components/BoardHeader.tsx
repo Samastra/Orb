@@ -8,6 +8,7 @@ import ResourceList from "@/components/ResourceList";
 import SaveBoardModal from "@/components/save-modal-board";
 import FloatingChatPanel from "@/components/FloatingChatPanel"; // CHANGED: New Import
 import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal";
+import { useOrbChat } from "@/hooks/useOrbChat";
 import CreateBoard from "@/components/createBoard"; 
 import { useUser } from "@clerk/nextjs";
 import { 
@@ -74,10 +75,17 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isEditBoardModalOpen, setIsEditBoardModalOpen] = useState(false); 
   
+  
+
+  
   // AI / Scanning State (For the Context Engine/ResourceList)
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [hasResults, setHasResults] = useState(false);
+
+  
+  // INITIALIZE THE CHAT STATE HERE (This keeps it alive!)
+  const chatState = useOrbChat();
 
   // Trigger "Scan" on mount or title change
   useEffect(() => {
@@ -287,10 +295,22 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
           </motion.div>
         )}
 
-        {/* New Floating Chat Panel */}
+        {/* Floating Panel Section */}
+      <AnimatePresence>
         {isChatOpen && (
-          <FloatingChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+          <FloatingChatPanel 
+            isOpen={isChatOpen} 
+            onClose={() => setIsChatOpen(false)}
+            // PASS THE STATE DOWN
+            messages={chatState.messages}
+            input={chatState.input}
+            setInput={chatState.setInput}
+            isLoading={chatState.isLoading}
+            onSend={chatState.handleSend}
+            onClear={chatState.clearChat}
+          />
         )}
+      </AnimatePresence>
       </AnimatePresence>
       
       {/* Modals */}
