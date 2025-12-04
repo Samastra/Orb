@@ -100,7 +100,7 @@ const FloatingChatPanel: React.FC<FloatingChatPanelProps> = ({
             </div>
             <h4 className="text-sm font-semibold text-gray-700">Hey Partner!</h4>
             <p className="text-xs text-gray-500 mt-1 max-w-[200px]">
-              I'm here to brainstorm, critique, and help you build. What are we working on?
+              I&apos;m here to brainstorm, critique, and help you build. What are we working on?
             </p>
           </div>
         )}
