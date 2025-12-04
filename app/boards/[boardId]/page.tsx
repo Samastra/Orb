@@ -208,7 +208,7 @@ const handleFinishTextEditing = useCallback(() => {
         }, 10000);
 
   const handleInteractionStart = useCallback(() => {
-  console.log("🖱️ Interaction started (scaling/dragging/adding)");
+
   setIsInteracting(true);
   setHasChanges(true);
 }, [setIsInteracting]);
@@ -305,17 +305,17 @@ const copyCleanText = async () => {
 
     await navigator.clipboard.writeText(allText);
     
-    console.log('✅ Clean text copied to clipboard:', allText);
+
     alert('Clean text copied to clipboard!');
     
   } catch (error) {
-    console.error('❌ Failed to copy text:', error);
+   
     alert('Failed to copy text. Please try again.');
   }
 };
 
   const handleInteractionEnd = useCallback(() => {
-  console.log("🖱️ Interaction ended (scaling/dragging/adding)");
+
   setIsInteracting(false);
   if (currentBoardId && !isTemporaryBoard && user && hasChanges) {
     debouncedTriggerSave({
@@ -333,7 +333,7 @@ const copyCleanText = async () => {
 }, [currentBoardId, isTemporaryBoard, user, debouncedTriggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, hasChanges, setIsInteracting]);
 
 const handleTextCreate = useCallback((position: { x: number; y: number }) => {
-    console.log('🎯 Creating text at position:', position);
+
     
     const shapeId = `text-${crypto.randomUUID()}`;
     
@@ -368,15 +368,15 @@ const handleTextCreate = useCallback((position: { x: number; y: number }) => {
     setEditingId(shapeId); 
     setActiveTool("select"); 
     
-    console.log('✅ Text created, swapped to Select Tool');
+  
   }, [setReactShapes, setSelectedNodeIds, setActiveTool, undoRedoAddAction]);
 
   useEffect(() => {
     const loadBoardData = async () => {
       try {
-        console.log("📥 Fetching board data for:", params.boardId);
+      
         const board = await fetchBoard(params.boardId as string);
-        console.log("✅ Board data fetched:", board);
+   
         setBoardInfo({
           title: board.title || "Untitled Board",
           category: board.category || ""
@@ -396,20 +396,20 @@ useLayoutEffect(() => {
 
     const loadSavedElements = async () => {
       try {
-        console.log("🔄 LOADING BOARD ELEMENTS...");
+       
         const elements = await loadBoardElements(currentBoardId);
 
         if (stageRef.current) {
           const stage = stageRef.current;
 
           if (elements.stageState && elements.stageState.scale) {
-            console.log("📥 Restoring saved camera view...");
+            
             stage.scale({ x: elements.stageState.scale, y: elements.stageState.scale });
             stage.position(elements.stageState.position);
             boardState.setScale(elements.stageState.scale);
             boardState.setPosition(elements.stageState.position);
           } else {
-            console.log("🆕 New Board Detected - Applying Default View...");
+         
             const defaultScale = 0.4; 
             const centerX = stage.width() / 2;
             const centerY = stage.height() / 2;
@@ -422,7 +422,7 @@ useLayoutEffect(() => {
         }
 
         setTimeout(() => {
-          console.log("📝 Populating shapes...");
+       
           setReactShapes([]);
           setKonvaShapes([]);
           setStageFrames([]);
@@ -438,11 +438,11 @@ useLayoutEffect(() => {
           setLines(elements.lines || []);
           
           setHasLoaded(true);
-          console.log("✅ BOARD FULLY INITIALIZED");
+         
         }, 50);
 
       } catch (error) {
-        console.error("❌ LOAD FAILED:", error);
+       console.error("❌ LOAD FAILED:", error);
         setHasLoaded(true); 
       }
     };
@@ -467,7 +467,7 @@ useEffect(() => {
     stage.scale({ x: scale, y: scale });
     stage.position(position);
     stage.batchDraw();
-    console.log("🔄 STAGE UPDATED WITH CAMERA:", { scale, position });
+   
   }
 }, [scale, position]);
 
@@ -554,7 +554,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     stage.scale({ x: newScale, y: newScale });
     stage.batchDraw();
     
-    console.log("🔍 Zooming in:", { oldScale, newScale });
+  
     boardState.setScale(newScale);
     setTimeout(handleInteractionEnd, 100); 
   }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd,boardState]);
@@ -571,7 +571,7 @@ const getSelectedShapeScreenPosition = useCallback(() => {
     stage.scale({ x: newScale, y: newScale });
     stage.batchDraw();
     
-    console.log("🔍 Zooming out:", { oldScale, newScale });
+   
     boardState.setScale(newScale);
     setTimeout(handleInteractionEnd, 100); 
   }, [stageRef, boardState.setScale, handleInteractionStart, handleInteractionEnd, boardState]);
@@ -646,7 +646,7 @@ const handleAddShape = useCallback((type: Tool) => {
       y: safePos.y + (checkHeight / 2)
   };
 
-  console.log("🎯 Smart Spawn at:", finalCenter);
+
 
   addShape(type, undoRedoAddAction, finalCenter); 
 
@@ -670,10 +670,10 @@ const handleAddShape = useCallback((type: Tool) => {
       reader.onload = (e) => {
         const src = e.target?.result as string;
         if (src) {
-          console.log("📸 Adding image:", { src });
+         
           addImage(src, undoRedoAddAction);
           if (currentBoardId && !isTemporaryBoard && user) {
-            console.log("💾 Immediate save for new image");
+           
             triggerSave({
               reactShapes,
               konvaShapes,
@@ -691,7 +691,7 @@ const handleAddShape = useCallback((type: Tool) => {
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      console.error('Error uploading image:', error);
+     console.error('❌ Error uploading image:', error);
     }
   }, [addImage, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
 
@@ -700,13 +700,13 @@ const handleAddShape = useCallback((type: Tool) => {
       await deleteBoard(currentBoardId);
       window.location.href = "/";
     } catch (error) {
-      console.error("Failed to delete board:", error);
+      console.error("❌ Failed to delete board:", error);
     }
   }, [currentBoardId]);
 
   // --- FIX: Delete Shape Undo Support ---
   const handleDeleteShape = useCallback((id: string) => {
-    console.log('🗑️ Keyboard delete triggered for:', id);
+
     
     // 1. Find the shape BEFORE deleting it
     const shapeToDelete = allShapes.find(shape => shape.id === id);
@@ -734,11 +734,11 @@ const handleAddShape = useCallback((type: Tool) => {
         connectionId: actionType === 'delete-connection' ? id : undefined
     } as Action);
 
-    console.log('🗑️ Actually deleting shape:', id);
+  
     deleteShape(id);
 
     if (currentBoardId && !isTemporaryBoard && user) {
-      console.log("💾 Immediate save for shape deletion:", { id });
+     
       triggerSave({
         reactShapes,
         konvaShapes,
@@ -755,7 +755,7 @@ const handleAddShape = useCallback((type: Tool) => {
   }, [allShapes, reactShapes, konvaShapes, images, connections, stageFrames, deleteShape, undoRedoAddAction, currentBoardId, isTemporaryBoard, user, triggerSave, scale, position]);
 
   const handleToolChangeWithAutoCreate = useCallback((tool: Tool | null) => {
-    console.log('🔧 Tool change:', tool);
+ 
     toolHandlers.handleToolChange(tool);
     setActiveTool(tool);
   }, [toolHandlers.handleToolChange, setActiveTool, handleAddShape,toolHandlers]);
@@ -776,11 +776,11 @@ const handleAddShape = useCallback((type: Tool) => {
   const handleAddImageFromRecommendations = useCallback((imageUrl: string) => {
     handleInteractionStart();
     const viewportCenter = calculateViewportCenter();
-    console.log('🎯 Adding image from recommendations at:', viewportCenter);
+   
     
     addImage(imageUrl, undoRedoAddAction, viewportCenter);
     if (currentBoardId && !isTemporaryBoard && user) {
-      console.log("💾 Immediate save for recommendation image");
+   
       triggerSave({
         reactShapes,
         konvaShapes,
@@ -842,11 +842,11 @@ const handleAddShape = useCallback((type: Tool) => {
   boardState.setScale(finalScale);
   boardState.setPosition({ x: newPosX, y: newPosY });
 
-  console.log("Auto-fit applied:", { finalScale: finalScale.toFixed(2), frames: allFrames.length });
+  
 }, [stageRef, stageFrames, konvaShapes, boardState]);
 
   const handleApplyStage = useCallback(() => {
-    console.log('🎯 Creating stage frame:', tempDimensions);
+    
     
     if (tempDimensions.width > 0 && tempDimensions.height > 0) {
       handleInteractionStart();
@@ -885,10 +885,10 @@ const handleAddShape = useCallback((type: Tool) => {
         safeCenter // Pass the collision-aware center
       );
       
-      console.log('✅ Stage frame created at safe pos:', safePos);
+     
       
       if (currentBoardId && !isTemporaryBoard && user) {
-        console.log("💾 Immediate save for stage frame");
+      
         triggerSave({
           reactShapes,
           konvaShapes,
@@ -905,18 +905,18 @@ const handleAddShape = useCallback((type: Tool) => {
       setTimeout(handleInteractionEnd, 100);
           
     } else {
-      console.log('❌ Invalid stage dimensions');
+      
     }
   }, [tempDimensions, addStageFrame, setTempDimensions, undoRedoAddAction, calculateViewportCenter, currentBoardId, isTemporaryBoard, user, triggerSave, reactShapes, konvaShapes, stageFrames, images, connections, lines, scale, position, handleInteractionStart, handleInteractionEnd]);
 
-  
+
   const keyboardShortcuts = useKeyboardShortcuts({
     selectedNodeIds, 
     deleteShape: handleDeleteShape,
     setSelectedNodeIds, 
     activeTool,
     setActiveTool: (tool: Tool | null) => {
-      console.log('🔧 Keyboard tool change:', tool);
+     
       handleToolChangeWithAutoCreate(tool);
     },
     handleToolChange: handleToolChangeWithAutoCreate,
@@ -950,7 +950,7 @@ const handleAddShape = useCallback((type: Tool) => {
       return;
     }
 
-    console.log("✨ Generating Smart Layout:", layout);
+    
 
     // 3. Add to State
     setStageFrames(prev => [...prev, layout.stageFrame]);
@@ -999,7 +999,7 @@ const handleAddShape = useCallback((type: Tool) => {
               stageState: { scale, position }
             }}
             onBoardUpdate={(updates) => {
-              console.log("🔄 Board title updated from header:", updates);
+            
               setBoardInfo({
                 title: updates.title,
                 category: updates.category
@@ -1123,7 +1123,7 @@ const handleAddShape = useCallback((type: Tool) => {
         onOpenChange={(open) => setShowSetupDialog(open)} 
         boardId={params.boardId as string}
         onBoardUpdate={(updates) => {
-          console.log("🔄 Board info updated from CreateBoard:", updates);
+         
           setBoardInfo({
             title: updates.title,
             category: updates.category

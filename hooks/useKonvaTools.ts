@@ -111,9 +111,15 @@ export const useKonvaTools = (
   const selectionStart = useRef({ x: 0, y: 0 });
   const selectionRect = useRef<Konva.Rect | null>(null);
   const lastFrameTime = useRef<number>(0);
-  
+  const shapesRef = useRef(allShapes);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+
+  // This updates the ref silently without triggering a re-render of the handlers
+  useEffect(() => {
+    shapesRef.current = allShapes;
+  }, [allShapes]);
 
   // --- DRAG PERMISSIONS ---
   const updateDraggables = useCallback(() => {
@@ -450,7 +456,7 @@ export const useKonvaTools = (
   }, [setIsConnecting, setConnectionStart, setTempConnection]);
 
   // --- CONNECTION MOUSE MOVE ---
-  const handleConnectionMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+ const handleConnectionMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isConnecting || !connectionStart || !tempConnection) return;
     
     const now = Date.now();
@@ -467,8 +473,11 @@ export const useKonvaTools = (
     let endNodeId: string | null = null;
     let endSide: Side | undefined = undefined;
 
-    for (let i = 0; i < allShapes.length; i++) {
-        const s = allShapes[i];
+    // ⚡ FIX: Read from ref instead of dependency
+    const currentShapes = shapesRef.current; 
+
+    for (let i = 0; i < currentShapes.length; i++) {
+        const s = currentShapes[i];
         if (s.id === connectionStart.nodeId) continue; 
         if (s.type === 'text' || s.type === 'stickyNote') continue;
 
@@ -493,7 +502,8 @@ export const useKonvaTools = (
         }
     }
     setTempConnection({ ...tempConnection, to: { nodeId: endNodeId, side: endSide, x: endX, y: endY } });
-  }, [isConnecting, connectionStart, tempConnection, stageRef, allShapes, setTempConnection]);
+  // ⚡ FIX: Removed 'allShapes' from dependency array
+  }, [isConnecting, connectionStart, tempConnection, stageRef, setTempConnection]);
 
   const handleConnectionMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isConnecting || !tempConnection || !connectionStart) return;
@@ -518,7 +528,10 @@ export const useKonvaTools = (
   const handleAnchorClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>, nodeId: string, side: Side) => {
     e.cancelBubble = true;
     e.evt.stopPropagation();
-    const sourceShape = allShapes.find(s => s.id === nodeId);
+    
+    // ⚡ FIX: Read from ref
+    const sourceShape = shapesRef.current.find(s => s.id === nodeId);
+    
     if (!sourceShape) return;
     const gap = 150;
     let newX = (sourceShape as any).x;
@@ -539,7 +552,8 @@ export const useKonvaTools = (
     if (sourceShape.type === 'stickyNote') type = 'stickyNote';
     if (sourceShape.type === 'circle') type = 'circle';
     addShape(type, addAction, { x: newX, y: newY });
-  }, [allShapes, addShape, addAction]);
+  // ⚡ FIX: Removed 'allShapes' from dependency array
+  }, [addShape, addAction]);
 
   const handleShapeMouseEnter = useCallback((id: string) => {
     if (!isConnecting) setHoveredNodeId(id);

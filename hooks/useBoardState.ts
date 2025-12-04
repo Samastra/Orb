@@ -74,7 +74,7 @@ export const useBoardState = () => {
       draggable: false, 
     };
     
-    console.log('➕ Adding Connection:', newConnection);
+
     setConnections(prev => [...prev, newConnection]);
     
     addAction({
@@ -146,7 +146,7 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
   };
   
   img.onerror = () => {
-    console.error('Failed to load image for dimensions:', src);
+
     const fallbackImage: ImageShape = {
       id: imageId,
       type: 'image',
@@ -253,7 +253,7 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
 
   // Apply reordered shapes - UPDATED TO INCLUDE IMAGES AND CONNECTIONS
   const applyReorderedShapes = useCallback((updatedShapes: Array<KonvaShape | ReactShape | ImageShape | Connection>) => {
-    console.log('🔄 Applying reordered shapes:', updatedShapes.length);
+
     
     const newKonvaShapes: KonvaShape[] = [];
     const newReactShapes: ReactShape[] = [];
@@ -274,13 +274,7 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
       }
     });
 
-    console.log('📊 Split into:', { 
-      konva: newKonvaShapes.length, 
-      react: newReactShapes.length, 
-      images: newImages.length,
-      connections: newConnections.length
-    });
-    
+
     setKonvaShapes(newKonvaShapes);
     setReactShapes(newReactShapes);
     setImages(newImages);
@@ -289,7 +283,7 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
 
   // SIMPLE LAYER FUNCTIONS - UPDATED FOR MULTI-SELECT
   const bringForward = () => {
-    console.log('🎯 BRING FORWARD called, selected:', selectedNodeIds);
+
     if (selectedNodeIds.length === 0) return;
     
     // For multi-select, we'll bring forward the last selected shape for now
@@ -297,16 +291,9 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
     const shapeIdToMove = selectedNodeIds[selectedNodeIds.length - 1];
     
     const allShapes = [...konvaShapes, ...reactShapes, ...images, ...connections];
-    console.log('📋 All shapes:', { 
-      konva: konvaShapes.length, 
-      react: reactShapes.length, 
-      images: images.length,
-      connections: connections.length,
-      total: allShapes.length 
-    });
+
     
     const shapeIndex = allShapes.findIndex(shape => shape.id === shapeIdToMove);
-    console.log('📊 Shape index:', shapeIndex, 'Total shapes:', allShapes.length);
     
     if (shapeIndex === -1 || shapeIndex === allShapes.length - 1) return;
 
@@ -315,22 +302,15 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
   };
 
   const sendBackward = () => {
-    console.log('🎯 SEND BACKWARD called, selected:', selectedNodeIds);
+
     if (selectedNodeIds.length === 0) return;
     
     const shapeIdToMove = selectedNodeIds[0]; // Use first selected for backward
     
     const allShapes = [...konvaShapes, ...reactShapes, ...images, ...connections];
-    console.log('📋 All shapes:', { 
-      konva: konvaShapes.length, 
-      react: reactShapes.length, 
-      images: images.length,
-      connections: connections.length,
-      total: allShapes.length 
-    });
     
     const shapeIndex = allShapes.findIndex(shape => shape.id === shapeIdToMove);
-    console.log('📊 Shape index:', shapeIndex, 'Total shapes:', allShapes.length);
+
     
     if (shapeIndex <= 0) return;
 
@@ -339,22 +319,15 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
   };
 
   const bringToFront = () => {
-    console.log('🎯 BRING TO FRONT called, selected:', selectedNodeIds);
+
     if (selectedNodeIds.length === 0) return;
     
     const shapeIdToMove = selectedNodeIds[selectedNodeIds.length - 1];
     
     const allShapes = [...konvaShapes, ...reactShapes, ...images, ...connections];
-    console.log('📋 All shapes:', { 
-      konva: konvaShapes.length, 
-      react: reactShapes.length, 
-      images: images.length,
-      connections: connections.length,
-      total: allShapes.length 
-    });
     
     const shapeIndex = allShapes.findIndex(shape => shape.id === shapeIdToMove);
-    console.log('📊 Shape index:', shapeIndex, 'Total shapes:', allShapes.length);
+
     
     if (shapeIndex === -1 || shapeIndex === allShapes.length - 1) return;
 
@@ -363,22 +336,15 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
   };
 
   const sendToBack = () => {
-    console.log('🎯 SEND TO BACK called, selected:', selectedNodeIds);
+
     if (selectedNodeIds.length === 0) return;
     
     const shapeIdToMove = selectedNodeIds[0];
     
     const allShapes = [...konvaShapes, ...reactShapes, ...images, ...connections];
-    console.log('📋 All shapes:', { 
-      konva: konvaShapes.length, 
-      react: reactShapes.length, 
-      images: images.length,
-      connections: connections.length,
-      total: allShapes.length 
-    });
-    
+      
     const shapeIndex = allShapes.findIndex(shape => shape.id === shapeIdToMove);
-    console.log('📊 Shape index:', shapeIndex, 'Total shapes:', allShapes.length);
+ 
     
     if (shapeIndex <= 0) return;
 
@@ -407,7 +373,7 @@ const addImage = useCallback((src: string, addAction: (action: Action) => void, 
        }
     }
 
-    console.log('📍 Creating shape at exact world position:', spawnPos);
+   
 
     if (type === "text") {
       const shapeId = `text-${Date.now()}`;
@@ -517,7 +483,7 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
     draggable: true,
   };
   
-  console.log('➕ Adding Stage Frame at viewport position:', { x, y }, stageFrame);
+  
   setStageFrames(prev => [...prev, stageFrame]);
   
   addAction({
@@ -530,7 +496,7 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
 
  const updateShape = useCallback(
   (id: string, attrs: Record<string, unknown>) => {
-    console.log('🔄 updateShape called:', { id, attrs });
+  
     
     // Update each shape type separately with proper type safety
     setReactShapes((prev) => 
@@ -569,14 +535,7 @@ const addStageFrame = useCallback((width: number, height: number, addAction: (ac
   // In useBoardState.ts - replace deleteShape with this:
 const deleteShape = useCallback(
   (id: string) => {
-    console.log('🗑️ Deleting shape:', id, {
-      reactShapes: reactShapes.find(s => s.id === id),
-      konvaShapes: konvaShapes.find(s => s.id === id),
-      images: images.find(s => s.id === id),
-      connections: connections.find(s => s.id === id),
-      stageFrames: stageFrames.find(s => s.id === id) // ADD THIS LINE
-    });
-    
+      
     setReactShapes((prev) => prev.filter((s) => s.id !== id));
     setKonvaShapes((prev) => prev.filter((s) => s.id !== id));
     setImages((prev) => prev.filter((s) => s.id !== id));
@@ -634,7 +593,7 @@ const deleteShape = useCallback(
     const newId = `${shape.type}-${Date.now()}`;
     const newShape = { ...shape, id: newId, x: newX, y: newY };
 
-    console.log(`🚀 Spawning ${shape.type} to ${direction}`);
+ 
 
     // Add to state
     if (shape.type === 'image') {
