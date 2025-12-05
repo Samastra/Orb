@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { 
-  LayoutGrid, 
-  Files, 
+import {
+  LayoutGrid,
+  Files,
   Star,
   Clock,
   Settings,
@@ -16,6 +16,8 @@ import {
 import { useUser } from "@clerk/nextjs"
 import { getUserBoardsWithDetails } from "@/lib/actions/board-actions"
 import Link from "next/link"
+import { useSubscription } from "@/hooks/use-subscription"
+import { loadPaddle, openPaddleCheckout } from "@/lib/paddle-loader"
 
 // --- HAND DRAWN ASSETS ---
 const SidebarScribble = () => (
@@ -40,6 +42,16 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
   const { user } = useUser()
   const [boards, setBoards] = useState<Board[]>([])
   const [recentBoards, setRecentBoards] = useState<Board[]>([])
+  const { isPaid } = useSubscription()
+
+  const handleCheckout = async (priceId: string) => {
+    try {
+      const loaded = await loadPaddle();
+      if (loaded && user?.primaryEmailAddress?.emailAddress) {
+        openPaddleCheckout(priceId, user.primaryEmailAddress.emailAddress);
+      }
+    } catch (e) { console.error(e); }
+  };
 
   // Fetch logic (Kept your original logic intact)
   useEffect(() => {
@@ -63,7 +75,7 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
       }
     }
     fetchUserBoards()
-  }, [user])
+  }, [user?.id])
 
   const mainNavItems = [
     { icon: LayoutGrid, label: "Studio", href: "/dashboard", active: true },
@@ -114,8 +126,8 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
             href={item.href}
             className={`
               group flex items-center w-full p-2.5 rounded-xl text-sm font-medium transition-all duration-200
-              ${item.active 
-                ? 'bg-gray-100 text-gray-900 shadow-sm' 
+              ${item.active
+                ? 'bg-gray-100 text-gray-900 shadow-sm'
                 : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
               }
               ${collapsed ? 'justify-center' : 'justify-between'}
@@ -154,8 +166,8 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
 
       {/* New Board Button */}
       <div className="p-4 relative">
-        {!collapsed && boards.length === 0 && <SidebarScribble />} {/* Sticker pointing to button */}
-        
+        {!collapsed && boards.length === 0 && <SidebarScribble />}
+
         <Link href="/boards/new">
           <button className={`
             flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-lg hover:shadow-blue-500/25
@@ -167,6 +179,27 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
         </Link>
       </div>
 
+      {/* Upgrade Card - Shows for free users */}
+      {!collapsed && !isPaid && (
+        <div className="mx-3 mb-3 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-1.5 bg-blue-100 rounded-lg">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+            </div>
+            <span className="text-xs font-bold text-blue-900">Upgrade to Pro</span>
+          </div>
+          <p className="text-[10px] text-blue-700 mb-3 leading-relaxed">
+            Get unlimited boards and AI insights.
+          </p>
+          <button
+            onClick={() => handleCheckout('pri_01kabghk4hhgbz2dnj353sv2td')}
+            className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
+          >
+            Upgrade Now
+          </button>
+        </div>
+      )}
+
       {/* Footer / Toggle */}
       <div className="p-3 border-t border-gray-100 flex items-center justify-between">
         <Link href="/settings">
@@ -174,7 +207,7 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
             <Settings className="w-5 h-5" />
           </button>
         </Link>
-        
+
         {!collapsed && (
           <button
             onClick={onToggle}
@@ -184,7 +217,7 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
           </button>
         )}
       </div>
-      
+
       {/* Collapsed Toggle (Centered) */}
       {collapsed && (
         <button
