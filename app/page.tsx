@@ -54,7 +54,7 @@ const GlobalStyles = () => (
 const stickyNotesData = [
   { text: "Q3 Growth Strategy: Focus on SEO & Content partnerships.", color: "bg-yellow-100 border-yellow-200", top: "5%", left: "2%", rotate: -3 },
   { text: "Edu cohort launching Sept 15th. Need curriculum review.", color: "bg-blue-100 border-blue-200", top: "10%", left: "85%", rotate: 5 },
-  { text: "User Interview Key Takeaway: 'Too many clicks to start a board'.", color: "bg-pink-100 border-pink-200", top: "75%", left: "5%", rotate: 2 },
+  { text: "User Interview Key Takeaway: &apos;Too many clicks to start a board&apos;.", color: "bg-pink-100 border-pink-200", top: "75%", left: "5%", rotate: 2 },
   { text: "Machine Learning model update - improve citation accuracy.", color: "bg-green-100 border-green-200", top: "60%", left: "88%", rotate: -4 },
   { text: "Brainstorm: How to reduce onboarding friction?", color: "bg-yellow-50 border-yellow-100", top: "90%", left: "30%", rotate: 6 },
 ];
@@ -229,22 +229,22 @@ const TabChaosSimulation = () => {
   const [activeTab, setActiveTab] = useState(0);
   
   const tabs = [
-    { title: "Research Paper.pdf", color: "bg-red-100", border: "border-red-200" },
-    { title: "YouTube Tutorial", color: "bg-blue-100", border: "border-blue-200" },
-    { title: "Wikipedia", color: "bg-gray-100", border: "border-gray-200" },
-    { title: "GitHub Repo", color: "bg-purple-100", border: "border-purple-200" },
-    { title: "Medium Article", color: "bg-green-100", border: "border-green-200" },
-    { title: "Google Scholar", color: "bg-yellow-100", border: "border-yellow-200" },
-    { title: "Stack Overflow", color: "bg-orange-100", border: "border-orange-200" },
-    { title: "Data Set.csv", color: "bg-indigo-100", border: "border-indigo-200" },
-    { title: "Twitter Thread", color: "bg-cyan-100", border: "border-cyan-200" },
-    { title: "Documentation", color: "bg-pink-100", border: "border-pink-200" },
-    { title: "Academic Journal", color: "bg-amber-100", border: "border-amber-200" },
-    { title: "Product Hunt", color: "bg-teal-100", border: "border-teal-200" },
+    { title: "Research Paper.pdf", color: "bg-blue-50", border: "border-blue-100" },
+    { title: "YouTube Tutorial", color: "bg-gray-50", border: "border-gray-200" },
+    { title: "Wikipedia", color: "bg-gray-100", border: "border-gray-300" },
+    { title: "GitHub Repo", color: "bg-blue-50", border: "border-blue-100" },
+    { title: "Medium Article", color: "bg-gray-50", border: "border-gray-200" },
+    { title: "Google Scholar", color: "bg-blue-50", border: "border-blue-100" },
+    { title: "Stack Overflow", color: "bg-gray-100", border: "border-gray-300" },
+    { title: "Data Set.csv", color: "bg-gray-50", border: "border-gray-200" },
+    { title: "Twitter Thread", color: "bg-blue-50", border: "border-blue-100" },
+    { title: "Documentation", color: "bg-gray-100", border: "border-gray-300" },
+    { title: "Academic Journal", color: "bg-gray-50", border: "border-gray-200" },
+    { title: "Product Hunt", color: "bg-blue-50", border: "border-blue-100" },
   ];
 
   return (
-    <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-gray-50 to-white rounded-2xl shadow-xl border border-gray-200 p-6 overflow-hidden">
+    <div className="relative w-full aspect-[4/3] bg-white rounded-2xl shadow-xl border border-gray-200 p-6 overflow-hidden">
       {/* Browser Top Bar with Tabs */}
       <div className="flex items-end gap-2 mb-6 overflow-x-auto pb-2">
         {[...Array(12)].map((_, i) => (
@@ -262,8 +262,8 @@ const TabChaosSimulation = () => {
             <div className={cn(
               "absolute inset-0 rounded-t-lg",
               i === activeTab 
-                ? "bg-gradient-to-b from-white to-gray-50" 
-                : "bg-gradient-to-b from-gray-300 to-gray-200"
+                ? "bg-white" 
+                : "bg-gray-200"
             )} />
             {i === activeTab && (
               <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-blue-500 rounded-full" />
@@ -332,8 +332,8 @@ const TabChaosSimulation = () => {
             Tab Overload!
           </motion.div>
           <p className="mt-6 text-gray-700 max-w-xs text-lg font-medium">
-            Can't find what you need?<br/>
-            That's the problem.
+            Can&apos;t find what you need?<br/>
+            That&apos;s the problem.
           </p>
         </div>
       </motion.div>
@@ -458,7 +458,7 @@ export default function Home() {
 
           {/* SUBTEXT */}
           <p className="text-lg md:text-xl text-gray-700 max-w-2xl mx-auto mb-10 leading-relaxed font-medium">
-            Eliminate "research chaos." Orblin watches you brainstorm and quietly pulls up the relevant papers, videos, and data you need—so you stay in flow.
+            Eliminate &quot;research chaos.&quot; Orblin watches you brainstorm and quietly pulls up the relevant papers, videos, and data you need—so you stay in flow.
           </p>
 
           {/* BUTTONS */}
@@ -486,12 +486,12 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-4xl font-bold font-serif-heading mb-6">The "47-Tab Syndrome"</h2>
+              <h2 className="text-4xl font-bold font-serif-heading mb-6">The &quot;47-Tab Syndrome&quot;</h2>
               <p className="text-gray-600 mb-6 leading-relaxed text-lg">
                 You know the feeling. You start with one idea. Then you open a tab to fact-check. Then another for a video.
                 <br /><br />
                 <span className="font-bold text-gray-900 text-xl">
-                  20 minutes later, you're lost.
+                  20 minutes later, you&apos;re lost.
                 </span>
                 <br /><br />
                 Your whiteboard is empty, but your browser is full. The cognitive cost of switching contexts is killing your ability to think deeply.
@@ -521,7 +521,7 @@ export default function Home() {
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Main Feature - The "Aha!" Generator */}
+      {/* Main Feature - The &quot;Aha!&quot; Generator */}
       <div className="md:col-span-2 bg-blue-50/50 rounded-3xl p-8 border border-blue-100 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
         <div className="relative z-10 max-w-md">
           <div className="flex items-center gap-3 mb-6">
@@ -529,15 +529,15 @@ export default function Home() {
               <Brain className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">The "Aha!" Generator</h3>
+              <h3 className="text-2xl font-bold text-gray-900">The &quot;Aha!&quot; Generator</h3>
               <p className="text-blue-600 text-sm font-medium">No more dead-end research</p>
             </div>
           </div>
           <p className="text-gray-700 leading-relaxed text-lg">
             Remember that moment when connecting two ideas suddenly made everything click? 
-            <span className="font-bold text-gray-900"> That's what happens automatically.</span>
+            <span className="font-bold text-gray-900"> That&apos;s what happens automatically.</span>
             <br /><br />
-            While you're sketching your startup idea, Orblin quietly pulls up the exact case studies, 
+            While you&apos;re sketching your startup idea, Orblin quietly pulls up the exact case studies, 
             competitor data, and market research you need—before you even realize you need it.
           </p>
           <div className="mt-6 p-4 bg-white rounded-lg border border-blue-100 shadow-sm">
@@ -546,7 +546,7 @@ export default function Home() {
               <span className="text-xs font-semibold text-gray-600">LIVE EXAMPLE</span>
             </div>
             <p className="text-sm text-gray-700 mt-2 italic">
-              "Writing about 'remote work productivity'? Here are 3 recent studies showing the optimal team size."
+              &quot;Writing about &apos;remote work productivity&apos;? Here are 3 recent studies showing the optimal team size.&quot;
             </p>
           </div>
         </div>
@@ -557,7 +557,7 @@ export default function Home() {
           </div>
           <div className="space-y-3">
             <div className="bg-gray-50 p-2 rounded text-[10px] text-gray-500 border-l-2 border-blue-500">
-              "Based on your 'SaaS' note..."
+              &quot;Based on your &apos;SaaS&apos; note...&quot;
             </div>
             <div className="bg-blue-50 p-3 rounded-lg text-[11px] text-blue-700 font-bold border border-blue-100">
               <div className="font-bold mb-1">🎯 Pattern Found:</div>
@@ -587,7 +587,7 @@ export default function Home() {
         </p>
         <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
           <p className="text-xs text-blue-700 font-medium">
-            💡 Pro tip: Right-click any link → "Add to Orblin board"
+            💡 Pro tip: Right-click any link → &quot;Add to Orblin board&quot;
           </p>
         </div>
       </div>
@@ -612,7 +612,7 @@ export default function Home() {
         </p>
         <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
           <p className="text-xs text-blue-700 font-medium">
-            🎯 Bonus: AI finds relevant timestamps based on what you're working on
+            🎯 Bonus: AI finds relevant timestamps based on what you&apos;re working on
           </p>
         </div>
       </div>
@@ -630,7 +630,7 @@ export default function Home() {
             </div>
           </div>
           <p className="text-gray-300 max-w-lg text-lg leading-relaxed">
-            Your brain doesn't work in isolated documents. Why should your tools?
+            Your brain doesn&apos;t work in isolated documents. Why should your tools?
             <br /><br />
             <span className="font-bold text-white">
               Connect your Q4 planning with customer research from 6 months ago. See how that side project idea relates to your main business.
@@ -679,7 +679,7 @@ export default function Home() {
             Pay Once. Think Forever.
           </h2>
           <p className="text-gray-500 text-lg mb-12 max-w-2xl mx-auto">
-            Stop renting your tools. Get full access to Orblin's AI, unlimited boards, and future updates for a single one-time payment.
+            Stop renting your tools. Get full access to Orblin&apos;s AI, unlimited boards, and future updates for a single one-time payment.
           </p>
 
           <div className="relative inline-block group">
