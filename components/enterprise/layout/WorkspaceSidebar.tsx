@@ -192,7 +192,7 @@ export default function WorkspaceSidebar({ collapsed, onToggle }: WorkspaceSideb
             Get unlimited boards and AI insights.
           </p>
           <button
-            onClick={() => handleCheckout('pri_01kabghk4hhgbz2dnj353sv2td')}
+            onClick={() => handleCheckout('pri_01kaehgc2qw3vkd42763qrrewe')}
             className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
           >
             Upgrade Now
