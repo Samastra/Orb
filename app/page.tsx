@@ -7,7 +7,7 @@ import { useAuth, useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import {
   Zap, Menu, X, Sparkles, Globe,
-  PlayCircle, Brain,
+  PlayCircle, Brain, ChevronLeft, ChevronRight,
   CheckCircle2, ShieldCheck, Gift, FileText, PieChart, Share2
 } from "lucide-react";
 import { loadPaddle, openPaddleCheckout } from '@/lib/paddle-loader';
@@ -165,6 +165,232 @@ const ShimmerButton = ({ onClick, children, className }: any) => (
   </button>
 );
 
+// --- 4.5 FEATURES CAROUSEL COMPONENT ---
+const FeaturesCarousel = () => {
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const features = [
+    {
+      id: 'ai-insights',
+      label: 'AI-Powered Insights',
+      title: 'The "Aha!" Generator',
+      description: 'While you brainstorm, Orblin quietly finds the exact case studies, competitor data, and research you need—before you realize you need it.',
+      icon: Brain,
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-500/20',
+      borderColor: 'border-blue-500/30',
+    },
+    {
+      id: 'source-embedding',
+      label: 'Source Embedding',
+      title: 'Never Lose That Perfect Source',
+      description: 'See websites, PDFs, and data visualizations directly on your board—right next to the idea they inspired. Your research stays connected.',
+      icon: Globe,
+      color: 'text-emerald-400',
+      bgColor: 'bg-emerald-500/20',
+      borderColor: 'border-emerald-500/30',
+    },
+    {
+      id: 'video-learning',
+      label: 'Video Learning',
+      title: 'Learn Without Losing Flow',
+      description: 'Watch videos side-by-side with your notes. Orblin transcribes, summarizes, and lets you timestamp your insights automatically.',
+      icon: PlayCircle,
+      color: 'text-purple-400',
+      bgColor: 'bg-purple-500/20',
+      borderColor: 'border-purple-500/30',
+    },
+    {
+      id: 'infinite-canvas',
+      label: 'Infinite Canvas',
+      title: 'Infinite Canvas for Infinite Ideas',
+      description: 'Connect your Q4 planning with research from 6 months ago. Everything you think about lives in one connected space that grows with you.',
+      icon: Sparkles,
+      color: 'text-amber-400',
+      bgColor: 'bg-amber-500/20',
+      borderColor: 'border-amber-500/30',
+    },
+  ];
+
+  // Auto-switch features every 5 seconds
+  useEffect(() => {
+    if (isPaused) return;
+    const interval = setInterval(() => {
+      setActiveFeature((prev) => (prev + 1) % features.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isPaused, features.length]);
+
+  const goToPrev = () => {
+    setActiveFeature((prev) => (prev - 1 + features.length) % features.length);
+  };
+
+  const goToNext = () => {
+    setActiveFeature((prev) => (prev + 1) % features.length);
+  };
+
+  const currentFeature = features[activeFeature];
+  const IconComponent = currentFeature.icon;
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
+      {/* Main Card */}
+      <div className="relative bg-[#111111] rounded-3xl border border-gray-800 overflow-hidden">
+        {/* Subtle glow effect */}
+        <div className={`absolute top-0 right-0 w-96 h-96 ${currentFeature.bgColor} rounded-full blur-3xl opacity-30 transition-all duration-700`} />
+
+        <div className="relative grid md:grid-cols-2 gap-8 p-8 md:p-12">
+          {/* Left Side - Feature List & Content */}
+          <div className="space-y-8">
+            {/* Feature Navigation List */}
+            <div className="space-y-2">
+              {features.map((feature, index) => (
+                <button
+                  key={feature.id}
+                  onClick={() => setActiveFeature(index)}
+                  className={cn(
+                    "flex items-center gap-3 w-full text-left px-4 py-2.5 rounded-xl transition-all duration-300",
+                    index === activeFeature
+                      ? "bg-white/5 border border-white/10"
+                      : "hover:bg-white/5"
+                  )}
+                >
+                  <div className={cn(
+                    "w-2 h-2 rounded-full transition-all duration-300",
+                    index === activeFeature ? "bg-blue-500" : "bg-gray-600"
+                  )} />
+                  <span className={cn(
+                    "text-sm font-medium transition-all duration-300",
+                    index === activeFeature ? "text-white" : "text-gray-500"
+                  )}>
+                    {feature.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Feature Content */}
+            <motion.div
+              key={activeFeature}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+              className="space-y-4"
+            >
+              {/* Icon */}
+              <div className={cn(
+                "inline-flex items-center justify-center w-12 h-12 rounded-xl",
+                currentFeature.bgColor,
+                currentFeature.borderColor,
+                "border"
+              )}>
+                <IconComponent className={cn("w-6 h-6", currentFeature.color)} />
+              </div>
+
+              {/* Title */}
+              <h3 className="text-3xl md:text-4xl font-bold text-white leading-tight">
+                {currentFeature.title}
+              </h3>
+
+              {/* Description */}
+              <p className="text-gray-400 text-lg leading-relaxed max-w-md">
+                {currentFeature.description}
+              </p>
+
+              {/* CTA */}
+              <Link href="/boards/new">
+                <button className="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40">
+                  Get started
+                </button>
+              </Link>
+            </motion.div>
+          </div>
+
+          {/* Right Side - Illustration */}
+          <div className="relative flex items-center justify-center">
+            <motion.div
+              key={`illustration-${activeFeature}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5 }}
+              className={cn(
+                "relative w-64 h-64 md:w-80 md:h-80 rounded-3xl",
+                currentFeature.bgColor,
+                currentFeature.borderColor,
+                "border backdrop-blur-xl flex items-center justify-center"
+              )}
+            >
+              {/* Main Icon */}
+              <IconComponent className={cn("w-24 h-24 md:w-32 md:h-32", currentFeature.color)} />
+
+              {/* Floating decorative elements */}
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-gray-800/80 backdrop-blur rounded-full border border-gray-700 flex items-center justify-center">
+                <div className="w-5 h-5 bg-gray-600 rounded" />
+              </div>
+              <div className="absolute -bottom-4 -left-4 w-10 h-10 bg-gray-800/80 backdrop-blur rounded-full border border-gray-700 flex items-center justify-center">
+                <div className="w-4 h-4 bg-gray-600 rounded-full" />
+              </div>
+
+              {/* Glow lines */}
+              <div className={cn("absolute inset-0 rounded-3xl", currentFeature.borderColor, "border opacity-50")} />
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
+          <motion.div
+            key={`progress-${activeFeature}`}
+            className="h-full bg-blue-500"
+            initial={{ width: "0%" }}
+            animate={{ width: isPaused ? "0%" : "100%" }}
+            transition={{ duration: 5, ease: "linear" }}
+          />
+        </div>
+      </div>
+
+      {/* Glass Navigation Arrows */}
+      <button
+        onClick={goToPrev}
+        className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all duration-300 shadow-lg"
+        aria-label="Previous feature"
+      >
+        <ChevronLeft className="w-6 h-6" />
+      </button>
+      <button
+        onClick={goToNext}
+        className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition-all duration-300 shadow-lg"
+        aria-label="Next feature"
+      >
+        <ChevronRight className="w-6 h-6" />
+      </button>
+
+      {/* Dot Indicators */}
+      <div className="flex items-center justify-center gap-2 mt-6">
+        {features.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => setActiveFeature(index)}
+            className={cn(
+              "w-2 h-2 rounded-full transition-all duration-300",
+              index === activeFeature
+                ? "w-8 bg-blue-500"
+                : "bg-gray-600 hover:bg-gray-500"
+            )}
+            aria-label={`Go to feature ${index + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // --- 5. HERO WITH YOUR IMAGE ---
 const HeroInterface = () => {
   return (
@@ -227,7 +453,7 @@ const HeroInterface = () => {
 // --- 6. INTERACTIVE TAB CHAOS SIMULATION ---
 const TabChaosSimulation = () => {
   const [activeTab, setActiveTab] = useState(0);
-  
+
   const tabs = [
     { title: "Research Paper.pdf", color: "bg-blue-50", border: "border-blue-100" },
     { title: "YouTube Tutorial", color: "bg-gray-50", border: "border-gray-200" },
@@ -252,8 +478,8 @@ const TabChaosSimulation = () => {
             key={i}
             className={cn(
               "w-20 h-8 rounded-t-lg relative cursor-pointer transition-all duration-300 min-w-[80px]",
-              i === activeTab 
-                ? "bg-white shadow-sm border-t border-x border-gray-300" 
+              i === activeTab
+                ? "bg-white shadow-sm border-t border-x border-gray-300"
                 : "bg-gray-200 hover:bg-gray-300"
             )}
             whileHover={{ y: -2 }}
@@ -261,8 +487,8 @@ const TabChaosSimulation = () => {
           >
             <div className={cn(
               "absolute inset-0 rounded-t-lg",
-              i === activeTab 
-                ? "bg-white" 
+              i === activeTab
+                ? "bg-white"
                 : "bg-gray-200"
             )} />
             {i === activeTab && (
@@ -332,7 +558,7 @@ const TabChaosSimulation = () => {
             Tab Overload!
           </motion.div>
           <p className="mt-6 text-gray-700 max-w-xs text-lg font-medium">
-            Can&apos;t find what you need?<br/>
+            Can&apos;t find what you need?<br />
             That&apos;s the problem.
           </p>
         </div>
@@ -464,7 +690,7 @@ export default function Home() {
           {/* BUTTONS */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16 relative z-20">
             {/* ShimmerButton now matches size of secondary button and has subtle shadow */}
-            <ShimmerButton onClick={() => handleCheckout('pri_01kabghk4hhgbz2dnj353sv2td')}>
+            <ShimmerButton onClick={() => handleCheckout('pri_01kaeh8pqxqtdamn0h7z4dnbaa')}>
               <Sparkles className="w-5 h-5 text-yellow-300 fill-yellow-300" />
               <span>Get Lifetime Access</span>
             </ShimmerButton>
@@ -505,210 +731,175 @@ export default function Home() {
                 <span>This stops today.</span>
               </div>
             </div>
-            
+
             {/* Replace the old static grid with the interactive simulation */}
             <TabChaosSimulation />
           </div>
         </div>
       </section>
 
-     {/* --- FEATURES --- */}
-<section id="features" className="py-32 px-6 bg-white relative z-10">
-  <div className="max-w-6xl mx-auto">
-    <div className="text-center mb-20">
-      <h2 className="text-4xl font-bold text-gray-900 font-serif-heading">Your Silent Partner</h2>
-      <p className="text-gray-500 mt-4">Orblin sits in the background, only speaking when it has something valuable to add.</p>
-    </div>
+      {/* --- FEATURES CAROUSEL --- */}
+      <section id="features" className="py-32 px-6 bg-[#0a0a0a] relative z-10 overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(59,130,246,0.08)_0%,_transparent_70%)]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Main Feature - The &quot;Aha!&quot; Generator */}
-      <div className="md:col-span-2 bg-blue-50/50 rounded-3xl p-8 border border-blue-100 relative overflow-hidden group hover:shadow-xl transition-all duration-500">
-        <div className="relative z-10 max-w-md">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-blue-100">
-              <Brain className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900">The &quot;Aha!&quot; Generator</h3>
-              <p className="text-blue-600 text-sm font-medium">No more dead-end research</p>
-            </div>
-          </div>
-          <p className="text-gray-700 leading-relaxed text-lg">
-            Remember that moment when connecting two ideas suddenly made everything click? 
-            <span className="font-bold text-gray-900"> That&apos;s what happens automatically.</span>
-            <br /><br />
-            While you&apos;re sketching your startup idea, Orblin quietly pulls up the exact case studies, 
-            competitor data, and market research you need—before you even realize you need it.
-          </p>
-          <div className="mt-6 p-4 bg-white rounded-lg border border-blue-100 shadow-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-              <span className="text-xs font-semibold text-gray-600">LIVE EXAMPLE</span>
-            </div>
-            <p className="text-sm text-gray-700 mt-2 italic">
-              &quot;Writing about &apos;remote work productivity&apos;? Here are 3 recent studies showing the optimal team size.&quot;
+        <div className="max-w-6xl mx-auto relative">
+          {/* Header */}
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 font-serif-heading">
+              Your Silent Partner
+            </h2>
+            <p className="text-gray-500 text-lg">
+              Orblin sits in the background, only speaking when it has something valuable to add.
             </p>
           </div>
-        </div>
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1/3 h-3/4 border-l border-y border-gray-200 bg-white rounded-l-xl shadow-lg p-4 translate-x-4 group-hover:translate-x-0 transition-transform duration-500">
-          <div className="flex gap-2 items-center mb-3">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-            <span className="text-[10px] font-bold text-gray-400">INSIGHT DELIVERED</span>
-          </div>
-          <div className="space-y-3">
-            <div className="bg-gray-50 p-2 rounded text-[10px] text-gray-500 border-l-2 border-blue-500">
-              &quot;Based on your &apos;SaaS&apos; note...&quot;
-            </div>
-            <div className="bg-blue-50 p-3 rounded-lg text-[11px] text-blue-700 font-bold border border-blue-100">
-              <div className="font-bold mb-1">🎯 Pattern Found:</div>
-              <div>Successful B2B SaaS companies...</div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Feature 2: Never Lose That Perfect Source */}
-      <div className="bg-white rounded-3xl p-8 border border-gray-200 hover:border-blue-200 hover:shadow-lg transition-all duration-300 group hover:-translate-y-1">
-        <div className="mb-6">
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mb-4 shadow-sm border border-gray-200">
-            <Globe className="w-6 h-6 text-gray-900" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Never Lose That Perfect Source</h3>
-          <p className="text-blue-600 text-sm font-medium">The end of bookmark chaos</p>
+          {/* Features Carousel Component */}
+          <FeaturesCarousel />
         </div>
-        <p className="text-gray-600 text-sm leading-relaxed">
-          How many brilliant articles have you bookmarked... only to forget why they mattered?
-          <br /><br />
-          <span className="font-bold text-gray-900">
-            See websites, PDFs, and data visualizations directly on your board—right next to the idea they inspired.
-          </span>
-          <br /><br />
-          Your research stays <span className="italic">connected to your thinking</span>, not lost in a sea of tabs.
-        </p>
-        <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
-          <p className="text-xs text-blue-700 font-medium">
-            💡 Pro tip: Right-click any link → &quot;Add to Orblin board&quot;
-          </p>
-        </div>
-      </div>
+      </section>
 
-      {/* Feature 3: Learn Without Losing Flow */}
-      <div className="bg-white rounded-3xl p-8 border border-gray-200 hover:border-blue-200 hover:shadow-lg transition-all duration-300 group hover:-translate-y-1">
-        <div className="mb-6">
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mb-4 shadow-sm border border-gray-200">
-            <PlayCircle className="w-6 h-6 text-gray-900" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Learn Without Losing Flow</h3>
-          <p className="text-blue-600 text-sm font-medium">Watch, think, and create—simultaneously</p>
-        </div>
-        <p className="text-gray-600 text-sm leading-relaxed">
-          That tutorial you keep rewinding? That lecture where you miss key points while scrambling for notes?
-          <br /><br />
-          <span className="font-bold text-gray-900">
-            Watch videos side-by-side with your notes. Orblin transcribes, summarizes, and lets you timestamp your insights.
-          </span>
-          <br /><br />
-          Finally, <span className="italic">learn deeply</span> instead of just watching passively.
-        </p>
-        <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
-          <p className="text-xs text-blue-700 font-medium">
-            🎯 Bonus: AI finds relevant timestamps based on what you&apos;re working on
-          </p>
-        </div>
-      </div>
+      {/* --- PRICING SECTION --- */}
+      <section id="pricing" className="py-24 px-6 bg-gradient-to-b from-[#0a0a0a] to-[#111111] overflow-hidden relative border-t border-gray-800">
+        {/* Subtle gradient orbs */}
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Feature 4: Infinite Canvas for Infinite Ideas */}
-      <div className="md:col-span-2 bg-gradient-to-br from-gray-900 to-black rounded-3xl p-8 text-white relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center border border-gray-700 shadow-sm">
-              <Sparkles className="w-6 h-6 text-yellow-400" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold mb-1">Infinite Canvas for Infinite Ideas</h3>
-              <p className="text-gray-400 text-sm font-medium">Where all your thinking lives—forever</p>
-            </div>
-          </div>
-          <p className="text-gray-300 max-w-lg text-lg leading-relaxed">
-            Your brain doesn&apos;t work in isolated documents. Why should your tools?
-            <br /><br />
-            <span className="font-bold text-white">
-              Connect your Q4 planning with customer research from 6 months ago. See how that side project idea relates to your main business.
-            </span>
-            <br /><br />
-            Everything you think about lives in one connected space that grows with you.
-          </p>
-          <div className="mt-8 grid grid-cols-2 gap-4 max-w-md">
-            <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-700">
-              <div className="text-xs text-gray-400 mb-1">Projects</div>
-              <div className="text-sm font-bold">Unlimited boards</div>
-            </div>
-            <div className="bg-gray-800/50 p-3 rounded-xl border border-gray-700">
-              <div className="text-xs text-gray-400 mb-1">Connections</div>
-              <div className="text-sm font-bold">Auto-linked ideas</div>
-            </div>
-          </div>
-        </div>
-        {/* Subtle grid pattern in background */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gray-800/30 rounded-full blur-3xl -mr-16 -mt-16 opacity-30" />
-      </div>
-    </div>
-
-    {/* Callout at the bottom of features */}
-    <div className="mt-20 text-center">
-      <div className="inline-flex items-center gap-3 px-6 py-4 bg-white rounded-2xl border border-blue-100 shadow-sm">
-        <Brain className="w-5 h-5 text-blue-600" />
-        <span className="text-gray-700 font-medium">
-          Stop managing tabs. Start connecting ideas. 
-          <span className="text-blue-600 font-bold ml-2">Try it risk-free →</span>
-        </span>
-      </div>
-    </div>
-  </div>
-</section>
-
-      {/* --- PRICING (SALE) --- */}
-      <section id="pricing" className="py-24 px-6 bg-gradient-to-b from-white to-gray-50 overflow-hidden relative border-t border-gray-200 relative z-10">
-        <div className="max-w-5xl mx-auto relative z-10 text-center">
-
-          <div className="inline-block px-4 py-1.5 rounded-full bg-red-100 text-red-600 text-xs font-bold tracking-widest mb-8 border border-red-200">
-            <Gift className="w-3 h-3 inline mr-1" /> LIMITED HOLIDAY DEAL
+        <div className="max-w-5xl mx-auto relative z-10">
+          {/* Header */}
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 font-serif-heading">
+              Simple and Affordable
+              <br />
+              <span className="text-gray-400">Pricing Plans</span>
+            </h2>
+            <p className="text-gray-500 text-lg">
+              Start brainstorming and organizing your ideas with Orblin
+            </p>
           </div>
 
-          <h2 className="text-4xl md:text-6xl font-bold font-serif-heading mb-6 text-gray-900">
-            Pay Once. Think Forever.
-          </h2>
-          <p className="text-gray-500 text-lg mb-12 max-w-2xl mx-auto">
-            Stop renting your tools. Get full access to Orblin&apos;s AI, unlimited boards, and future updates for a single one-time payment.
-          </p>
+          {/* Pricing Cards Container */}
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
 
-          <div className="relative inline-block group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-[2rem] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200" />
-            <div className="relative bg-white border border-gray-200 p-8 md:p-12 rounded-[2rem] shadow-2xl max-w-lg mx-auto">
-              <div className="flex justify-center items-center gap-4 mb-2">
-                <span className="text-6xl font-bold text-gray-900">$299</span>
-                <div className="text-left">
-                  <span className="block text-gray-400 line-through text-lg">$599</span>
-                  <span className="block text-red-500 font-bold text-sm bg-red-50 px-2 rounded">50% OFF</span>
-                </div>
+            {/* Yearly Card */}
+            <div className="relative bg-[#1a1a1a] rounded-2xl p-8 border border-gray-800 hover:border-gray-700 transition-all duration-300 group">
+              {/* Most Popular Badge */}
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-orange-500/25">
+                  Most Popular
+                </span>
               </div>
-              <p className="text-gray-500 mb-8 font-medium">One-time payment. Lifetime access.</p>
 
-              <ShimmerButton className="w-full" onClick={() => handleCheckout('pri_01kabghk4hhgbz2dnj353sv2td')}>
-                Get Lifetime Access
-              </ShimmerButton>
+              <div className="pt-4">
+                <h3 className="text-xl font-semibold text-white mb-6">Pro Yearly</h3>
 
-              <div className="mt-6 flex flex-col gap-3 text-sm text-gray-500">
-                <div className="flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-green-500" /> <span>30-day money-back guarantee</span>
+                {/* Price */}
+                <div className="flex items-baseline gap-1 mb-3">
+                  <span className="text-5xl font-bold text-white">$79</span>
+                  <span className="text-gray-500 text-lg">/year</span>
                 </div>
-                <div className="flex items-center justify-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-500" /> <span>Secure checkout via Paddle</span>
+
+                <p className="text-gray-500 text-sm mb-8">
+                  Best for creators and researchers who want full access at the best value.
+                </p>
+
+                {/* CTA Button */}
+                <button
+                  onClick={() => handleCheckout('pri_01kaehgc2qw3vkd42763qrrewe')}
+                  className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40"
+                >
+                  Get Pro Yearly
+                </button>
+
+                {/* Features */}
+                <div className="mt-8 pt-6 border-t border-gray-800">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Features</p>
+                  <ul className="space-y-3">
+                    {[
+                      "Unlimited boards",
+                      "AI-powered suggestions",
+                      "Priority support",
+                      "Advanced collaboration",
+                      "Export to PDF & more"
+                    ].map((feature, i) => (
+                      <li key={i} className="flex items-center gap-3 text-gray-400 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </div>
+
+            {/* Lifetime Card */}
+            <div className="relative bg-[#1a1a1a] rounded-2xl p-8 border border-gray-800 hover:border-gray-700 transition-all duration-300 group">
+              {/* Best Value Badge */}
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-blue-500/25">
+                  Best Value
+                </span>
+              </div>
+
+              <div className="pt-4">
+                <h3 className="text-xl font-semibold text-white mb-6">Lifetime</h3>
+
+                {/* Price */}
+                <div className="flex items-baseline gap-2 mb-3">
+                  <span className="text-5xl font-bold text-white">$299</span>
+                  <div className="flex flex-col">
+                    <span className="text-gray-600 line-through text-sm">$599</span>
+                    <span className="text-red-400 text-xs font-bold">50% OFF</span>
+                  </div>
+                </div>
+
+                <p className="text-gray-500 text-sm mb-8">
+                  Pay once, own forever. Perfect for power users who want lifetime access.
+                </p>
+
+                {/* CTA Button */}
+                <button
+                  onClick={() => handleCheckout('pri_01kaeh8pqxqtdamn0h7z4dnbaa')}
+                  className="w-full py-3.5 bg-white hover:bg-gray-100 text-gray-900 font-semibold rounded-xl transition-all duration-300 shadow-lg"
+                >
+                  Get Lifetime Access
+                </button>
+
+                {/* Features */}
+                <div className="mt-8 pt-6 border-t border-gray-800">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Features</p>
+                  <ul className="space-y-3">
+                    {[
+                      "Everything in Pro Yearly",
+                      "Lifetime updates & upgrades",
+                      "Priority feature requests",
+                      "Early access to new features",
+                      "Founding member badge"
+                    ].map((feature, i) => (
+                      <li key={i} className="flex items-center gap-3 text-gray-400 text-sm">
+                        <CheckCircle2 className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
           </div>
 
+          {/* Trust Badges */}
+          <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6 text-sm text-gray-500">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-green-500" />
+              <span>30-day money-back guarantee</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-blue-500" />
+              <span>Secure checkout via Paddle</span>
+            </div>
+          </div>
         </div>
       </section>
 
