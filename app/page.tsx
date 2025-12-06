@@ -796,7 +796,7 @@ export default function Home() {
 
                 {/* Price */}
                 <div className="flex items-baseline gap-1 mb-3">
-                  <span className="text-5xl font-bold text-white">$79</span>
+                  <span className="text-5xl font-bold text-white">$60</span>
                   <span className="text-gray-500 text-lg">/year</span>
                 </div>
 
