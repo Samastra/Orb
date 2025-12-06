@@ -9,10 +9,10 @@ import SaveBoardModal from "@/components/save-modal-board";
 import FloatingChatPanel from "@/components/FloatingChatPanel"; // CHANGED: New Import
 import ShareBoardModal from "@/components/enterprise/sharing/ShareBoardModal";
 import { useOrbChat } from "@/hooks/useOrbChat";
-import CreateBoard from "@/components/createBoard"; 
+import CreateBoard from "@/components/createBoard";
 import { useUser } from "@clerk/nextjs";
-import { 
-  MessageSquare, Save, X, MoreVertical, Download, Share2, 
+import {
+  MessageSquare, Save, X, MoreVertical, Download, Share2,
   FileImage, FileText, Image as ImageIcon, Edit3, Copy, Sparkles, Search
 } from "lucide-react";
 import type { ReactShape, ImageShape, Connection } from "@/types/board-types";
@@ -21,8 +21,8 @@ import { downloadAsImage, downloadAsPDF } from "@/lib/download-utils";
 import { cn } from "@/lib/utils";
 import type Konva from "konva";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
-  DropdownMenuTrigger, DropdownMenuSub, 
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, DropdownMenuSub,
   DropdownMenuSubTrigger, DropdownMenuSubContent
 } from "@/components/ui/dropdown-menu";
 import { motion, AnimatePresence } from "framer-motion";
@@ -43,7 +43,7 @@ interface BoardHeaderProps {
     stageFrames: KonvaShape[];
     images: ImageShape[];
     connections: Connection[];
-    stageState?: { scale: number; position: { x: number; y: number } }; 
+    stageState?: { scale: number; position: { x: number; y: number } };
   };
   onBoardUpdate?: (updates: { title: string; category: string }) => void;
   onOpenWebsite?: (url: string, title: string) => void;
@@ -62,7 +62,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   setShowSaveModal,
   handleCloseWithoutSave,
   onAddImageFromRecommendations,
-  onPlayVideo, 
+  onPlayVideo,
   boardElements,
   onOpenWebsite,
   onBoardUpdate,
@@ -70,22 +70,22 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   onAddAIContent,
 }) => {
   const { user } = useUser();
-  
+
   // CHANGED: We now use isChatOpen to toggle the FloatingPanel, not a modal
   const [isChatOpen, setIsChatOpen] = useState(false);
-  
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isEditBoardModalOpen, setIsEditBoardModalOpen] = useState(false); 
-  
-  
 
-  
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isEditBoardModalOpen, setIsEditBoardModalOpen] = useState(false);
+
+
+
+
   // AI / Scanning State (For the Context Engine/ResourceList)
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [hasResults, setHasResults] = useState(false);
 
-  
+
   // INITIALIZE THE CHAT STATE HERE (This keeps it alive!)
   const chatState = useOrbChat();
 
@@ -94,13 +94,13 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
     if (boardInfo.title && boardInfo.title !== "Untitled Board") {
       setIsScanning(true);
       setHasResults(false);
-      
+
       // Simulate AI processing time
       const timer = setTimeout(() => {
         setIsScanning(false);
         setHasResults(true); // Show notification dot
       }, 2500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [boardInfo.title]);
@@ -109,10 +109,19 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
     try {
       const stage = stageRef?.current;
       if (!stage) return;
+
+      // Prepare elements for bounds calculation
+      const elements = boardElements ? {
+        reactShapes: boardElements.reactShapes || [],
+        konvaShapes: boardElements.konvaShapes || [],
+        stageFrames: boardElements.stageFrames || [],
+        images: boardElements.images || []
+      } : undefined;
+
       switch (format) {
-        case 'png': downloadAsImage(stage, 'png'); break;
-        case 'jpeg': downloadAsImage(stage, 'jpeg'); break;
-        case 'pdf': downloadAsPDF(stage); break;
+        case 'png': downloadAsImage(stage, 'png', elements); break;
+        case 'jpeg': downloadAsImage(stage, 'jpeg', elements); break;
+        case 'pdf': downloadAsPDF(stage, elements); break;
       }
     } catch (error) {
       console.error('Download failed:', error);
@@ -120,12 +129,12 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
   };
 
   const HeaderIconButton = ({ icon: Icon, onClick, className, title, active, badge }: any) => (
-    <button 
+    <button
       onClick={onClick}
       className={cn(
         "relative flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200",
-        active 
-          ? "bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-100" 
+        active
+          ? "bg-blue-50 text-blue-600 shadow-sm ring-1 ring-blue-100"
           : "hover:bg-gray-100 text-gray-500 hover:text-gray-900",
         className
       )}
@@ -157,7 +166,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
               <span className="text-xs font-semibold text-gray-900">Scanning board context...</span>
               {/* Animated Progress Bar */}
               <div className="h-1 w-32 bg-gray-100 rounded-full mt-1 overflow-hidden">
-                <motion.div 
+                <motion.div
                   initial={{ x: "-100%" }}
                   animate={{ x: "100%" }}
                   transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
@@ -171,7 +180,7 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
 
       {/* 2. THE HEADER */}
       <header className="fixed top-4 left-4 right-4 z-40 flex items-center justify-between bg-white/95 backdrop-blur-xl px-4 py-2 rounded-2xl shadow-sm border border-gray-200/50">
-        
+
         {/* Left: Title & Menu */}
         <div className="flex items-center gap-3">
           <DropdownMenu>
@@ -210,35 +219,35 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          
+
           <div className="hidden md:flex items-center gap-1 pr-3 border-r border-gray-100 relative">
             {onCopyCleanText && (
-               <HeaderIconButton icon={Copy} onClick={onCopyCleanText} title="Copy text" />
+              <HeaderIconButton icon={Copy} onClick={onCopyCleanText} title="Copy text" />
             )}
-            
+
             {/* THE CONTEXT ENGINE TOGGLE */}
-            <HeaderIconButton 
-              icon={Sparkles} 
+            <HeaderIconButton
+              icon={Sparkles}
               active={isAIPanelOpen}
               badge={hasResults && !isAIPanelOpen}
               onClick={() => {
                 setIsAIPanelOpen(!isAIPanelOpen);
                 if (isChatOpen) setIsChatOpen(false); // Close Chat if open
                 setHasResults(false);
-              }} 
+              }}
               title="Context Engine"
               className={isAIPanelOpen ? "text-blue-600 bg-blue-50" : "text-gray-500 hover:text-blue-600"}
             />
 
             {/* THE NEW CHAT TOGGLE */}
-            <HeaderIconButton 
-              icon={MessageSquare} 
+            <HeaderIconButton
+              icon={MessageSquare}
               active={isChatOpen}
               onClick={() => {
                 setIsChatOpen(!isChatOpen);
                 if (isAIPanelOpen) setIsAIPanelOpen(false); // Close Context Engine if open
-              }} 
-              title="Chat Assistant" 
+              }}
+              title="Chat Assistant"
               className={isChatOpen ? "text-blue-600 bg-blue-50" : "text-gray-500 hover:text-blue-600"}
             />
           </div>
@@ -284,38 +293,38 @@ const BoardHeader: React.FC<BoardHeaderProps> = ({
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-hidden h-full">
-              <ResourceList 
+              <ResourceList
                 boardTitle={boardInfo.title}
                 boardCategory={boardInfo.category}
                 onAddToBoard={onAddImageFromRecommendations}
                 onPlayVideo={onPlayVideo}
-                onOpenWebsite={onOpenWebsite} 
+                onOpenWebsite={onOpenWebsite}
               />
             </div>
           </motion.div>
         )}
 
         {/* Floating Panel Section */}
-      <AnimatePresence>
-        {isChatOpen && (
-          <FloatingChatPanel 
-            isOpen={isChatOpen} 
-            onClose={() => setIsChatOpen(false)}
-            // PASS THE STATE DOWN
-            messages={chatState.messages}
-            input={chatState.input}
-            setInput={chatState.setInput}
-            isLoading={chatState.isLoading}
-            onSend={chatState.handleSend}
-            onClear={chatState.clearChat}
-            onAddToBoard={onAddAIContent}
-          />
-        )}
+        <AnimatePresence>
+          {isChatOpen && (
+            <FloatingChatPanel
+              isOpen={isChatOpen}
+              onClose={() => setIsChatOpen(false)}
+              // PASS THE STATE DOWN
+              messages={chatState.messages}
+              input={chatState.input}
+              setInput={chatState.setInput}
+              isLoading={chatState.isLoading}
+              onSend={chatState.handleSend}
+              onClear={chatState.clearChat}
+              onAddToBoard={onAddAIContent}
+            />
+          )}
+        </AnimatePresence>
       </AnimatePresence>
-      </AnimatePresence>
-      
+
       {/* Modals */}
       <SaveBoardModal isOpen={showSaveModal} onClose={() => setShowSaveModal(false)} tempBoardId={currentBoardId} boardElements={boardElements || { reactShapes: [], konvaShapes: [], stageFrames: [], images: [], connections: [] }} />
       <ShareBoardModal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} boardId={currentBoardId} boardTitle={boardInfo.title} />
