@@ -63,6 +63,8 @@ const nextConfig: NextConfig = {
     };
     return config;
   },
+  // Empty turbopack config to silence warning - we use webpack for konva compatibility
+  turbopack: {},
 };
 
 export default nextConfig;
