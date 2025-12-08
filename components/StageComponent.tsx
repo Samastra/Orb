@@ -13,7 +13,6 @@ import EditableStickyNoteComponent from "./EditableStickyNoteComponent";
 
 const Stage = dynamic(() => import("react-konva").then((mod) => mod.Stage), { ssr: false });
 
-// ... [Keep existing Interfaces & Constants unmodified] ...
 type KonvaPointerEvent = Konva.KonvaEventObject<MouseEvent | TouchEvent>;
 
 interface StageComponentProps {
@@ -214,7 +213,6 @@ const StageFrameNode = React.memo(({ item, commonProps, setShapeRef, updateShape
           <Path data={item.isLocked ? LOCK_ICON_PATH : UNLOCK_ICON_PATH} fill={item.isLocked ? "#ef4444" : "#94a3b8"} scaleX={0.7} scaleY={0.7} x={4} y={2} />
         </Group>
       </Group>
-      {/* PERFORMANCE FIX: Removed Shadow */}
       <Rect
         width={item.width}
         height={item.height}
@@ -231,14 +229,11 @@ StageFrameNode.displayName = "StageFrameNode";
 const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onClick, selected, stageRef }: any) => {
   const isTemp = connection.id === 'temp-connection';
 
-  // Helper to get visual rect (handles transforms/groups)
-  // This bridges the gap between React State (normalized) and Konva Stage (transformed)
   const getVisualRect = (shape: any) => {
     if (stageRef?.current) {
       const node = stageRef.current.findOne('#' + shape.id);
       if (node) {
         const layer = node.getLayer();
-        // Ensuring we get the Position relative to the Layer (where connections live)
         if (layer) {
           return node.getClientRect({ relativeTo: layer });
         }
@@ -247,8 +242,6 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
     return getNormalizedRect(shape);
   };
 
-  // 1. Determine Start Point
-  // For temp connections, TRUST the cached/absolute position we calculated in useKonvaTools (isTemp overrides all).
   let startPoint = { x: connection.from.x, y: connection.from.y };
 
   if (!isTemp && fromShape) {
@@ -258,11 +251,9 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
     return null;
   }
 
-  // 2. Determine End Point
   let endPoint = { x: connection.to.x, y: connection.to.y };
   let endSide: Side = connection.to.side || "left";
 
-  // Only recalculate end point if it's NOT a temp connection
   if (!isTemp && connection.to.nodeId && toShape) {
     const endRect = getVisualRect(toShape);
     const targetSide = connection.to.side || (connection.from.side === 'left' ? 'right' : 'left');
@@ -270,7 +261,7 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
     endSide = targetSide;
   }
 
-  const pathData = getOrthogonalPath(startPoint, endPoint, connection.from.side, endSide); // Use optimized defaults
+  const pathData = getOrthogonalPath(startPoint, endPoint, connection.from.side, endSide);
   const strokeColor = selected ? "#3366FF" : (connection.stroke || "#64748B");
   const strokeWidth = selected ? 4 : (connection.strokeWidth || 4);
   const arrowLength = 10;
@@ -285,8 +276,6 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
   );
 });
 OrthogonalConnection.displayName = "OrthogonalConnection";
-
-
 
 const ImageElement = React.memo(React.forwardRef<Konva.Image, any>(({ imageShape, ...props }, ref) => {
   const [image, setImage] = React.useState<HTMLImageElement | null>(null);
@@ -368,12 +357,10 @@ const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, u
 });
 ShapeRenderer.displayName = "ShapeRenderer";
 
-const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplicate, onAnchorMouseDown, onAnchorClick, scale, stageRef }: any) => {
+const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplicate, onAnchorMouseDown, onAnchorClick, scale, stageRef, groupRef }: any) => {
   const shape = allShapesMap.get(selectedNodeId);
   const [box, setBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
-  // Use useLayoutEffect to sync position synchronously AFTER the shape commit but BEFORE paint.
-  // This prevents visual detachment/lag without using 'setTimeout'.
   React.useLayoutEffect(() => {
     if (!shape) return;
 
@@ -387,9 +374,7 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
       let finalWidth = 0;
       let finalHeight = 0;
 
-      // STRATEGY 1: Centered Shapes (Circle, Ellipse)
       if (shape.type === 'circle' || shape.type === 'ellipse') {
-        // ... Logic reused ...
         let baseWidth = 0;
         let baseHeight = 0;
         if (shape.type === 'circle') {
@@ -405,7 +390,6 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
         finalX -= finalWidth / 2;
         finalY -= finalHeight / 2;
       }
-      // STRATEGY 2: Box Shapes
       else {
         const rect = node.getClientRect({ skipTransform: true });
         finalWidth = rect.width * scaleX;
@@ -418,14 +402,12 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
     } else {
       setBox(getNormalizedRect(shape));
     }
-  }, [shape, selectedNodeId, stageRef]); // Run whenever shape updates
-
+  }, [shape, selectedNodeId, stageRef]);
 
   if (!shape || shape.isLocked) return null;
 
   const { x, y, width, height } = box;
 
-  // Duplicate button settings
   const GAP = 50 / scale;
   const BUTTON_SIZE = 28 / scale;
   const VISIBLE_RADIUS = 12 / scale;
@@ -433,7 +415,6 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
   const ICON_SIZE = 5 / scale;
   const STROKE_WIDTH = 2 / scale;
 
-  // Anchor settings (closer to shape than duplicate buttons)
   const ANCHOR_OFFSET = 22 / scale;
   const ANCHOR_HIT = 18 / scale;
   const ANCHOR_VISIBLE = 7 / scale;
@@ -454,8 +435,7 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
   ];
 
   return (
-    <Group>
-      {/* Connection Anchors (hollow circles) */}
+    <Group ref={groupRef}>
       {onAnchorMouseDown && anchors.map(anchor => {
         const edgePoint = getAnchorPoint({ x, y, width, height }, anchor.side);
         return (
@@ -475,7 +455,6 @@ const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplic
         );
       })}
 
-      {/* Duplicate Buttons (filled circles with +) */}
       {duplicateActions.map((action) => (
         <Group key={action.dir} x={action.x} y={action.dir === 'top' || action.dir === 'bottom' ? action.y - HALF_BTN : action.y - HALF_BTN}>
           <Circle radius={BUTTON_SIZE} fill="transparent" onClick={(e) => { e.cancelBubble = true; onDuplicate(action.dir, true); }} onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = "pointer"; const group = e.target.getParent() as Konva.Group; group?.findOne('.visible-btn')?.to({ scaleX: 1.2, scaleY: 1.2, duration: 0.1 }); group?.findOne('.plus-icon')?.to({ scaleX: 1.2, scaleY: 1.2, duration: 0.1 }); }} onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = "default"; const group = e.target.getParent() as Konva.Group; group?.findOne('.visible-btn')?.to({ scaleX: 1, scaleY: 1, duration: 0.1 }); group?.findOne('.plus-icon')?.to({ scaleX: 1, scaleY: 1, duration: 0.1 }); }} />
@@ -499,16 +478,33 @@ const StageComponent: React.FC<StageComponentProps> = ({
   editingId, setEditingId, onTextCreate,
   hoveredNodeId, setHoveredNodeId, handleAnchorMouseDown, handleAnchorClick, tempConnection, isSpacePressed = false,
   onAction,
-
-  // --- NEW PROPS ---
   guides,
   getSnappedPosition,
   clearGuides
 }) => {
+  const [isOverlayVisible, setIsOverlayVisible] = useState(true);
+
+  // Re-enable overlay when selection changes
+  useEffect(() => {
+    setIsOverlayVisible(true);
+  }, [selectedNodeIds]);
+
+  const overlayRef = useRef<Konva.Group>(null);
+
+  const handleWheelWrapper = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
+    // Imperatively hide immediately for instant response
+    if (overlayRef.current) {
+      overlayRef.current.hide();
+    }
+    setIsOverlayVisible(false); // Update state for consistency
+    handleWheel(e);
+  }, [handleWheel]);
+
   const shapeRefs = useRef<{ [key: string]: Konva.Node | null }>({});
   const dragStartPos = useRef<Map<string, { x: number; y: number }>>(new Map());
   const transformStartAttrs = useRef<{ [key: string]: any }>({});
   const [isDragging, setIsDragging] = useState(false);
+
   const setShapeRef = useCallback((id: string, node: Konva.Node | null) => {
     if (node) shapeRefs.current[id] = node;
     else delete shapeRefs.current[id];
@@ -520,19 +516,20 @@ const StageComponent: React.FC<StageComponentProps> = ({
     return map;
   }, [shapes, reactShapes, images, stageFrames]);
 
-  // Optimization: Keep a ref to the latest map so handlers don't need to depend on it (prevents re-creation)
   const latestShapesRef = useRef(allShapesMap);
   useEffect(() => { latestShapesRef.current = allShapesMap; }, [allShapesMap]);
 
   const handleShapeClick = useCallback((e: any, id: string) => {
     e.cancelBubble = true;
     setSelectedNodeIds([id]);
+    setIsOverlayVisible(true); // Force overlay visible on click
     setEditingId(null);
   }, [setSelectedNodeIds, setEditingId]);
 
   const handleShapeTap = useCallback((e: any, id: string) => {
     e.cancelBubble = true;
     setSelectedNodeIds([id]);
+    setIsOverlayVisible(true); // Force overlay visible on tap
     setEditingId(null);
   }, [setSelectedNodeIds, setEditingId]);
 
@@ -559,11 +556,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
     dragStartPos.current = startPositions;
   }, [selectedNodeIds, setSelectedNodeIds]);
 
-  // --- UPDATED: handleDragMove with SNAP LOGIC ---
   const handleDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
 
-    // 1. SNAP LOGIC
     if (selectedNodeIds.length === 1 && getSnappedPosition) {
       const allShapes = Array.from(latestShapesRef.current.values());
       const snapped = getSnappedPosition(
@@ -576,7 +571,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
       node.y(snapped.y);
     }
 
-    // 2. STANDARD MOVE LOGIC
     const startPos = dragStartPos.current.get(node.id());
     if (!startPos) return;
     const dx = node.x() - startPos.x;
@@ -592,10 +586,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (trRef.current) trRef.current.getLayer()?.batchDraw();
   }, [selectedNodeIds, getSnappedPosition]);
 
-  // --- UPDATED: handleDragEnd with CLEAR GUIDES ---
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     setIsDragging(false);
-    if (clearGuides) clearGuides(); // Clear lines
+    if (clearGuides) clearGuides();
 
     const node = e.target;
     const startPos = dragStartPos.current.get(node.id());
@@ -603,7 +596,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const dx = node.x() - startPos.x;
     const dy = node.y() - startPos.y;
 
-    // applyMove now accepts only the setter, using functional updates and ref-based filtering
     const applyMove = (setter: any) => {
       setter((prev: any[]) => {
         const affected = prev.filter(item => selectedNodeIds.includes(item.id) || item.id === node.id());
@@ -638,7 +630,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
           else if (shape.type === 'image') type = 'update-image';
           else if (shape.type === 'stage') type = 'update-stage-frame';
           else type = 'update-konva-shape';
-          // Use myNode.x/y for new data, myStart for old
+
           const prevData = { ...shape, x: myStart.x, y: myStart.y };
           const newData = { ...shape, x: myNode.x(), y: myNode.y() };
           actionsToDispatch.push({ type, id: shape.id, prevData, newData } as any);
@@ -657,7 +649,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (shape) transformStartAttrs.current[id] = { ...shape };
   }, [allShapesMap]);
 
-  // --- UPDATED: Text Transformer Logic ---
   const handleShapeTransform = useCallback((e: Konva.KonvaEventObject<Event>) => {
     const node = e.target;
     const id = node.id();
@@ -772,7 +763,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
         width={width || (typeof window !== "undefined" ? window.innerWidth : 3072)}
         height={height || (typeof window !== "undefined" ? window.innerHeight : 2048)}
         scaleX={scale} scaleY={scale} x={position.x} y={position.y}
-        onWheel={handleWheel}
+        onWheel={handleWheelWrapper}
         onClick={handleStageClick} onTap={handleStageClick}
         ref={(node) => { if (node) { stageRef.current = node; setStageInstance(node); } }}
         className="bg-slate-50"
@@ -825,8 +816,6 @@ const StageComponent: React.FC<StageComponentProps> = ({
               stageRef={stageRef}
             />
           )}
-
-
 
           {lines.map((line, i) => (
             <Line
@@ -884,7 +873,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
             />
           ))}
 
-          {selectedNodeIds.length === 1 && !isSpacePressed && !isDragging && (
+          {selectedNodeIds.length === 1 && !isSpacePressed && !isDragging && isOverlayVisible && (
             <QuickActionsOverlay
               selectedNodeId={selectedNodeIds[0]}
               allShapesMap={allShapesMap}
@@ -893,6 +882,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
               onAnchorMouseDown={(e: any, side: Side, pos: any) => handleAnchorMouseDown(e, selectedNodeIds[0], side, pos)}
               onAnchorClick={(e: any, side: Side) => handleAnchorClick(e, selectedNodeIds[0], side)}
               stageRef={stageRef}
+              groupRef={overlayRef}
             />
           )}
         </Layer>
