@@ -64,7 +64,7 @@ interface StageComponentProps {
   isSpacePressed?: boolean;
   duplicateShape: (direction: 'top' | 'right' | 'bottom' | 'left', shouldConnect?: boolean) => void;
   onAction?: (action: Action) => void;
-  
+
   // --- NEW PROPS FOR SMART GUIDES ---
   guides?: Array<{ orientation: 'V' | 'H'; points: number[] }>;
   getSnappedPosition?: (id: string, x: number, y: number, allShapes: any[]) => { x: number, y: number };
@@ -72,7 +72,7 @@ interface StageComponentProps {
 }
 
 const LOCK_ICON_PATH = "M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2Zm10-10V7a4 4 0 0 0-8 0v4h8Z";
-const UNLOCK_ICON_PATH = "M7 11V7a5 5 0 0 1 10 0v4"; 
+const UNLOCK_ICON_PATH = "M7 11V7a5 5 0 0 1 10 0v4";
 
 const getNormalizedRect = (shape: any): UtilsRect => {
   if (!shape) return { x: 0, y: 0, width: 0, height: 0 };
@@ -143,7 +143,7 @@ const StageFrameNode = React.memo(({ item, commonProps, setShapeRef, updateShape
       textarea.style.border = 'none';
       textarea.style.padding = '4px';
       textarea.style.margin = '0px';
-      textarea.style.background = '#f1f5f9'; 
+      textarea.style.background = '#f1f5f9';
       textarea.style.borderRadius = '4px';
       textarea.style.outline = '2px solid #3b82f6';
       textarea.style.color = '#333';
@@ -183,13 +183,13 @@ const StageFrameNode = React.memo(({ item, commonProps, setShapeRef, updateShape
         if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
       };
     } else if (textRef.current) {
-        textRef.current.show();
+      textRef.current.show();
     }
   }, [isEditingName, item.name, item.id, updateShape, onAction]);
 
   const frameName = item.name || "Section";
-  const pillWidth = Math.max(80, frameName.length * 9) + 30; 
-  
+  const pillWidth = Math.max(80, frameName.length * 9) + 30;
+
   return (
     <Group
       ref={handleRef}
@@ -200,47 +200,77 @@ const StageFrameNode = React.memo(({ item, commonProps, setShapeRef, updateShape
       onTap={(e) => commonProps.onTap(e, item.id)}
       draggable={!item.isLocked && commonProps.draggable}
     >
-      <Group 
-        y={-32} 
-        onDblClick={(e) => { e.cancelBubble=true; startEditing(); }}
-        onDblTap={(e) => { e.cancelBubble=true; startEditing(); }}
-        onMouseEnter={(e) => { if(item.isLocked) return; e.target.getStage()!.container().style.cursor = "text"; }}
+      <Group
+        y={-32}
+        onDblClick={(e) => { e.cancelBubble = true; startEditing(); }}
+        onDblTap={(e) => { e.cancelBubble = true; startEditing(); }}
+        onMouseEnter={(e) => { if (item.isLocked) return; e.target.getStage()!.container().style.cursor = "text"; }}
         onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = "default"; }}
       >
         <Rect width={pillWidth} height={26} fill={item.isLocked ? "#fee2e2" : "#f1f5f9"} cornerRadius={[6, 6, 0, 0]} stroke={item.isLocked ? "#ef4444" : "#cbd5e1"} strokeWidth={1} />
         <Text ref={textRef} x={10} y={7} text={frameName} fontSize={12} fontFamily="Inter, sans-serif" fill="#334155" fontStyle="bold" listening={false} />
         <Group x={pillWidth - 24} y={5} onClick={handleToggleLock} onTap={handleToggleLock} onMouseEnter={(e) => e.target.getStage()!.container().style.cursor = "pointer"} onMouseLeave={(e) => e.target.getStage()!.container().style.cursor = "default"}>
-            <Circle radius={10} x={8} y={8} fill="transparent" />
-            <Path data={item.isLocked ? LOCK_ICON_PATH : UNLOCK_ICON_PATH} fill={item.isLocked ? "#ef4444" : "#94a3b8"} scaleX={0.7} scaleY={0.7} x={4} y={2} />
+          <Circle radius={10} x={8} y={8} fill="transparent" />
+          <Path data={item.isLocked ? LOCK_ICON_PATH : UNLOCK_ICON_PATH} fill={item.isLocked ? "#ef4444" : "#94a3b8"} scaleX={0.7} scaleY={0.7} x={4} y={2} />
         </Group>
       </Group>
       {/* PERFORMANCE FIX: Removed Shadow */}
-      <Rect 
-        width={item.width} 
-        height={item.height} 
-        fill={item.fill || "#ffffff"} 
-        stroke={item.isLocked ? "#ef4444" : (item.stroke || "#cbd5e1")} 
-        strokeWidth={item.isLocked ? 3 : (item.strokeWidth || 2)} 
-        cornerRadius={item.cornerRadius || 0} 
+      <Rect
+        width={item.width}
+        height={item.height}
+        fill={item.fill || "#ffffff"}
+        stroke={item.isLocked ? "#ef4444" : (item.stroke || "#cbd5e1")}
+        strokeWidth={item.isLocked ? 3 : (item.strokeWidth || 2)}
+        cornerRadius={item.cornerRadius || 0}
       />
     </Group>
   );
 });
 StageFrameNode.displayName = "StageFrameNode";
 
-const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onClick, selected }: any) => {
-  if (!fromShape) return null;
-  const startRect = getNormalizedRect(fromShape);
-  const startPoint = getAnchorPoint(startRect, connection.from.side);
+const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onClick, selected, stageRef }: any) => {
+  const isTemp = connection.id === 'temp-connection';
+
+  // Helper to get visual rect (handles transforms/groups)
+  // This bridges the gap between React State (normalized) and Konva Stage (transformed)
+  const getVisualRect = (shape: any) => {
+    if (stageRef?.current) {
+      const node = stageRef.current.findOne('#' + shape.id);
+      if (node) {
+        const layer = node.getLayer();
+        // Ensuring we get the Position relative to the Layer (where connections live)
+        if (layer) {
+          return node.getClientRect({ relativeTo: layer });
+        }
+      }
+    }
+    return getNormalizedRect(shape);
+  };
+
+  // 1. Determine Start Point
+  // For temp connections, TRUST the cached/absolute position we calculated in useKonvaTools (isTemp overrides all).
+  let startPoint = { x: connection.from.x, y: connection.from.y };
+
+  if (!isTemp && fromShape) {
+    const startRect = getVisualRect(fromShape);
+    startPoint = getAnchorPoint(startRect, connection.from.side);
+  } else if (!isTemp && !fromShape) {
+    return null;
+  }
+
+  // 2. Determine End Point
   let endPoint = { x: connection.to.x, y: connection.to.y };
-  let endSide: Side = connection.to.side || "left"; 
-  if (connection.to.nodeId && toShape) {
-    const endRect = getNormalizedRect(toShape);
+  let endSide: Side = connection.to.side || "left";
+
+  // Only recalculate end point if it's NOT a temp connection
+  if (!isTemp && connection.to.nodeId && toShape) {
+    const endRect = getVisualRect(toShape);
     const targetSide = connection.to.side || (connection.from.side === 'left' ? 'right' : 'left');
     endPoint = getAnchorPoint(endRect, targetSide);
     endSide = targetSide;
   }
-  const pathData = getOrthogonalPath(startPoint, endPoint, connection.from.side, endSide, 40, 20); 
+
+  const pathData = getOrthogonalPath(startPoint, endPoint, connection.from.side, endSide); // Use optimized defaults
   const strokeColor = selected ? "#3366FF" : (connection.stroke || "#64748B");
   const strokeWidth = selected ? 4 : (connection.strokeWidth || 4);
   const arrowLength = 10;
@@ -250,34 +280,13 @@ const OrthogonalConnection = React.memo(({ connection, fromShape, toShape, onCli
     <Group onClick={onClick} onTap={(e) => onClick(e)}>
       <Path data={pathData} stroke="transparent" strokeWidth={30} />
       <Path data={pathData} stroke={strokeColor} strokeWidth={strokeWidth} lineCap="round" lineJoin="round" dash={connection.id === 'temp-connection' ? [5, 5] : undefined} listening={false} />
-      <Arrow x={arrowX} y={arrowY} points={[0, 0, arrowLength, 0]} rotation={arrowRotation} stroke={strokeColor} fill={strokeColor} strokeWidth={strokeWidth} pointerLength={arrowLength} pointerWidth={arrowLength} lineCap="round" lineJoin="round" listening={false} />
+      <Arrow x={arrowX} y={arrowY} points={[0, 0, arrowLength, 0]} rotation={arrowRotation} stroke={strokeColor} fill="transparent" strokeWidth={strokeWidth} pointerLength={arrowLength} pointerWidth={arrowLength} lineCap="round" lineJoin="round" listening={false} />
     </Group>
   );
 });
 OrthogonalConnection.displayName = "OrthogonalConnection";
 
-const AnchorOverlay = React.memo(({ shape, onMouseDown, onClick, scale }: any) => {
-  if (!shape) return null;
-  const rect = getNormalizedRect(shape);
-  const sides: Side[] = ["top", "right", "bottom", "left"];
-  const OFFSET = 15 / scale; const HIT_RADIUS = 40 / scale; const VISIBLE_RADIUS = 9 / scale; const STROKE_WIDTH = 3 / scale;
-  return (
-    <Group>
-      {sides.map(side => {
-        const pos = getAnchorPoint(rect, side);
-        let displayX = pos.x; let displayY = pos.y;
-        if (side === 'top') displayY -= OFFSET; if (side === 'bottom') displayY += OFFSET; if (side === 'left') displayX -= OFFSET; if (side === 'right') displayX += OFFSET;
-        return (
-          <Group key={side} x={displayX} y={displayY} onMouseDown={(e) => { e.cancelBubble = true; onMouseDown(e, side, pos); }} onClick={(e) => onClick(e, side)} onTap={(e) => onClick(e, side)} onMouseEnter={(e) => { const stage = e.target.getStage(); if(stage) stage.container().style.cursor = "crosshair"; }} onMouseLeave={(e) => { const stage = e.target.getStage(); if(stage) stage.container().style.cursor = "default"; }}>
-            <Circle radius={HIT_RADIUS} fill="transparent" />
-            <Circle radius={VISIBLE_RADIUS} fill="#ffffff" stroke="#3366FF" strokeWidth={STROKE_WIDTH} shadowBlur={4} shadowColor="rgba(0,0,0,0.15)" listening={false} />
-          </Group>
-        );
-      })}
-    </Group>
-  );
-});
-AnchorOverlay.displayName = "AnchorOverlay";
+
 
 const ImageElement = React.memo(React.forwardRef<Konva.Image, any>(({ imageShape, ...props }, ref) => {
   const [image, setImage] = React.useState<HTMLImageElement | null>(null);
@@ -288,40 +297,40 @@ const ImageElement = React.memo(React.forwardRef<Konva.Image, any>(({ imageShape
 ImageElement.displayName = 'ImageElement';
 
 const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, updateShape, setShapeRef, onAction, draggable, onShapeClick, onShapeTap, onDragStart, onDragMove, onDragEnd, onTransformStart, onTransform, onTransformEnd, onMouseEnter, onMouseLeave }: any) => {
-  
+
   const handleRef = (node: Konva.Node | null) => setShapeRef(item.id, node);
 
   const dispatchUpdateAction = (id: string, newAttrs: any) => {
-      if (!onAction) return; 
-      let type: Action['type'] = 'update-konva-shape';
-      if(item.type === 'text' || item.type === 'stickyNote') type = 'update-react-shape';
-      else if(item.type === 'image') type = 'update-image';
-      else if(item.type === 'stage') type = 'update-stage-frame';
-      else type = 'update-konva-shape';
-      onAction({ type, id, prevData: item, newData: { ...item, ...newAttrs } } as any);
+    if (!onAction) return;
+    let type: Action['type'] = 'update-konva-shape';
+    if (item.type === 'text' || item.type === 'stickyNote') type = 'update-react-shape';
+    else if (item.type === 'image') type = 'update-image';
+    else if (item.type === 'stage') type = 'update-stage-frame';
+    else type = 'update-konva-shape';
+    onAction({ type, id, prevData: item, newData: { ...item, ...newAttrs } } as any);
   };
 
   const commonProps = {
-      id: item.id,
-      draggable: !item.isLocked && draggable,
-      name: 'selectable-shape',
-      onClick: (e: any) => { if(onShapeClick) onShapeClick(e, item.id); },
-      onTap: (e: any) => { if(onShapeTap) onShapeTap(e, item.id); },
-      onMouseDown: (e: any) => { e.cancelBubble = true; },
-      onDragStart,
-      onDragMove,
-      onDragEnd,
-      onTransformStart,
-      onTransform,
-      onTransformEnd,
-      onMouseEnter,
-      onMouseLeave
+    id: item.id,
+    draggable: !item.isLocked && draggable,
+    name: 'selectable-shape',
+    onClick: (e: any) => { if (onShapeClick) onShapeClick(e, item.id); },
+    onTap: (e: any) => { if (onShapeTap) onShapeTap(e, item.id); },
+    onMouseDown: (e: any) => { e.cancelBubble = true; },
+    onDragStart,
+    onDragMove,
+    onDragEnd,
+    onTransformStart,
+    onTransform,
+    onTransformEnd,
+    onMouseEnter,
+    onMouseLeave
   };
 
   if (item.__kind === 'stage') {
     return <StageFrameNode item={item} commonProps={commonProps} setShapeRef={setShapeRef} updateShape={updateShape} onAction={onAction} />;
   }
-  
+
   if (item.__kind === 'image') {
     return <ImageElement ref={handleRef} imageShape={item} {...commonProps} />;
   }
@@ -336,121 +345,140 @@ const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, u
 
   if (item.__kind === 'react') {
     if (item.type === 'text') {
-      return ( 
+      return (
         <Group {...commonProps} x={item.x} y={item.y} ref={handleRef}>
-            <TextComponent 
-                {...item} 
-                x={0} y={0} 
-                draggable={false} 
-                isSelected={isSelected} 
-                isEditing={isEditing} 
-                onStartEditing={() => setEditingId(item.id)} 
-                onFinishEditing={() => setEditingId(null)} 
-                onUpdate={(attrs: any) => { dispatchUpdateAction(item.id, attrs); updateShape(item.id, attrs); }} 
-            />
+          <TextComponent
+            {...item}
+            x={0} y={0}
+            draggable={false}
+            isSelected={isSelected}
+            isEditing={isEditing}
+            onStartEditing={() => setEditingId(item.id)}
+            onFinishEditing={() => setEditingId(null)}
+            onUpdate={(attrs: any) => { dispatchUpdateAction(item.id, attrs); updateShape(item.id, attrs); }}
+          />
         </Group>
       );
     }
     if (item.type === 'stickyNote') {
-      return ( <EditableStickyNoteComponent ref={handleRef} shapeData={item} isSelected={isSelected} activeTool={null} onSelect={() => {}} onUpdate={(attrs: any) => { dispatchUpdateAction(item.id, attrs); updateShape(item.id, attrs); }} {...commonProps} /> );
+      return (<EditableStickyNoteComponent ref={handleRef} shapeData={item} isSelected={isSelected} activeTool={null} onSelect={() => { }} onUpdate={(attrs: any) => { dispatchUpdateAction(item.id, attrs); updateShape(item.id, attrs); }} {...commonProps} />);
     }
   }
   return null;
-}); 
+});
 ShapeRenderer.displayName = "ShapeRenderer";
 
-const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplicate, scale }: any) => {
+const QuickActionsOverlay = React.memo(({ selectedNodeId, allShapesMap, onDuplicate, onAnchorMouseDown, onAnchorClick, scale, stageRef }: any) => {
   const shape = allShapesMap.get(selectedNodeId);
   const [box, setBox] = useState({ x: 0, y: 0, width: 0, height: 0 });
 
-  useEffect(() => {
+  // Use useLayoutEffect to sync position synchronously AFTER the shape commit but BEFORE paint.
+  // This prevents visual detachment/lag without using 'setTimeout'.
+  React.useLayoutEffect(() => {
     if (!shape) return;
-    
-    // We use a timer to ensure the Konva node has updated its position/scale
-    const timer = setTimeout(() => {
-        const node = Konva.stages[0]?.findOne('#' + selectedNodeId);
-        
-        if (node) {
-          const scaleX = node.scaleX();
-          const scaleY = node.scaleY();
 
-          let finalX = node.x();
-          let finalY = node.y();
-          let finalWidth = 0;
-          let finalHeight = 0;
+    const node = stageRef?.current?.findOne('#' + selectedNodeId);
 
-          // STRATEGY 1: Centered Shapes (Circle, Ellipse)
-          // These have their Origin at the Center, so we must calculate Top-Left manually.
-          if (shape.type === 'circle' || shape.type === 'ellipse') {
-             let baseWidth = 0;
-             let baseHeight = 0;
+    if (node) {
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+      let finalX = node.x();
+      let finalY = node.y();
+      let finalWidth = 0;
+      let finalHeight = 0;
 
-             if (shape.type === 'circle') {
-                const r = (node as any).radius ? (node as any).radius() : (shape.radius || 50);
-                baseWidth = r * 2;
-                baseHeight = r * 2;
-             } else {
-                const rx = (node as any).radiusX ? (node as any).radiusX() : (shape.radiusX || 80);
-                const ry = (node as any).radiusY ? (node as any).radiusY() : (shape.radiusY || 50);
-                baseWidth = rx * 2;
-                baseHeight = ry * 2;
-             }
-             
-             finalWidth = baseWidth * scaleX;
-             finalHeight = baseHeight * scaleY;
-             finalX -= finalWidth / 2;
-             finalY -= finalHeight / 2;
-          } 
-          // STRATEGY 2: Box Shapes (Text, Rect, Stage, Sticky, Image)
-          // We use getClientRect() to get the TRUE visual size. 
-          // This is critical for Text where height is auto-calculated.
-          else {
-             // skipTransform: true gets the local box (unrotated, unscaled relative to parent)
-             // We apply the node's scale manually for precision.
-             const rect = node.getClientRect({ skipTransform: true });
-             
-             finalWidth = rect.width * scaleX;
-             finalHeight = rect.height * scaleY;
-             
-             // Adjust X/Y by the clientRect offset (handles padding or internal offsets)
-             // For standard Rects/Text this is usually close to 0, but good for safety.
-             finalX += rect.x * scaleX;
-             finalY += rect.y * scaleY;
-          }
-
-          setBox({ x: finalX, y: finalY, width: finalWidth, height: finalHeight });
-          
+      // STRATEGY 1: Centered Shapes (Circle, Ellipse)
+      if (shape.type === 'circle' || shape.type === 'ellipse') {
+        // ... Logic reused ...
+        let baseWidth = 0;
+        let baseHeight = 0;
+        if (shape.type === 'circle') {
+          const r = (node as any).radius ? (node as any).radius() : (shape.radius || 50);
+          baseWidth = r * 2; baseHeight = r * 2;
         } else {
-            // Fallback if node isn't ready yet
-            setBox(getNormalizedRect(shape));
+          const rx = (node as any).radiusX ? (node as any).radiusX() : (shape.radiusX || 80);
+          const ry = (node as any).radiusY ? (node as any).radiusY() : (shape.radiusY || 50);
+          baseWidth = rx * 2; baseHeight = ry * 2;
         }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [selectedNodeId, shape, allShapesMap]); 
+        finalWidth = baseWidth * scaleX;
+        finalHeight = baseHeight * scaleY;
+        finalX -= finalWidth / 2;
+        finalY -= finalHeight / 2;
+      }
+      // STRATEGY 2: Box Shapes
+      else {
+        const rect = node.getClientRect({ skipTransform: true });
+        finalWidth = rect.width * scaleX;
+        finalHeight = rect.height * scaleY;
+        finalX += rect.x * scaleX;
+        finalY += rect.y * scaleY;
+      }
 
-  if (!shape || shape.isLocked) return null; 
+      setBox({ x: finalX, y: finalY, width: finalWidth, height: finalHeight });
+    } else {
+      setBox(getNormalizedRect(shape));
+    }
+  }, [shape, selectedNodeId, stageRef]); // Run whenever shape updates
+
+
+  if (!shape || shape.isLocked) return null;
 
   const { x, y, width, height } = box;
-  
-  const GAP = 50 / scale; 
-  const BUTTON_SIZE = 28 / scale; 
-  const VISIBLE_RADIUS = 12 / scale; 
-  const HALF_BTN = BUTTON_SIZE / 2; 
-  const ICON_SIZE = 5 / scale; 
+
+  // Duplicate button settings
+  const GAP = 50 / scale;
+  const BUTTON_SIZE = 28 / scale;
+  const VISIBLE_RADIUS = 12 / scale;
+  const HALF_BTN = BUTTON_SIZE / 2;
+  const ICON_SIZE = 5 / scale;
   const STROKE_WIDTH = 2 / scale;
-  
-  const actions = [ 
-      { dir: 'top', x: x + width / 2, y: y - GAP }, 
-      { dir: 'right', x: x + width + GAP, y: y + height / 2 }, 
-      { dir: 'bottom', x: x + width / 2, y: y + height + GAP }, 
-      { dir: 'left', x: x - GAP, y: y + height / 2 }, 
+
+  // Anchor settings (closer to shape than duplicate buttons)
+  const ANCHOR_OFFSET = 22 / scale;
+  const ANCHOR_HIT = 18 / scale;
+  const ANCHOR_VISIBLE = 7 / scale;
+  const ANCHOR_STROKE = 2 / scale;
+
+  const duplicateActions = [
+    { dir: 'top', x: x + width / 2, y: y - GAP },
+    { dir: 'right', x: x + width + GAP, y: y + height / 2 },
+    { dir: 'bottom', x: x + width / 2, y: y + height + GAP },
+    { dir: 'left', x: x - GAP, y: y + height / 2 },
+  ];
+
+  const anchors = [
+    { side: 'top' as Side, x: x + width / 2, y: y - ANCHOR_OFFSET },
+    { side: 'right' as Side, x: x + width + ANCHOR_OFFSET, y: y + height / 2 },
+    { side: 'bottom' as Side, x: x + width / 2, y: y + height + ANCHOR_OFFSET },
+    { side: 'left' as Side, x: x - ANCHOR_OFFSET, y: y + height / 2 },
   ];
 
   return (
     <Group>
-      {actions.map((action) => (
+      {/* Connection Anchors (hollow circles) */}
+      {onAnchorMouseDown && anchors.map(anchor => {
+        const edgePoint = getAnchorPoint({ x, y, width, height }, anchor.side);
+        return (
+          <Group
+            key={`anchor-${anchor.side}`}
+            x={anchor.x}
+            y={anchor.y}
+            onMouseDown={(e) => { e.cancelBubble = true; onAnchorMouseDown(e, anchor.side, edgePoint); }}
+            onClick={(e) => onAnchorClick?.(e, anchor.side)}
+            onTap={(e) => onAnchorClick?.(e, anchor.side)}
+            onMouseEnter={(e) => { const stage = e.target.getStage(); if (stage) stage.container().style.cursor = "crosshair"; }}
+            onMouseLeave={(e) => { const stage = e.target.getStage(); if (stage) stage.container().style.cursor = "default"; }}
+          >
+            <Circle radius={ANCHOR_HIT} fill="transparent" />
+            <Circle radius={ANCHOR_VISIBLE} fill="#ffffff" stroke="#3366FF" strokeWidth={ANCHOR_STROKE} shadowBlur={2} shadowColor="rgba(0,0,0,0.1)" listening={false} />
+          </Group>
+        );
+      })}
+
+      {/* Duplicate Buttons (filled circles with +) */}
+      {duplicateActions.map((action) => (
         <Group key={action.dir} x={action.x} y={action.dir === 'top' || action.dir === 'bottom' ? action.y - HALF_BTN : action.y - HALF_BTN}>
-          <Circle radius={BUTTON_SIZE} fill="transparent" onClick={(e) => { e.cancelBubble = true; onDuplicate(action.dir,true); }} onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = "pointer"; const group = e.target.getParent() as Konva.Group; group?.findOne('.visible-btn')?.to({ scaleX: 1.2, scaleY: 1.2, duration: 0.1 }); group?.findOne('.plus-icon')?.to({ scaleX: 1.2, scaleY: 1.2, duration: 0.1 }); }} onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = "default"; const group = e.target.getParent() as Konva.Group; group?.findOne('.visible-btn')?.to({ scaleX: 1, scaleY: 1, duration: 0.1 }); group?.findOne('.plus-icon')?.to({ scaleX: 1, scaleY: 1, duration: 0.1 }); }} />
+          <Circle radius={BUTTON_SIZE} fill="transparent" onClick={(e) => { e.cancelBubble = true; onDuplicate(action.dir, true); }} onMouseEnter={(e) => { e.target.getStage()!.container().style.cursor = "pointer"; const group = e.target.getParent() as Konva.Group; group?.findOne('.visible-btn')?.to({ scaleX: 1.2, scaleY: 1.2, duration: 0.1 }); group?.findOne('.plus-icon')?.to({ scaleX: 1.2, scaleY: 1.2, duration: 0.1 }); }} onMouseLeave={(e) => { e.target.getStage()!.container().style.cursor = "default"; const group = e.target.getParent() as Konva.Group; group?.findOne('.visible-btn')?.to({ scaleX: 1, scaleY: 1, duration: 0.1 }); group?.findOne('.plus-icon')?.to({ scaleX: 1, scaleY: 1, duration: 0.1 }); }} />
           <Circle name="visible-btn" radius={VISIBLE_RADIUS} fill="#3366FF" opacity={1} listening={false} />
           <Group name="plus-icon" listening={false}><Line points={[-ICON_SIZE, 0, ICON_SIZE, 0]} stroke="white" strokeWidth={STROKE_WIDTH} listening={false} /><Line points={[0, -ICON_SIZE, 0, ICON_SIZE]} stroke="white" strokeWidth={STROKE_WIDTH} listening={false} /></Group>
         </Group>
@@ -463,7 +491,7 @@ QuickActionsOverlay.displayName = "QuickActionsOverlay";
 const StageComponent: React.FC<StageComponentProps> = ({
   stageRef, trRef, scale, position, activeTool, lines, hasLoaded,
   reactShapes, shapes, stageFrames, images, connections,
-  selectedNodeIds, stageInstance, width, height,duplicateShape,
+  selectedNodeIds, stageInstance, width, height, duplicateShape,
   handleWheel, handleMouseDown, handleMouseUp, handleMouseMove,
   handleTouchStart, handleTouchEnd, handleTouchMove,
   setSelectedNodeIds, setReactShapes, setShapes, setImages,
@@ -471,7 +499,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   editingId, setEditingId, onTextCreate,
   hoveredNodeId, setHoveredNodeId, handleAnchorMouseDown, handleAnchorClick, tempConnection, isSpacePressed = false,
   onAction,
-  
+
   // --- NEW PROPS ---
   guides,
   getSnappedPosition,
@@ -492,15 +520,19 @@ const StageComponent: React.FC<StageComponentProps> = ({
     return map;
   }, [shapes, reactShapes, images, stageFrames]);
 
-  const handleShapeClick = useCallback((e: any, id: string) => { 
-    e.cancelBubble=true; 
-    setSelectedNodeIds([id]); 
+  // Optimization: Keep a ref to the latest map so handlers don't need to depend on it (prevents re-creation)
+  const latestShapesRef = useRef(allShapesMap);
+  useEffect(() => { latestShapesRef.current = allShapesMap; }, [allShapesMap]);
+
+  const handleShapeClick = useCallback((e: any, id: string) => {
+    e.cancelBubble = true;
+    setSelectedNodeIds([id]);
     setEditingId(null);
   }, [setSelectedNodeIds, setEditingId]);
 
-  const handleShapeTap = useCallback((e: any, id: string) => { 
-    e.cancelBubble=true; 
-    setSelectedNodeIds([id]); 
+  const handleShapeTap = useCallback((e: any, id: string) => {
+    e.cancelBubble = true;
+    setSelectedNodeIds([id]);
     setEditingId(null);
   }, [setSelectedNodeIds, setEditingId]);
 
@@ -518,30 +550,30 @@ const StageComponent: React.FC<StageComponentProps> = ({
     setIsDragging(true);
     const node = e.target;
     if (!node) return;
-    const shape = allShapesMap.get(node.id());
+    const shape = latestShapesRef.current.get(node.id());
     if (shape?.isLocked) { e.cancelBubble = true; node.stopDrag(); return; }
     if (!selectedNodeIds.includes(node.id())) { setSelectedNodeIds([node.id()]); }
-    const startPositions = new Map<string, {x:number, y:number}>();
+    const startPositions = new Map<string, { x: number, y: number }>();
     selectedNodeIds.forEach(id => { const ref = shapeRefs.current[id]; if (ref) startPositions.set(id, { x: ref.x(), y: ref.y() }); });
     if (!startPositions.has(node.id())) { startPositions.set(node.id(), { x: node.x(), y: node.y() }); }
     dragStartPos.current = startPositions;
-  }, [selectedNodeIds, setSelectedNodeIds, allShapesMap]);
+  }, [selectedNodeIds, setSelectedNodeIds]);
 
   // --- UPDATED: handleDragMove with SNAP LOGIC ---
   const handleDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target;
-    
+
     // 1. SNAP LOGIC
     if (selectedNodeIds.length === 1 && getSnappedPosition) {
-       const allShapes = Array.from(allShapesMap.values());
-       const snapped = getSnappedPosition(
-          node.id(), 
-          node.x(), 
-          node.y(), 
-          allShapes
-       );
-       node.x(snapped.x);
-       node.y(snapped.y);
+      const allShapes = Array.from(latestShapesRef.current.values());
+      const snapped = getSnappedPosition(
+        node.id(),
+        node.x(),
+        node.y(),
+        allShapes
+      );
+      node.x(snapped.x);
+      node.y(snapped.y);
     }
 
     // 2. STANDARD MOVE LOGIC
@@ -551,14 +583,14 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const dy = node.y() - startPos.y;
     selectedNodeIds.forEach(id => {
       if (id === node.id()) return;
-      const shape = allShapesMap.get(id);
+      const shape = latestShapesRef.current.get(id);
       if (shape?.isLocked) return;
       const otherNode = shapeRefs.current[id];
       const otherStart = dragStartPos.current.get(id);
       if (otherNode && otherStart) { otherNode.x(otherStart.x + dx); otherNode.y(otherStart.y + dy); }
     });
     if (trRef.current) trRef.current.getLayer()?.batchDraw();
-  }, [selectedNodeIds, allShapesMap, getSnappedPosition]); 
+  }, [selectedNodeIds, getSnappedPosition]);
 
   // --- UPDATED: handleDragEnd with CLEAR GUIDES ---
   const handleDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
@@ -567,63 +599,70 @@ const StageComponent: React.FC<StageComponentProps> = ({
 
     const node = e.target;
     const startPos = dragStartPos.current.get(node.id());
-    if(!startPos) return;
+    if (!startPos) return;
     const dx = node.x() - startPos.x;
     const dy = node.y() - startPos.y;
-    const applyMove = (list: any[], setter: any) => {
-        const affected = list.filter(item => selectedNodeIds.includes(item.id) || item.id === node.id());
-        if (affected.length === 0) return;
-        setter((prev: any[]) => prev.map(item => {
-            if (selectedNodeIds.includes(item.id) || item.id === node.id()) {
-                if (item.isLocked) return item;
-                const myStart = dragStartPos.current.get(item.id);
-                if (myStart) { return { ...item, x: myStart.x + dx, y: myStart.y + dy }; }
-            }
-            return item;
-        }));
-    };
-    applyMove(reactShapes, setReactShapes);
-    applyMove(shapes, setShapes);
-    applyMove(images, setImages);
-    applyMove(stageFrames, setStageFrames);
-    if (onAction) {
-        const actionsToDispatch: Action[] = [];
-        const affectedIds = new Set([...selectedNodeIds, node.id()]);
-        affectedIds.forEach(id => {
-            const shape = allShapesMap.get(id);
-            if (shape?.isLocked) return;
-            const myStart = dragStartPos.current.get(id);
-            const myNode = shapeRefs.current[id]; 
-            if (shape && myStart && myNode) {
-                let type: Action['type'] = 'update-konva-shape';
-                if(shape.type === 'text' || shape.type === 'stickyNote') type = 'update-react-shape';
-                else if(shape.type === 'image') type = 'update-image';
-                else if(shape.type === 'stage') type = 'update-stage-frame';
-                else type = 'update-konva-shape';
-                const prevData = { ...shape, x: myStart.x, y: myStart.y };
-                const newData = { ...shape, x: myNode.x(), y: myNode.y() };
-                actionsToDispatch.push({ type, id: shape.id, prevData, newData } as any);
-            }
+
+    // applyMove now accepts only the setter, using functional updates and ref-based filtering
+    const applyMove = (setter: any) => {
+      setter((prev: any[]) => {
+        const affected = prev.filter(item => selectedNodeIds.includes(item.id) || item.id === node.id());
+        if (affected.length === 0) return prev;
+        return prev.map(item => {
+          if (selectedNodeIds.includes(item.id) || item.id === node.id()) {
+            if (item.isLocked) return item;
+            const myStart = dragStartPos.current.get(item.id);
+            if (myStart) { return { ...item, x: myStart.x + dx, y: myStart.y + dy }; }
+          }
+          return item;
         });
-        if (actionsToDispatch.length === 1) onAction(actionsToDispatch[0]);
-        else if (actionsToDispatch.length > 1) onAction({ type: 'batch', actions: actionsToDispatch });
+      });
+    };
+
+    applyMove(setReactShapes);
+    applyMove(setShapes);
+    applyMove(setImages);
+    applyMove(setStageFrames);
+
+    if (onAction) {
+      const actionsToDispatch: Action[] = [];
+      const affectedIds = new Set([...selectedNodeIds, node.id()]);
+      affectedIds.forEach(id => {
+        const shape = latestShapesRef.current.get(id);
+        if (shape?.isLocked) return;
+        const myStart = dragStartPos.current.get(id);
+        const myNode = shapeRefs.current[id];
+        if (shape && myStart && myNode) {
+          let type: Action['type'] = 'update-konva-shape';
+          if (shape.type === 'text' || shape.type === 'stickyNote') type = 'update-react-shape';
+          else if (shape.type === 'image') type = 'update-image';
+          else if (shape.type === 'stage') type = 'update-stage-frame';
+          else type = 'update-konva-shape';
+          // Use myNode.x/y for new data, myStart for old
+          const prevData = { ...shape, x: myStart.x, y: myStart.y };
+          const newData = { ...shape, x: myNode.x(), y: myNode.y() };
+          actionsToDispatch.push({ type, id: shape.id, prevData, newData } as any);
+        }
+      });
+      if (actionsToDispatch.length === 1) onAction(actionsToDispatch[0]);
+      else if (actionsToDispatch.length > 1) onAction({ type: 'batch', actions: actionsToDispatch });
     }
     dragStartPos.current.clear();
-  }, [selectedNodeIds, reactShapes, shapes, images, stageFrames, setReactShapes, setShapes, setImages, setStageFrames, allShapesMap, onAction, clearGuides]);
+  }, [selectedNodeIds, setReactShapes, setShapes, setImages, setStageFrames, onAction, clearGuides]);
 
   const handleShapeTransformStart = useCallback((e: Konva.KonvaEventObject<Event>) => {
-      const node = e.target;
-      const id = node.id();
-      const shape = allShapesMap.get(id);
-      if (shape) transformStartAttrs.current[id] = { ...shape };
+    const node = e.target;
+    const id = node.id();
+    const shape = allShapesMap.get(id);
+    if (shape) transformStartAttrs.current[id] = { ...shape };
   }, [allShapesMap]);
 
   // --- UPDATED: Text Transformer Logic ---
   const handleShapeTransform = useCallback((e: Konva.KonvaEventObject<Event>) => {
-    const node = e.target; 
+    const node = e.target;
     const id = node.id();
     const item = allShapesMap.get(id);
-    
+
     if (!item || item.type !== 'text') return;
 
     const group = node as Konva.Group;
@@ -634,15 +673,15 @@ const StageComponent: React.FC<StageComponentProps> = ({
     if (!anchor || !textNode) return;
 
     if (['middle-left', 'middle-right'].includes(anchor)) {
-        const scaleX = group.scaleX();
-        const currentWidth = textNode.width();
-        const newWidth = Math.max(30, currentWidth * scaleX);
-        
-        textNode.width(newWidth);
-        group.width(newWidth);
-        
-        group.scaleX(1);
-        group.scaleY(1);
+      const scaleX = group.scaleX();
+      const currentWidth = textNode.width();
+      const newWidth = Math.max(30, currentWidth * scaleX);
+
+      textNode.width(newWidth);
+      group.width(newWidth);
+
+      group.scaleX(1);
+      group.scaleY(1);
     }
   }, [allShapesMap]);
 
@@ -650,54 +689,54 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const node = e.target;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
-    
-    node.scaleX(1); 
+
+    node.scaleX(1);
     node.scaleY(1);
-    
-    const updates: any = { 
-        x: node.x(), 
-        y: node.y(), 
-        rotation: node.rotation() 
+
+    const updates: any = {
+      x: node.x(),
+      y: node.y(),
+      rotation: node.rotation()
     };
 
     if (item.type === 'text') {
       if (Math.abs(scaleX - 1) > 0.05 || Math.abs(scaleY - 1) > 0.05) {
-          const currentFontSize = item.fontSize || 24;
-          const currentWidth = item.width || 200;
-          updates.fontSize = Math.max(12, currentFontSize * scaleY);
-          updates.width = Math.max(30, currentWidth * scaleX);
+        const currentFontSize = item.fontSize || 24;
+        const currentWidth = item.width || 200;
+        updates.fontSize = Math.max(12, currentFontSize * scaleY);
+        updates.width = Math.max(30, currentWidth * scaleX);
       } else {
-          updates.width = node.width();
+        updates.width = node.width();
       }
-      updates.height = undefined; 
+      updates.height = undefined;
     }
     else if (item.type === 'circle') {
       updates.radius = Math.max(5, (node as Konva.Circle).radius() * scaleX);
-    } 
+    }
     else if (item.type === 'ellipse') {
       updates.radiusX = Math.max(5, (node as Konva.Ellipse).radiusX() * scaleX);
       updates.radiusY = Math.max(5, (node as Konva.Ellipse).radiusY() * scaleY);
-    } 
+    }
     else {
       const baseWidth = node.width() || item.width;
       const baseHeight = node.height() || item.height;
       updates.width = Math.max(5, baseWidth * scaleX);
       updates.height = Math.max(5, baseHeight * scaleY);
     }
-    
+
     updateShape(item.id, updates);
     if (onAction) {
-        const prevData = transformStartAttrs.current[item.id];
-        if (prevData) {
-            let type: Action['type'] = 'update-konva-shape';
-            if(item.type === 'text' || item.type === 'stickyNote') type = 'update-react-shape';
-            else if(item.type === 'image') type = 'update-image';
-            else if(item.type === 'stage') type = 'update-stage-frame';
-            else type = 'update-konva-shape';
-            
-            onAction({ type, id: item.id, prevData, newData: { ...prevData, ...updates } } as any);
-            delete transformStartAttrs.current[item.id];
-        }
+      const prevData = transformStartAttrs.current[item.id];
+      if (prevData) {
+        let type: Action['type'] = 'update-konva-shape';
+        if (item.type === 'text' || item.type === 'stickyNote') type = 'update-react-shape';
+        else if (item.type === 'image') type = 'update-image';
+        else if (item.type === 'stage') type = 'update-stage-frame';
+        else type = 'update-konva-shape';
+
+        onAction({ type, id: item.id, prevData, newData: { ...prevData, ...updates } } as any);
+        delete transformStartAttrs.current[item.id];
+      }
     }
   }, [updateShape, onAction]);
 
@@ -707,7 +746,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
     const nodes = selectedNodeIds.map(id => { const shape = allShapesMap.get(id); if (shape?.isLocked) return null; return shapeRefs.current[id]; }).filter((n): n is Konva.Node => !!n);
     trRef.current.nodes(nodes);
     trRef.current.getLayer()?.batchDraw();
-  }, [selectedNodeIds, shapes, reactShapes, images, stageFrames, allShapesMap]); 
+  }, [selectedNodeIds, shapes, reactShapes, images, stageFrames, allShapesMap]);
 
   const combinedShapes = useMemo(() => [
     ...stageFrames.map(s => ({ ...s, __kind: 'stage' })),
@@ -719,9 +758,9 @@ const StageComponent: React.FC<StageComponentProps> = ({
   const handleStageClick = (e: KonvaPointerEvent) => {
     const clickedOnEmpty = e.target === e.target.getStage();
     if (clickedOnEmpty) {
-        if (editingId) setEditingId(null);
-        setSelectedNodeIds([]);
-        if (activeTool === 'text') { const pos = e.target.getStage()?.getRelativePointerPosition(); if(pos) onTextCreate(pos); }
+      if (editingId) setEditingId(null);
+      setSelectedNodeIds([]);
+      if (activeTool === 'text') { const pos = e.target.getStage()?.getRelativePointerPosition(); if (pos) onTextCreate(pos); }
     }
   };
 
@@ -743,86 +782,81 @@ const StageComponent: React.FC<StageComponentProps> = ({
         <GridLayer stage={stageInstance} />
         <Layer name="draw-layer">
           {combinedShapes.map((item: any) => (
-            <ShapeRenderer 
-                key={item.id}
-                item={item}
-                isSelected={selectedNodeIds.includes(item.id)}
-                isEditing={editingId === item.id}
-                setEditingId={setEditingId}
-                updateShape={updateShape}
-                setShapeRef={setShapeRef}
-                onAction={onAction} 
-                draggable={isDraggable}
-                onShapeClick={handleShapeClick}
-                onShapeTap={handleShapeTap}
-                onDragStart={handleDragStart}
-                onDragMove={handleDragMove}
-                onDragEnd={handleDragEnd}
-                onTransformStart={handleShapeTransformStart}
-                onTransform={handleShapeTransform} 
-                onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
-                onMouseEnter={item.type === 'text' || item.type === 'stickyNote' ? undefined : handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
+            <ShapeRenderer
+              key={item.id}
+              item={item}
+              isSelected={selectedNodeIds.includes(item.id)}
+              isEditing={editingId === item.id}
+              setEditingId={setEditingId}
+              updateShape={updateShape}
+              setShapeRef={setShapeRef}
+              onAction={onAction}
+              draggable={isDraggable}
+              onShapeClick={handleShapeClick}
+              onShapeTap={handleShapeTap}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragEnd={handleDragEnd}
+              onTransformStart={handleShapeTransformStart}
+              onTransform={handleShapeTransform}
+              onTransformEnd={(e: any) => handleShapeTransformEnd(item, e)}
+              onMouseEnter={item.type === 'text' || item.type === 'stickyNote' ? undefined : handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
             />
           ))}
 
           {connections.map(conn => (
-            <OrthogonalConnection 
-                key={conn.id} 
-                connection={conn}
-                fromShape={allShapesMap.get(conn.from.nodeId)}
-                toShape={conn.to.nodeId ? allShapesMap.get(conn.to.nodeId) : null}
-                onClick={(e: any) => { e.cancelBubble=true; setSelectedNodeIds([conn.id]); }}
-                selected={selectedNodeIds.includes(conn.id)}
+            <OrthogonalConnection
+              key={conn.id}
+              connection={conn}
+              fromShape={allShapesMap.get(conn.from.nodeId)}
+              toShape={conn.to.nodeId ? allShapesMap.get(conn.to.nodeId) : null}
+              onClick={(e: any) => { e.cancelBubble = true; setSelectedNodeIds([conn.id]); }}
+              selected={selectedNodeIds.includes(conn.id)}
+              stageRef={stageRef}
             />
           ))}
 
           {tempConnection && (
-            <OrthogonalConnection 
-                connection={tempConnection} 
-                fromShape={allShapesMap.get(tempConnection.from.nodeId)}
-                toShape={tempConnection.to.nodeId ? allShapesMap.get(tempConnection.to.nodeId) : null}
+            <OrthogonalConnection
+              connection={tempConnection}
+              fromShape={allShapesMap.get(tempConnection.from.nodeId)}
+              toShape={tempConnection.to.nodeId ? allShapesMap.get(tempConnection.to.nodeId) : null}
+              stageRef={stageRef}
             />
           )}
 
-          {hoveredNodeId && activeTool === "connect" && allShapesMap.has(hoveredNodeId) && (
-            <AnchorOverlay 
-                shape={allShapesMap.get(hoveredNodeId)}
-                scale={scale}
-                onMouseDown={(e: any, side: Side, pos: any) => handleAnchorMouseDown(e, hoveredNodeId, side, pos)}
-                onClick={(e: any, side: Side) => handleAnchorClick(e, hoveredNodeId, side)}
-            />
-          )}
-          
+
+
           {lines.map((line, i) => (
-            <Line 
-                key={i} 
-                points={line.points} 
-                stroke={line.tool === 'brush' ? '#000' : '#fff'} 
-                strokeWidth={5} 
-                tension={0.5} 
-                lineCap="round" 
-                lineJoin="round" 
-                globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'} 
-                listening={false}
+            <Line
+              key={i}
+              points={line.points}
+              stroke={line.tool === 'brush' ? '#000' : '#fff'}
+              strokeWidth={5}
+              tension={0.5}
+              lineCap="round"
+              lineJoin="round"
+              globalCompositeOperation={line.tool === 'eraser' ? 'destination-out' : 'source-over'}
+              listening={false}
             />
           ))}
 
           {(() => {
             const selectedNode = selectedNodeIds.length === 1 ? allShapesMap.get(selectedNodeIds[0]) : null;
-            const shouldHideAnchors = selectedNode && ( selectedNode.type === 'stickyNote' || selectedNode.type === 'stage' || selectedNode.isLocked );
+            const shouldHideAnchors = selectedNode && (selectedNode.type === 'stickyNote' || selectedNode.type === 'stage' || selectedNode.isLocked);
             const isText = selectedNode?.type === 'text';
 
             return (
-              <Transformer 
+              <Transformer
                 ref={trRef}
                 resizeEnabled={!shouldHideAnchors}
                 rotateEnabled={!shouldHideAnchors}
                 enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right']}
-                keepRatio={!isText} 
+                keepRatio={!isText}
                 boundBoxFunc={(oldBox, newBox) => {
-                    if (newBox.width < 30 || newBox.height < 5) return oldBox;
-                    return newBox;
+                  if (newBox.width < 30 || newBox.height < 5) return oldBox;
+                  return newBox;
                 }}
                 borderStroke="#3366FF"
                 borderStrokeWidth={1.5}
@@ -832,7 +866,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
                 anchorFill="#FFFFFF"
                 anchorStrokeWidth={1.5}
                 rotationSnaps={[0, 90, 180, 270]}
-                padding={8}
+                padding={0}
                 ignoreStroke={true}
               />
             );
@@ -843,19 +877,22 @@ const StageComponent: React.FC<StageComponentProps> = ({
             <Line
               key={`guide-${i}`}
               points={guide.points}
-              stroke="#ff007b" 
-              strokeWidth={2 / scale}   
-              dash={[4 / scale, 3 / scale]} 
-              listening={false} 
+              stroke="#ff007b"
+              strokeWidth={2 / scale}
+              dash={[4 / scale, 3 / scale]}
+              listening={false}
             />
           ))}
 
           {selectedNodeIds.length === 1 && !isSpacePressed && !isDragging && (
-            <QuickActionsOverlay 
-                selectedNodeId={selectedNodeIds[0]} 
-                allShapesMap={allShapesMap} 
-                scale={scale}
-                onDuplicate={duplicateShape}
+            <QuickActionsOverlay
+              selectedNodeId={selectedNodeIds[0]}
+              allShapesMap={allShapesMap}
+              scale={scale}
+              onDuplicate={duplicateShape}
+              onAnchorMouseDown={(e: any, side: Side, pos: any) => handleAnchorMouseDown(e, selectedNodeIds[0], side, pos)}
+              onAnchorClick={(e: any, side: Side) => handleAnchorClick(e, selectedNodeIds[0], side)}
+              stageRef={stageRef}
             />
           )}
         </Layer>

@@ -35,7 +35,7 @@ const createRoundedPath = (points: number[], radius: number): string => {
   if (points.length < 4) return "";
 
   let path = `M ${points[0]} ${points[1]}`;
-  
+
   for (let i = 2; i < points.length - 2; i += 2) {
     const prevX = points[i - 2];
     const prevY = points[i - 1];
@@ -85,8 +85,8 @@ export const getOrthogonalPath = (
   end: Point,
   startSide: Side,
   endSide: Side,
-  padding: number = 40,
-  cornerRadius: number = 20
+  padding: number = 30,      // Reduced from 40 for tighter paths
+  cornerRadius: number = 12  // Reduced from 20 for sharper, cleaner bends
 ): string => {
   const points: number[] = [];
 
@@ -102,22 +102,22 @@ export const getOrthogonalPath = (
   // 2. Padding Start (Stub)
   let p1x = sx, p1y = sy;
   switch (startSide) {
-    case "top":    p1y -= padding; break;
+    case "top": p1y -= padding; break;
     case "bottom": p1y += padding; break;
-    case "right":  p1x += padding; break;
-    case "left":   p1x -= padding; break;
+    case "right": p1x += padding; break;
+    case "left": p1x -= padding; break;
   }
   points.push(snap(p1x), snap(p1y));
 
   // 3. Padding End (Target approach)
   let p2x = ex, p2y = ey;
   switch (endSide) {
-    case "top":    p2y -= padding; break;
+    case "top": p2y -= padding; break;
     case "bottom": p2y += padding; break;
-    case "right":  p2x += padding; break;
-    case "left":   p2x -= padding; break;
+    case "right": p2x += padding; break;
+    case "left": p2x -= padding; break;
   }
-  
+
   // Snap intermediates
   p2x = snap(p2x);
   p2y = snap(p2y);
@@ -127,21 +127,21 @@ export const getOrthogonalPath = (
   const isEndVertical = endSide === "top" || endSide === "bottom";
 
   if (isStartVertical === isEndVertical) {
-      if (isStartVertical) {
-          const midY = snap((p1y + p2y) / 2);
-          points.push(p1x, midY);
-          points.push(p2x, midY);
-      } else {
-          const midX = snap((p1x + p2x) / 2);
-          points.push(midX, p1y);
-          points.push(midX, p2y);
-      }
+    if (isStartVertical) {
+      const midY = snap((p1y + p2y) / 2);
+      points.push(p1x, midY);
+      points.push(p2x, midY);
+    } else {
+      const midX = snap((p1x + p2x) / 2);
+      points.push(midX, p1y);
+      points.push(midX, p2y);
+    }
   } else {
-      if (isStartVertical) {
-          points.push(p1x, p2y); 
-      } else {
-          points.push(p2x, p1y);
-      }
+    if (isStartVertical) {
+      points.push(p1x, p2y);
+    } else {
+      points.push(p2x, p1y);
+    }
   }
 
   points.push(p2x, p2y);

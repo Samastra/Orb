@@ -7,12 +7,11 @@ import {
   Pen,
   Eraser,
   TvMinimal,
-  Cable,
   Shapes,
   GripHorizontal,
-  GripVertical, // Added GripVertical icon
+  GripVertical,
   Undo2,
-  Redo2 
+  Redo2
 } from "lucide-react";
 import {
   Tooltip,
@@ -109,20 +108,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
   undo,
   redo
 }) => {
-  
+
   // --- DRAGGABLE LOGIC ---
   const [position, setPosition] = useState({ x: 20, y: 120 });
   const [isDragging, setIsDragging] = useState(false);
   // NEW: State for Orientation
   const [orientation, setOrientation] = useState<'vertical' | 'horizontal'>('vertical');
-  
-  const dragStartRef = useRef({ x: 0, y: 0 }); 
-  const elementStartRef = useRef({ x: 0, y: 0 }); 
+
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const elementStartRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
       if (!isDragging) return;
-      
+
       const dx = e.clientX - dragStartRef.current.x;
       const dy = e.clientY - dragStartRef.current.y;
 
@@ -173,10 +172,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   return (
-    <div 
-      style={{ 
+    <div
+      style={{
         transform: `translate(${position.x}px, ${position.y}px)`,
-        touchAction: 'none' 
+        touchAction: 'none'
       }}
       className={cn(
         "fixed top-0 left-0 z-30 transition-shadow duration-300 will-change-transform",
@@ -188,11 +187,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
         // Dynamic Flex Direction
         orientation === 'vertical' ? "flex-col" : "flex-row"
       )}>
-        
+
         {/* --- DRAG HANDLE --- */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <div 
+            <div
               onPointerDown={handleDragStart}
               onContextMenu={toggleOrientation} // Right click to toggle
               onDoubleClick={toggleOrientation} // Double click to toggle
@@ -210,20 +209,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </TooltipContent>
         </Tooltip>
 
-        {/* --- GROUP 1: POINTERS --- */}
+        {/* --- GROUP 1: SELECTION --- */}
         <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
-          <ToolbarBtn 
-            label="Move Tool (V)" 
-            icon={MousePointer2} 
-            isActive={activeTool === "select"} 
-            onClick={() => handleToolChange("select")} 
-          />
-          
-          <ToolbarBtn 
-            label="Connection Tool (C)" 
-            icon={Cable} 
-            isActive={activeTool === "connect"} 
-            onClick={() => handleToolChange("connect")} 
+          <ToolbarBtn
+            label="Move Tool (V)"
+            icon={MousePointer2}
+            isActive={activeTool === "select"}
+            onClick={() => handleToolChange("select")}
           />
         </div>
 
@@ -231,24 +223,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         {/* --- GROUP 2: CREATION --- */}
         <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
-          <ToolbarBtn 
-            label="Text" 
-            icon={Type} 
+          <ToolbarBtn
+            label="Text"
+            icon={Type}
             isActive={false}
-            onClick={() => addShape("text")} 
-          />
-          
-          <ToolbarBtn 
-            label="Sticky Note" 
-            icon={StickyNote} 
-            isActive={false}
-            onClick={() => addShape("stickyNote")} 
+            onClick={() => addShape("text")}
           />
 
-           {/* Shapes Dropdown */}
+          <ToolbarBtn
+            label="Sticky Note"
+            icon={StickyNote}
+            isActive={false}
+            onClick={() => addShape("stickyNote")}
+          />
+
+          {/* Shapes Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger className="outline-none">
-               <Tooltip>
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <button className="flex items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-all duration-200">
                     <Shapes className="w-5 h-5" />
@@ -262,8 +254,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <DropdownMenuContent side="right" align="start" className="w-32 bg-white/95 backdrop-blur-xl border-gray-200 shadow-xl rounded-xl p-2 ml-4">
               <div className="grid grid-cols-2 gap-2">
                 {shapeOptions.map((shape) => (
-                  <DropdownMenuItem 
-                    key={shape.value} 
+                  <DropdownMenuItem
+                    key={shape.value}
                     onClick={() => addShape(shape.value as Tool)}
                     className="flex flex-col items-center justify-center p-2 cursor-pointer rounded-lg hover:bg-blue-50 focus:bg-blue-50 transition-colors"
                   >
@@ -298,18 +290,18 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         {/* --- GROUP 3: DRAWING --- */}
         <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
-          <ToolbarBtn 
-            label="Pen" 
-            icon={Pen} 
-            isActive={activeTool === "pen" && drawingMode === "brush"} 
-            onClick={() => { handleToolChange("pen"); setDrawingMode("brush"); }} 
+          <ToolbarBtn
+            label="Pen"
+            icon={Pen}
+            isActive={activeTool === "pen" && drawingMode === "brush"}
+            onClick={() => { handleToolChange("pen"); setDrawingMode("brush"); }}
           />
-          
-          <ToolbarBtn 
-            label="Eraser" 
-            icon={Eraser} 
-            isActive={activeTool === "pen" && drawingMode === "eraser"} 
-            onClick={() => { handleToolChange("pen"); setDrawingMode("eraser"); }} 
+
+          <ToolbarBtn
+            label="Eraser"
+            icon={Eraser}
+            isActive={activeTool === "pen" && drawingMode === "eraser"}
+            onClick={() => { handleToolChange("pen"); setDrawingMode("eraser"); }}
           />
         </div>
 
@@ -317,21 +309,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         {/* --- GROUP 4: ADVANCED / HISTORY --- */}
         <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
-          
-           {/* Undo */}
-           <ToolbarBtn 
-            label="Undo (Ctrl+Z)" 
-            icon={Undo2} 
-            isActive={false} 
-            onClick={undo} 
+
+          {/* Undo */}
+          <ToolbarBtn
+            label="Undo (Ctrl+Z)"
+            icon={Undo2}
+            isActive={false}
+            onClick={undo}
           />
 
-           {/* Redo */}
-           <ToolbarBtn 
-            label="Redo (Ctrl+Y)" 
-            icon={Redo2} 
-            isActive={false} 
-            onClick={redo} 
+          {/* Redo */}
+          <ToolbarBtn
+            label="Redo (Ctrl+Y)"
+            icon={Redo2}
+            isActive={false}
+            onClick={redo}
           />
 
           <Divider orientation={orientation} />
@@ -357,7 +349,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   <h4 className="font-semibold text-gray-900">Stage Frame</h4>
                   <p className="text-xs text-gray-500">Create a container for your content</p>
                 </div>
-                
+
                 <div className="grid gap-3">
                   <div className="grid grid-cols-3 items-center gap-2">
                     <Label htmlFor="width" className="text-xs font-medium text-gray-500">Width</Label>
@@ -366,12 +358,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
                         id="width"
                         className="h-8 text-sm rounded-md border-gray-200 focus:border-blue-500 pr-8"
                         value={tempDimensions.width}
-                        onChange={(e) => setTempDimensions(prev => ({...prev, width: parseInt(e.target.value) || 0}))}
+                        onChange={(e) => setTempDimensions(prev => ({ ...prev, width: parseInt(e.target.value) || 0 }))}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">px</span>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-3 items-center gap-2">
                     <Label htmlFor="height" className="text-xs font-medium text-gray-500">Height</Label>
                     <div className="col-span-2 relative">
@@ -379,15 +371,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
                         id="height"
                         className="h-8 text-sm rounded-md border-gray-200 focus:border-blue-500 pr-8"
                         value={tempDimensions.height}
-                        onChange={(e) => setTempDimensions(prev => ({...prev, height: parseInt(e.target.value) || 0}))}
+                        onChange={(e) => setTempDimensions(prev => ({ ...prev, height: parseInt(e.target.value) || 0 }))}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">px</span>
                     </div>
                   </div>
 
-                  <Button 
-                    onClick={handleApplyStage} 
-                    size="sm" 
+                  <Button
+                    onClick={handleApplyStage}
+                    size="sm"
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm"
                   >
                     Create Frame

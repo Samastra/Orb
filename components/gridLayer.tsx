@@ -9,12 +9,12 @@ interface GridLayerProps {
   size?: number;     // Dot radius
 }
 
-const GridLayer: React.FC<GridLayerProps> = ({ 
-  stage, 
-  baseSize = 40, 
-  color = "#aaaaaaff", 
+const GridLayer = React.memo(({
+  stage,
+  baseSize = 40,
+  color = "#aaaaaaff",
   size = 1.5 // Small size looks like Canva/Mural
-}) => {
+}: GridLayerProps) => {
   const layerRef = useRef<Konva.Layer>(null);
 
   useEffect(() => {
@@ -35,18 +35,18 @@ const GridLayer: React.FC<GridLayerProps> = ({
   }, [stage]);
 
   return (
-    <Layer ref={layerRef} listening={false}> 
+    <Layer ref={layerRef} listening={false}>
       <Shape
         sceneFunc={(context, shape) => {
           if (!stage) return;
 
           const stageWidth = stage.width();
           const stageHeight = stage.height();
-          
+
           // Get the current camera view
           const transform = stage.getAbsoluteTransform().copy();
           transform.invert();
-          
+
           const viewTopLeft = transform.point({ x: 0, y: 0 });
           const viewBottomRight = transform.point({ x: stageWidth, y: stageHeight });
 
@@ -62,12 +62,12 @@ const GridLayer: React.FC<GridLayerProps> = ({
 
           for (let x = startX; x < endX; x += baseSize) {
             for (let y = startY; y < endY; y += baseSize) {
-                // Draw a simple circle
-                context.moveTo(x + size, y);
-                context.arc(x, y, size, 0, Math.PI * 2, true);
+              // Draw a simple circle
+              context.moveTo(x + size, y);
+              context.arc(x, y, size, 0, Math.PI * 2, true);
             }
           }
-          
+
           context.fillStyle = color;
           context.fillStrokeShape(shape);
         }}
@@ -79,6 +79,6 @@ const GridLayer: React.FC<GridLayerProps> = ({
       />
     </Layer>
   );
-};
+});
 
 export default GridLayer;

@@ -1,10 +1,10 @@
 // hooks/useKeyboardShortcuts.ts
 import { useCallback, useEffect, useRef } from 'react';
 import { Tool } from '@/types/board-types';
-import { 
-  ALL_SHORTCUTS, 
-  PHASE_1_SHORTCUTS, 
-  keysMatch, 
+import {
+  ALL_SHORTCUTS,
+  PHASE_1_SHORTCUTS,
+  keysMatch,
   MODIFIER_KEY,
   formatKeys,
   KeyboardShortcut,
@@ -31,7 +31,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
   const pressedKeys = useRef<Set<string>>(new Set());
   const isSpacePanning = useRef(false);
   const modifierKey = getCurrentModifierKey();
-  
+
   // Use refs to store the latest props to avoid stale closures
   const propsRef = useRef(props);
 
@@ -43,15 +43,15 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
   // Check if we're in a context where shortcuts should be disabled
   const shouldIgnoreShortcuts = useCallback((): boolean => {
     const activeElement = document.activeElement;
-    const isTextInput = activeElement?.tagName === 'INPUT' || 
-                      activeElement?.tagName === 'TEXTAREA' ||
-                      activeElement?.getAttribute('contenteditable') === 'true';
-    
+    const isTextInput = activeElement?.tagName === 'INPUT' ||
+      activeElement?.tagName === 'TEXTAREA' ||
+      activeElement?.getAttribute('contenteditable') === 'true';
+
     if (isTextInput) {
       console.log('⌨️ Ignoring shortcut - text input focused');
       return true;
     }
-    
+
     return false;
   }, [props.isEditingText]);
 
@@ -61,26 +61,26 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
     const key = event.key.toLowerCase();
     const currentProps = propsRef.current;
-    
+
     // Clear and rebuild pressed keys to avoid duplicates
     pressedKeys.current.clear();
-    
+
     // Add the main key
     if (key !== 'control' && key !== 'meta') {
       pressedKeys.current.add(key);
     }
-    
+
     // Add modifier key if pressed
     if (isModifierPressed(event)) {
       pressedKeys.current.add(modifierKey);
     }
 
     const currentKeys = Array.from(pressedKeys.current);
-    
-    console.log('⌨️ Key pressed:', { 
-      key, 
-      currentKeys, 
-      ctrlKey: event.ctrlKey, 
+
+    console.log('⌨️ Key pressed:', {
+      key,
+      currentKeys,
+      ctrlKey: event.ctrlKey,
       metaKey: event.metaKey,
       modifierPressed: isModifierPressed(event),
       selectedNodeIds: currentProps.selectedNodeIds // ADDED: Log selected nodes
@@ -88,7 +88,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
 
     // CRITICAL: Prevent default for ALL problematic browser shortcuts EARLY
     if (isModifierPressed(event)) {
-      switch(key) {
+      switch (key) {
         case 'z': // Undo
         case 'y': // Redo
         case '=': // Zoom in
@@ -102,7 +102,7 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     }
 
     // Also prevent for non-modifier problematic keys
-    switch(key) {
+    switch (key) {
       case 'delete':
       case 'backspace':
         if (currentProps.selectedNodeIds.length > 0) { // CHANGED: Check if any nodes are selected
@@ -130,10 +130,10 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
   // Handle key up events
   const handleKeyUp = useCallback((event: KeyboardEvent) => {
     const key = event.key.toLowerCase();
-    
+
     // Remove the key that was released
     pressedKeys.current.delete(key);
-    
+
     // Also remove modifier key if it's no longer pressed
     if ((key === 'control' || key === 'meta') && !isModifierPressed(event)) {
       pressedKeys.current.delete(modifierKey);
@@ -149,8 +149,8 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     console.log('🔍 Checking shortcut for keys:', currentKeys, 'against all shortcuts...');
 
     // === SELECTION & EDITING ===
-    if (keysMatch(currentKeys, PHASE_1_SHORTCUTS.DELETE.keys) || 
-        keysMatch(currentKeys, PHASE_1_SHORTCUTS.BACKSPACE.keys)) {
+    if (keysMatch(currentKeys, PHASE_1_SHORTCUTS.DELETE.keys) ||
+      keysMatch(currentKeys, PHASE_1_SHORTCUTS.BACKSPACE.keys)) {
       if (props.selectedNodeIds.length > 0) { // CHANGED: Check if any nodes are selected
         console.log('🗑️ Deleting selected shapes:', props.selectedNodeIds);
         // Delete all selected shapes
@@ -183,12 +183,6 @@ export const useKeyboardShortcuts = (props: UseKeyboardShortcutsProps) => {
     if (keysMatch(currentKeys, PHASE_1_SHORTCUTS.PEN_TOOL.keys)) {
       console.log('🔧 Switching to Pen Tool');
       props.handleToolChange('pen');
-      return true;
-    }
-
-    if (keysMatch(currentKeys, PHASE_1_SHORTCUTS.CONNECTION_TOOL.keys)) {
-      console.log('🔧 Switching to Connection Tool');
-      props.handleToolChange('connect');
       return true;
     }
 
