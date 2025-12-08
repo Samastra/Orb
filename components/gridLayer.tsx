@@ -81,4 +81,6 @@ const GridLayer = React.memo(({
   );
 });
 
+GridLayer.displayName = "GridLayer";
+
 export default GridLayer;

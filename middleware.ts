@@ -3,13 +3,13 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
-  '/sign-up(.*)', 
+  '/sign-up(.*)',
   '/api/webhooks/clerk',
   '/terms',
   '/privacy',
   '/contact',
   '/features',
-  '/pricing', 
+  '/pricing',
   '/refunds',
   "/api/chat",
   '/boards/new',
@@ -24,21 +24,32 @@ const isAuthRoute = createRouteMatcher([
 ])
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId } = await auth()
-  
-  // 1. If user is logged in and tries to access an Auth route (sign-in/up), redirect to dashboard
-  if (userId && isAuthRoute(req)) {
-    return Response.redirect(new URL('/dashboard', req.url))
-  }
+  try {
+    console.log("Middleware executing for:", req.nextUrl.pathname);
+    const { userId } = await auth()
+    console.log("Auth checked, userId:", userId);
 
-  // 2. If user is logged in and trying to access root ("/"), redirect to dashboard
-  if (userId && req.nextUrl.pathname === '/') {
-    return Response.redirect(new URL('/dashboard', req.url))
-  }
-  
-  // 3. Protect all other routes except public ones
-  if (!isPublicRoute(req)) {
-    await auth.protect()
+    // 1. If user is logged in and tries to access an Auth route (sign-in/up), redirect to dashboard
+    if (userId && isAuthRoute(req)) {
+      console.log("Redirecting to dashboard (AuthRoute)");
+      return Response.redirect(new URL('/dashboard', req.url))
+    }
+
+    // 2. If user is logged in and trying to access root ("/"), redirect to dashboard
+    if (userId && req.nextUrl.pathname === '/') {
+      console.log("Redirecting to dashboard (Root)");
+      return Response.redirect(new URL('/dashboard', req.url))
+    }
+
+    // 3. Protect all other routes except public ones
+    if (!isPublicRoute(req)) {
+      console.log("Protecting route");
+      await auth.protect()
+    }
+    console.log("Middleware finished successfully");
+  } catch (error) {
+    console.error("Middleware failed:", error);
+    throw error;
   }
 })
 
