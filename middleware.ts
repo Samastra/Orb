@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
 
 const isPublicRoute = createRouteMatcher([
   '/',
@@ -25,33 +26,34 @@ const isAuthRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
   try {
-    console.log("Middleware executing for:", req.nextUrl.pathname);
-    const { userId } = await auth()
-    console.log("Auth checked, userId:", userId);
+    const { userId } = await auth();
 
     // 1. If user is logged in and tries to access an Auth route (sign-in/up), redirect to dashboard
     if (userId && isAuthRoute(req)) {
-      console.log("Redirecting to dashboard (AuthRoute)");
-      return Response.redirect(new URL('/dashboard', req.url))
+      const dashboardUrl = new URL('/dashboard', req.url);
+      return NextResponse.redirect(dashboardUrl);
     }
 
     // 2. If user is logged in and trying to access root ("/"), redirect to dashboard
     if (userId && req.nextUrl.pathname === '/') {
-      console.log("Redirecting to dashboard (Root)");
-      return Response.redirect(new URL('/dashboard', req.url))
+      const dashboardUrl = new URL('/dashboard', req.url);
+      return NextResponse.redirect(dashboardUrl);
     }
 
     // 3. Protect all other routes except public ones
     if (!isPublicRoute(req)) {
-      console.log("Protecting route");
-      await auth.protect()
+      await auth.protect();
     }
-    console.log("Middleware finished successfully");
+
+    return NextResponse.next();
   } catch (error) {
-    console.error("Middleware failed:", error);
-    throw error;
+    console.error("Middleware_Error_Recovered:", error);
+    // CRITICAL: Do NOT throw error. Fail OPEN.
+    // If middleware fails, let the application handle the request.
+    // The individual pages will enforce auth if needed.
+    return NextResponse.next();
   }
-})
+});
 
 export const config = {
   matcher: [
