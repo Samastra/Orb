@@ -5,12 +5,12 @@ interface SnapLine {
   points: number[];
 }
 
-// Huge threshold just for testing (50px)
-const SNAP_THRESHOLD = 50; 
+// REDUCED THRESHOLD: 8px prevents the "sticky trap" feeling. 
+// You can easily "break out" of the snap by moving 9px away.
+const SNAP_THRESHOLD = 8;
 
 export const useSnapGuides = () => {
   const [guides, setGuides] = useState<SnapLine[]>([]);
-  // Throttling logs so we don't crash your browser
   const logCounter = useRef(0);
 
   const clearGuides = useCallback(() => {
@@ -23,26 +23,12 @@ export const useSnapGuides = () => {
     currentY: number,
     allShapes: any[]
   ) => {
-    
-    // --- DIAGNOSTIC LOG (Runs once every 10 frames) ---
-    logCounter.current++;
-    if (logCounter.current % 10 === 0) {
-       console.log("📏 SNAP DEBUG:", { 
-          dragId: dragNodeId, 
-          x: Math.round(currentX), 
-          y: Math.round(currentY), 
-          totalShapesInArray: allShapes.length,
-          shapesToCheck: allShapes.filter(s => s.id !== dragNodeId).length
-       });
-    }
-    // --------------------------------------------------
 
     const dragNode = allShapes.find(s => s.id === dragNodeId);
     if (!dragNode) return { x: currentX, y: currentY };
 
     let w = dragNode.width || 0;
     let h = dragNode.height || 0;
-    // Normalize dimensions
     if (dragNode.type === 'circle') { w = (dragNode.radius || 0) * 2; h = w; }
     if (dragNode.type === 'ellipse') { w = (dragNode.radiusX || 0) * 2; h = (dragNode.radiusY || 0) * 2; }
 
@@ -56,22 +42,21 @@ export const useSnapGuides = () => {
       cy: currentY + h / 2,
     };
 
-    let newX = currentX;
-    let newY = currentY;
     const newGuides: SnapLine[] = [];
-    let snappedX = false;
-    let snappedY = false;
+
+    // Find ALL possible snaps first, then pick the best one
+    let bestSnapX: { diff: number; value: number; guide: SnapLine } | null = null;
+    let bestSnapY: { diff: number; value: number; guide: SnapLine } | null = null;
 
     for (const other of allShapes) {
-      if (other.id === dragNodeId) continue; 
+      if (other.id === dragNodeId) continue;
       if (other.isLocked) continue;
 
       let ow = other.width || 0;
       let oh = other.height || 0;
       let ox = other.x;
       let oy = other.y;
-      
-      // Normalize other shapes
+
       if (other.type === 'circle') { const r = other.radius || 0; ox -= r; oy -= r; ow = r * 2; oh = r * 2; }
       else if (other.type === 'ellipse') { const rx = other.radiusX || 0; const ry = other.radiusY || 0; ox -= rx; oy -= ry; ow = rx * 2; oh = ry * 2; }
 
@@ -84,40 +69,63 @@ export const useSnapGuides = () => {
         cy: oy + oh / 2,
       };
 
-      if (!snappedX) {
-        const snap = (val: number, targetVal: number) => {
-           if (Math.abs(val - targetVal) < SNAP_THRESHOLD) {
-             console.log("🎯 MATCH FOUND X!"); // Success log
-             newX = newX + (targetVal - val);
-             snappedX = true;
-             newGuides.push({ orientation: 'V', points: [targetVal, Math.min(box.t, target.t) - 50, targetVal, Math.max(box.b, target.b) + 50] });
-             return true;
-           }
-           return false;
-        };
-        snap(box.cx, target.cx) || snap(box.l, target.l) || snap(box.r, target.r) || snap(box.l, target.r) || snap(box.r, target.l);
+      // --- X CHECKS (Inline to satisfy TS control flow) ---
+      const xPairs = [
+        { src: box.l, dest: target.l }, { src: box.l, dest: target.r },
+        { src: box.r, dest: target.l }, { src: box.r, dest: target.r },
+        { src: box.cx, dest: target.cx }
+      ];
+
+      for (const { src, dest } of xPairs) {
+        const diff = dest - src;
+        if (Math.abs(diff) < SNAP_THRESHOLD) {
+          if (!bestSnapX || Math.abs(diff) < Math.abs(bestSnapX.diff)) {
+            bestSnapX = {
+              diff,
+              value: dest,
+              guide: { orientation: 'V', points: [dest, Math.min(box.t, target.t) - 50, dest, Math.max(box.b, target.b) + 50] }
+            };
+          }
+        }
       }
 
-      if (!snappedY) {
-        const snap = (val: number, targetVal: number) => {
-           if (Math.abs(val - targetVal) < SNAP_THRESHOLD) {
-             console.log("🎯 MATCH FOUND Y!"); // Success log
-             newY = newY + (targetVal - val);
-             snappedY = true;
-             newGuides.push({ orientation: 'H', points: [Math.min(box.l, target.l) - 50, targetVal, Math.max(box.r, target.r) + 50, targetVal] });
-             return true;
-           }
-           return false;
-        };
-        snap(box.cy, target.cy) || snap(box.t, target.t) || snap(box.b, target.b) || snap(box.t, target.b) || snap(box.b, target.t);
+      // --- Y CHECKS (Inline to satisfy TS control flow) ---
+      const yPairs = [
+        { src: box.t, dest: target.t }, { src: box.t, dest: target.b },
+        { src: box.b, dest: target.t }, { src: box.b, dest: target.b },
+        { src: box.cy, dest: target.cy }
+      ];
+
+      for (const { src, dest } of yPairs) {
+        const diff = dest - src;
+        if (Math.abs(diff) < SNAP_THRESHOLD) {
+          if (!bestSnapY || Math.abs(diff) < Math.abs(bestSnapY.diff)) {
+            bestSnapY = {
+              diff,
+              value: dest,
+              guide: { orientation: 'H', points: [Math.min(box.l, target.l) - 50, dest, Math.max(box.r, target.r) + 50, dest] }
+            };
+          }
+        }
       }
-      
-      if (snappedX && snappedY) break;
+    }
+
+    // Apply the SINGLE best snap found
+    let finalX = currentX;
+    let finalY = currentY;
+
+    if (bestSnapX) {
+      finalX += bestSnapX.diff;
+      newGuides.push(bestSnapX.guide);
+    }
+    if (bestSnapY) {
+      finalY += bestSnapY.diff;
+      newGuides.push(bestSnapY.guide);
     }
 
     if (newGuides.length > 0) setGuides(newGuides);
-    
-    return { x: newX, y: newY };
+
+    return { x: finalX, y: finalY };
 
   }, []);
 

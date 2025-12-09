@@ -99,8 +99,10 @@ export const useKonvaTools = (
   addAction: (action: Action) => void,
   setConnections: React.Dispatch<React.SetStateAction<Connection[]>>,
   updateConnection: (id: string, updates: Partial<Connection>) => void,
-  addShape: (type: Tool, addAction: (action: Action) => void, position: { x: number; y: number }) => void,
-  allShapes: Array<ReactShape | KonvaShape | ImageShape>
+  addShape: (type: Tool, addAction: (action: Action) => void, position: { x: number; y: number }, overrides?: Partial<KonvaShape>) => void,
+  allShapes: Array<ReactShape | KonvaShape | ImageShape>,
+  tempDrawingShape: KonvaShape | null,
+  setTempDrawingShape: (shape: KonvaShape | null) => void
 ) => {
   const isDrawing = useRef(false);
   const lastErasedLines = useRef<number[]>([]);
@@ -377,7 +379,9 @@ export const useKonvaTools = (
   }, [setLines, addAction, scale]);
 
   const handleDrawingMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool !== "pen") return;
+    const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse'].includes(activeTool || '');
+    if (activeTool !== "pen" && !isShapeTool) return;
+
     e.cancelBubble = true;
     isDrawing.current = true;
     const stage = stageRef.current;
@@ -385,15 +389,63 @@ export const useKonvaTools = (
     const pos = getRelativePointerPosition(stage);
     if (!pos) return;
 
-    if (drawingMode === "eraser") {
-      detectAndEraseLines(pos);
-    } else {
-      setLines(prev => [...prev, { tool: drawingMode, points: [pos.x, pos.y] }]);
+    if (activeTool === "pen") {
+      if (drawingMode === "eraser") {
+        detectAndEraseLines(pos);
+      } else {
+        setLines(prev => [...prev, { tool: "brush", points: [pos.x, pos.y] }]);
+      }
+    } else if (isShapeTool) {
+      // SHAPE / LINE / ARROW CREATION
+      const startId = `temp-${Date.now()}`;
+      const shapeType = activeTool as string;
+
+      let initialShape: KonvaShape;
+
+      if (shapeType === "line" || shapeType === "arrow") {
+        initialShape = {
+          id: startId,
+          type: shapeType as any,
+          x: 0,
+          y: 0,
+          points: [pos.x, pos.y, pos.x, pos.y],
+          stroke: "black",
+          strokeWidth: 2,
+          fill: shapeType === "arrow" ? "black" : "transparent",
+          draggable: false
+        } as KonvaShape;
+      } else {
+        initialShape = {
+          id: startId,
+          type: shapeType as any,
+          x: pos.x,
+          y: pos.y,
+          width: 0,
+          height: 0,
+          fill: "transparent",
+          stroke: "black",
+          strokeWidth: 2,
+          draggable: false,
+          rotation: 0
+        } as KonvaShape;
+
+        if (shapeType === 'circle') {
+          (initialShape as any).radius = 0;
+        }
+        if (shapeType === 'rounded_rect') {
+          (initialShape as any).cornerRadius = 20;
+        }
+      }
+
+      setTempDrawingShape(initialShape);
+      selectionStart.current = { x: pos.x, y: pos.y };
     }
-  }, [activeTool, drawingMode, stageRef, setLines, detectAndEraseLines]);
+  }, [activeTool, drawingMode, stageRef, setLines, detectAndEraseLines, setTempDrawingShape]);
 
   const handleDrawingMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (activeTool !== "pen" || !isDrawing.current) return;
+    const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse'].includes(activeTool || '');
+    if ((activeTool !== "pen" && !isShapeTool) || !isDrawing.current) return;
+
     e.cancelBubble = true;
     const stage = stageRef.current;
     if (!stage) return;
@@ -405,29 +457,112 @@ export const useKonvaTools = (
     const point = getRelativePointerPosition(stage);
     if (!point) return;
 
-    if (drawingMode === "eraser") {
-      detectAndEraseLines(point);
-    } else {
-      setLines(prev => {
-        if (prev.length === 0) return prev;
-        const last = prev[prev.length - 1];
-        const updated = { ...last, points: [...last.points, point.x, point.y] };
-        return [...prev.slice(0, -1), updated];
-      });
-    }
-  }, [activeTool, drawingMode, stageRef, setLines, detectAndEraseLines]);
+    if (activeTool === "pen") {
+      if (drawingMode === "eraser") {
+        detectAndEraseLines(point);
+      } else {
+        setLines(prev => {
+          if (prev.length === 0) return prev;
+          const last = prev[prev.length - 1];
+          const updated = { ...last, points: [...last.points, point.x, point.y] };
+          return [...prev.slice(0, -1), updated];
+        });
+      }
+    } else if (tempDrawingShape) {
+      const startX = selectionStart.current.x;
+      const startY = selectionStart.current.y;
+      const shapeType = activeTool as string;
 
-  const handleDrawingMouseUp = useCallback(() => {
-    if (activeTool !== "pen") return;
-    if (isDrawing.current && drawingMode === "brush") {
-      const lastLine = lines[lines.length - 1];
-      if (lastLine) {
-        addAction({ type: "add-line", line: lastLine });
+      if (shapeType === "line" || shapeType === "arrow") {
+        setTempDrawingShape({
+          ...tempDrawingShape,
+          points: [startX, startY, point.x, point.y]
+        });
+      } else {
+        const w = point.x - startX;
+        const h = point.y - startY;
+
+        if (shapeType === 'circle') {
+          const dist = Math.sqrt(w * w + h * h);
+          setTempDrawingShape({ ...tempDrawingShape, radius: dist } as any);
+        } else if (shapeType === 'triangle') {
+          const newX = w < 0 ? startX + w : startX;
+          const newY = h < 0 ? startY + h : startY;
+          setTempDrawingShape({
+            ...tempDrawingShape,
+            x: newX, y: newY, width: Math.abs(w), height: Math.abs(h)
+          });
+        } else {
+          const newX = w < 0 ? startX + w : startX;
+          const newY = h < 0 ? startY + h : startY;
+          const absW = Math.abs(w);
+          const absH = Math.abs(h);
+
+          if (shapeType === 'ellipse') {
+            setTempDrawingShape({
+              ...tempDrawingShape,
+              x: newX + absW / 2, y: newY + absH / 2, radiusX: absW / 2, radiusY: absH / 2
+            } as any);
+          } else {
+            setTempDrawingShape({
+              ...tempDrawingShape,
+              x: newX, y: newY, width: absW, height: absH
+            });
+            if (shapeType === 'rounded_rect') {
+              (tempDrawingShape as any).cornerRadius = 20;
+            }
+          }
+        }
       }
     }
+  }, [activeTool, drawingMode, stageRef, setLines, detectAndEraseLines, tempDrawingShape, setTempDrawingShape]);
+
+  const handleDrawingMouseUp = useCallback(() => {
+    const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse', 'rounded_rect'].includes(activeTool || '');
+    if (activeTool !== "pen" && !isShapeTool) return;
+
+    if (isDrawing.current) {
+      if (activeTool === "pen") {
+        if (drawingMode === "brush") {
+          const lastLine = lines[lines.length - 1];
+          if (lastLine) {
+            addAction({ type: "add-line", line: lastLine });
+          }
+        }
+      } else if (tempDrawingShape) {
+        const finalShape = tempDrawingShape;
+        const shapeType = activeTool as Tool;
+
+        let isValid = true;
+        if (shapeType === 'line' || shapeType === 'arrow') {
+          const pts = (finalShape as any).points;
+          if (pts && pts.length === 4 && pts[0] === pts[2] && pts[1] === pts[3]) isValid = false;
+        } else if (shapeType === 'circle') {
+          if ((finalShape as any).radius < 2) isValid = false;
+        } else {
+          if (!finalShape.width || finalShape.width < 5 || !finalShape.height || finalShape.height < 5) isValid = false;
+        }
+
+        if (isValid) {
+          const { x, y, width, height, points, radius, radiusX, radiusY } = finalShape as any;
+
+          let centerPos = { x: x, y: y };
+          if (shapeType === 'rect' || shapeType === 'rhombus' || shapeType === 'triangle' || shapeType === 'rounded_rect') {
+            centerPos = { x: x + (width || 0) / 2, y: y + (height || 0) / 2 };
+          }
+
+          addShape(shapeType, addAction, centerPos, {
+            width, height, points, radius, radiusX, radiusY,
+            fill: shapeType === 'line' ? 'transparent' : (shapeType === 'arrow' ? 'black' : '#aae3ff')
+          });
+        }
+      }
+    }
+
     isDrawing.current = false;
-    if (drawingMode === "eraser") lastErasedLines.current = [];
-  }, [activeTool, drawingMode, lines, addAction]);
+    setTempDrawingShape(null);
+    if (activeTool === "pen" && drawingMode === "eraser") lastErasedLines.current = [];
+  }, [activeTool, drawingMode, lines, addAction, tempDrawingShape, addShape, setTempDrawingShape]);
 
   // --- ZOOM ---
   const handleZoomIn = useCallback(() => {
@@ -632,14 +767,31 @@ export const useKonvaTools = (
     const sourceShape = shapesRef.current.find(s => s.id === nodeId);
 
     if (!sourceShape) return;
-    const gap = 150;
+
+    // SMART CHANGE: Reduced gap from 150px to 20px (standard padding)
+    const gap = 20;
+
     let newX = (sourceShape as any).x;
     let newY = (sourceShape as any).y;
     const width = (sourceShape as any).width || 100;
     const height = (sourceShape as any).height || 100;
+
     let offsetX = width;
     let offsetY = height;
-    if (sourceShape.type === 'circle') { const r = (sourceShape as any).radius || 50; offsetX = r; offsetY = r; }
+
+    // Fix for Circles (which use center coordinates)
+    // If we want next circle to be adjacent, we need to move: Radius (to edge) + Gap + Radius (to new center)
+    // Current logic uses offsetX = r. So newX += r + gap.
+    // If x is TOP-LEFT of bounding box, then width is correct.
+    // Assuming standard Konva Rect logic for now.
+
+    if (sourceShape.type === 'circle') {
+      const r = (sourceShape as any).radius || 50;
+      // If x,y are center: offsetX needs to be 2*r (diameter) to clear it? 
+      // Use diameter for offset to be safe if we treat it as bounding box move
+      offsetX = r;
+      offsetY = r;
+    }
 
     switch (side) {
       case "right": newX += offsetX + gap; break;
@@ -660,20 +812,28 @@ export const useKonvaTools = (
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     handlePanningMouseDown(e);
     if (activeTool === "select" && !isSpacePressed) handleSelectionStart(e);
-    if (activeTool === "pen") handleDrawingMouseDown(e);
+
+    const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse'].includes(activeTool || '');
+    if (activeTool === "pen" || isShapeTool) handleDrawingMouseDown(e);
   }, [activeTool, handleDrawingMouseDown, handlePanningMouseDown, handleSelectionStart, isSpacePressed]);
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isPanning.current) { handlePanningMouseMove(); return; }
     if (isSelecting.current) handleSelectionMove(e);
-    if (activeTool === "pen") handleDrawingMouseMove(e);
+
+    const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse'].includes(activeTool || '');
+    if (activeTool === "pen" || isShapeTool) handleDrawingMouseMove(e);
+
     handleConnectionMouseMove(e);
   }, [activeTool, handleDrawingMouseMove, handlePanningMouseMove, handleSelectionMove, handleConnectionMouseMove]);
 
   const handleMouseUp = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     handlePanningMouseUp();
     if (isSelecting.current) handleSelectionEnd(e);
-    if (activeTool === "pen") handleDrawingMouseUp();
+
+    const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse', 'rounded_rect'].includes(activeTool || '');
+    if (activeTool === "pen" || isShapeTool) handleDrawingMouseUp();
+
     handleConnectionMouseUp(e);
   }, [activeTool, handleDrawingMouseUp, handlePanningMouseUp, handleSelectionEnd, handleConnectionMouseUp]);
 
@@ -692,9 +852,18 @@ export const useKonvaTools = (
     handleAnchorClick,
     handleShapeMouseEnter,
     isSpacePressed,
-    handleTouchStart: (e: any) => { if (activeTool === 'pen') handleDrawingMouseDown(e) },
-    handleTouchEnd: (e: any) => { if (activeTool === 'pen') handleDrawingMouseUp() },
-    handleTouchMove: (e: any) => { if (activeTool === 'pen') handleDrawingMouseMove(e) },
+    handleTouchStart: (e: any) => {
+      const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse', 'rounded_rect'].includes(activeTool || '');
+      if (activeTool === 'pen' || isShapeTool) handleDrawingMouseDown(e);
+    },
+    handleTouchEnd: (e: any) => {
+      const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse', 'rounded_rect'].includes(activeTool || '');
+      if (activeTool === 'pen' || isShapeTool) handleDrawingMouseUp();
+    },
+    handleTouchMove: (e: any) => {
+      const isShapeTool = ['rect', 'circle', 'triangle', 'rhombus', 'line', 'arrow', 'ellipse', 'rounded_rect'].includes(activeTool || '');
+      if (activeTool === 'pen' || isShapeTool) handleDrawingMouseMove(e);
+    },
 
     // 4. EXPORT GUIDES & SNAP UTILS (For StageComponent)
     guides,

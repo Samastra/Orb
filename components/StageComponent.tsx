@@ -60,6 +60,7 @@ interface StageComponentProps {
   handleAnchorClick: (e: any, nodeId: string, side: Side) => void;
   handleShapeMouseEnter: (id: string) => void;
   tempConnection: Connection | null;
+  tempDrawingShape: KonvaShape | null; // NEW: Ghost Shape
   isSpacePressed?: boolean;
   duplicateShape: (direction: 'top' | 'right' | 'bottom' | 'left', shouldConnect?: boolean) => void;
   onAction?: (action: Action) => void;
@@ -325,11 +326,29 @@ const ShapeRenderer = React.memo(({ item, isSelected, isEditing, setEditingId, u
   }
 
   if (item.__kind === 'konva') {
-    if (item.type === 'triangle') return <Line ref={handleRef} {...commonProps} points={item.points} fill={item.fill} closed={true} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
+    if (item.type === 'line') return <Line ref={handleRef} {...commonProps} points={item.points} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
+
+    if (item.type === 'triangle') {
+      const w = (item.width || 0);
+      const h = (item.height || 0);
+      // Calculate points relative to top-left if not provided or if resizing
+      const pts = [w / 2, 0, w, h, 0, h];
+      return <Line ref={handleRef} {...commonProps} points={pts} fill={item.fill} closed={true} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
+    }
+
+    if (item.type === 'rhombus') {
+      const w = (item.width || 0);
+      const h = (item.height || 0);
+      const pts = [w / 2, 0, w, h / 2, w / 2, h, 0, h / 2];
+      return <Line ref={handleRef} {...commonProps} points={pts} fill={item.fill} closed={true} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
+    }
+
     if (item.type === 'arrow') return <Arrow ref={handleRef} {...commonProps} points={item.points} fill={item.fill} stroke={item.stroke || item.fill} strokeWidth={item.strokeWidth || 2} pointerLength={item.pointerLength || 10} pointerWidth={item.pointerWidth || 10} />;
     if (item.type === 'circle') return <Circle ref={handleRef} {...commonProps} x={item.x} y={item.y} radius={item.radius || 50} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
     if (item.type === 'ellipse') return <Ellipse ref={handleRef} {...commonProps} x={item.x} y={item.y} radiusX={item.radiusX || 80} radiusY={item.radiusY || 50} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} />;
-    return <Rect ref={handleRef} {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} cornerRadius={item.cornerRadius} />;
+
+    // Rect and Rounded Rect
+    return <Rect ref={handleRef} {...commonProps} x={item.x} y={item.y} width={item.width} height={item.height} fill={item.fill} stroke={item.stroke} strokeWidth={item.strokeWidth} cornerRadius={item.type === 'rounded_rect' ? (item.cornerRadius || 20) : (item.cornerRadius || 0)} />;
   }
 
   if (item.__kind === 'react') {
@@ -476,7 +495,7 @@ const StageComponent: React.FC<StageComponentProps> = ({
   setSelectedNodeIds, setReactShapes, setShapes, setImages,
   setStageFrames, updateShape, setStageInstance,
   editingId, setEditingId, onTextCreate,
-  hoveredNodeId, setHoveredNodeId, handleAnchorMouseDown, handleAnchorClick, tempConnection, isSpacePressed = false,
+  hoveredNodeId, setHoveredNodeId, handleAnchorMouseDown, handleAnchorClick, tempConnection, tempDrawingShape, isSpacePressed = false,
   onAction,
   guides,
   getSnappedPosition,
@@ -830,6 +849,29 @@ const StageComponent: React.FC<StageComponentProps> = ({
               listening={false}
             />
           ))}
+
+          {tempDrawingShape && (
+            <ShapeRenderer
+              item={{ ...tempDrawingShape, __kind: 'konva' }}
+              isSelected={false}
+              isEditing={false}
+              setEditingId={() => { }}
+              updateShape={() => { }}
+              setShapeRef={() => { }}
+              onAction={() => { }}
+              draggable={false}
+              onShapeClick={() => { }}
+              onShapeTap={() => { }}
+              onDragStart={() => { }}
+              onDragMove={() => { }}
+              onDragEnd={() => { }}
+              onTransformStart={() => { }}
+              onTransform={() => { }}
+              onTransformEnd={() => { }}
+              onMouseEnter={undefined}
+              onMouseLeave={undefined}
+            />
+          )}
 
           {(() => {
             const selectedNode = selectedNodeIds.length === 1 ? allShapesMap.get(selectedNodeIds[0]) : null;

@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tool } from "../types/board-types";
 import { shapeOptions } from "../constants/tool-constants";
+import DrawingToolsPanel from "./DrawingToolsPanel";
 
 // --- HELPER COMPONENTS ---
 
@@ -171,6 +172,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
     setOrientation(prev => prev === 'vertical' ? 'horizontal' : 'vertical');
   };
 
+  // NEW: State for Drawing Panel
+  const [showDrawingPanel, setShowDrawingPanel] = useState(false);
+
+  // Handle Tool Select from Panel
+  const handlePanelSelect = (tool: Tool, mode?: 'brush' | 'eraser') => {
+    handleToolChange(tool);
+    if (mode) setDrawingMode(mode);
+    // Keep panel open? Or close? User said "from the opened toolbar choose...", usually sticky.
+    // We'll keep it open or let user close it by clicking Pen again.
+  };
+
   return (
     <div
       style={{
@@ -288,43 +300,33 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
         <Divider orientation={orientation} />
 
-        {/* --- GROUP 3: DRAWING --- */}
-        <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
+        {/* --- GROUP 3: DRAWING (ADVANCED PEN) --- */}
+        <div className="relative">
           <ToolbarBtn
-            label="Pen"
-            icon={Pen}
-            isActive={activeTool === "pen" && drawingMode === "brush"}
-            onClick={() => { handleToolChange("pen"); setDrawingMode("brush"); }}
+            label="Drawing Tools"
+            icon={Pen} // Use Pen icon as the "Menu" trigger
+            isActive={['pen', 'line', 'arrow', 'rect', 'circle', 'triangle', 'rhombus', 'connect'].includes(activeTool || '')}
+            onClick={() => setShowDrawingPanel(!showDrawingPanel)}
           />
 
-          <ToolbarBtn
-            label="Eraser"
-            icon={Eraser}
-            isActive={activeTool === "pen" && drawingMode === "eraser"}
-            onClick={() => { handleToolChange("pen"); setDrawingMode("eraser"); }}
-          />
+          {showDrawingPanel && (
+            <DrawingToolsPanel
+              onSelect={handlePanelSelect}
+              activeTool={activeTool}
+              drawingMode={drawingMode}
+              orientation={orientation}
+            />
+          )}
         </div>
 
         <Divider orientation={orientation} />
 
         {/* --- GROUP 4: ADVANCED / HISTORY --- */}
         <div className={cn("flex gap-2", orientation === 'vertical' ? "flex-col" : "flex-row")}>
-
           {/* Undo */}
-          <ToolbarBtn
-            label="Undo (Ctrl+Z)"
-            icon={Undo2}
-            isActive={false}
-            onClick={undo}
-          />
-
+          <ToolbarBtn label="Undo (Ctrl+Z)" icon={Undo2} isActive={false} onClick={undo} />
           {/* Redo */}
-          <ToolbarBtn
-            label="Redo (Ctrl+Y)"
-            icon={Redo2}
-            isActive={false}
-            onClick={redo}
-          />
+          <ToolbarBtn label="Redo (Ctrl+Y)" icon={Redo2} isActive={false} onClick={redo} />
 
           <Divider orientation={orientation} />
 
@@ -338,58 +340,35 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                 </PopoverTrigger>
               </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={15} className="bg-gray-900 text-white border-0 font-medium">
-                Add Frame
-              </TooltipContent>
+              <TooltipContent side="right" sideOffset={15} className="bg-gray-900 text-white border-0 font-medium">Add Frame</TooltipContent>
             </Tooltip>
-
             <PopoverContent side="right" align="start" sideOffset={20} className="w-72 bg-white/95 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-2xl p-4">
               <div className="space-y-4">
                 <div className="space-y-1">
                   <h4 className="font-semibold text-gray-900">Stage Frame</h4>
                   <p className="text-xs text-gray-500">Create a container for your content</p>
                 </div>
-
                 <div className="grid gap-3">
                   <div className="grid grid-cols-3 items-center gap-2">
                     <Label htmlFor="width" className="text-xs font-medium text-gray-500">Width</Label>
                     <div className="col-span-2 relative">
-                      <Input
-                        id="width"
-                        className="h-8 text-sm rounded-md border-gray-200 focus:border-blue-500 pr-8"
-                        value={tempDimensions.width}
-                        onChange={(e) => setTempDimensions(prev => ({ ...prev, width: parseInt(e.target.value) || 0 }))}
-                      />
+                      <Input id="width" className="h-8 text-sm rounded-md border-gray-200 focus:border-blue-500 pr-8" value={tempDimensions.width} onChange={(e) => setTempDimensions(prev => ({ ...prev, width: parseInt(e.target.value) || 0 }))} />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">px</span>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-3 items-center gap-2">
                     <Label htmlFor="height" className="text-xs font-medium text-gray-500">Height</Label>
                     <div className="col-span-2 relative">
-                      <Input
-                        id="height"
-                        className="h-8 text-sm rounded-md border-gray-200 focus:border-blue-500 pr-8"
-                        value={tempDimensions.height}
-                        onChange={(e) => setTempDimensions(prev => ({ ...prev, height: parseInt(e.target.value) || 0 }))}
-                      />
+                      <Input id="height" className="h-8 text-sm rounded-md border-gray-200 focus:border-blue-500 pr-8" value={tempDimensions.height} onChange={(e) => setTempDimensions(prev => ({ ...prev, height: parseInt(e.target.value) || 0 }))} />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">px</span>
                     </div>
                   </div>
-
-                  <Button
-                    onClick={handleApplyStage}
-                    size="sm"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm"
-                  >
-                    Create Frame
-                  </Button>
+                  <Button onClick={handleApplyStage} size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm">Create Frame</Button>
                 </div>
               </div>
             </PopoverContent>
           </Popover>
         </div>
-
       </div>
     </div>
   );

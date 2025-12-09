@@ -12,11 +12,11 @@ export type Action =
   | { type: "add-konva-shape"; shapeType: Tool; data: KonvaShape }
   | { type: "delete-konva-shape"; data: KonvaShape; id: string }
   | {
-      type: "update";
-      id: string;
-      prevAttrs: Konva.NodeConfig;
-      newAttrs: Konva.NodeConfig;
-    }
+    type: "update";
+    id: string;
+    prevAttrs: Konva.NodeConfig;
+    newAttrs: Konva.NodeConfig;
+  }
   | { type: "delete"; node: Konva.Shape | Konva.Group }
   | { type: "delete-react-shape"; data: ReactShape; id: string }
   | { type: "delete-line"; lineIndex: number; data: { tool: 'brush' | 'eraser', points: number[] } }
@@ -50,7 +50,10 @@ export type Tool =
   | "arrow"
   | "circle"
   | "eraser"
-  | "image";
+  | "image"
+  | "line"
+  | "rhombus"
+  | "rounded_rect";
 
 // ---------- Shape Types ----------
 export interface BaseShape {
@@ -110,7 +113,7 @@ export type BoardState = {
   reactShapes: ReactShape[];
   selectedNodeId: string | null;
   drawingMode: 'brush' | 'eraser';
-  lines: Array<{tool: 'brush' | 'eraser', points: number[]}>;
+  lines: Array<{ tool: 'brush' | 'eraser', points: number[] }>;
   stageFrames: KonvaShape[];
   setStageFrames: React.Dispatch<React.SetStateAction<KonvaShape[]>>;
   stageDimensions: { width: number; height: number };
