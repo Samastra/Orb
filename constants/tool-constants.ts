@@ -16,7 +16,10 @@ export const toolIcons: Record<Tool, string> = {
   arrow: "/image/arrow-icon.svg",
   ellipse: "/image/ellipse.svg",
   stage: "/image/rectangle.svg",
-  image: "/image/image-icon.png" // ← ADD THIS LINE
+  image: "/image/image-icon.png",
+  line: "/image/line.svg",
+  rhombus: "/image/rhombus.svg", // Using placeholder, assuming user will add or reuse
+  rounded_rect: "/image/square.svg" // Reusing square for now
 };
 
 export const shapeOptions = [

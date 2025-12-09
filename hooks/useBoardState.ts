@@ -246,15 +246,7 @@ export const useBoardState = () => {
           ...overrides
         };
         break;
-      case "rhombus":
-        newShape = {
-          ...baseShape,
-          width: 100,
-          height: 100,
-          fill: "#aae3ff",
-          ...overrides
-        };
-        break;
+
       default:
         // Generic fallback for other shapes if added
         newShape = {
