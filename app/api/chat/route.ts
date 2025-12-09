@@ -4,8 +4,14 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GOOGLE_AI_KEY;
 
+  // SAFE LOGGING: Log if the key exists and its first 4 chars (masked)
+  const isKeySet = !!apiKey;
+  const maskedKey = isKeySet ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : "UNDEFINED";
+  console.log(`🔑 API Key Status - Exists: ${isKeySet}, Masked: ${maskedKey}`);
+
   if (!apiKey) {
-    return NextResponse.json({ error: "Missing API Key" }, { status: 500 });
+    console.error("❌ CRITICAL: GOOGLE_AI_KEY is missing in process.env");
+    return NextResponse.json({ error: "Missing API Key Configuration" }, { status: 500 });
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -14,10 +20,11 @@ export async function POST(request: NextRequest) {
     const { messages } = await request.json();
 
     if (!messages || !Array.isArray(messages)) {
+      console.error("❌ Invalid format:", messages);
       return NextResponse.json({ error: "Invalid message format" }, { status: 400 });
     }
 
-    // 1. The "Spatial Architect" Persona
+    // 1. The "Spatial Architect" Persona (RESTORED)
     const systemPrompt = `
     You are Orb, the intelligent creative partner inside 'Orblin'. 
     
@@ -47,22 +54,22 @@ export async function POST(request: NextRequest) {
     3. **Structure Chaos:** If they dump text, tell them exactly how to arrange it on the board using Stage Frames and Stickies.
     `;
 
-    // 2. Initialize Model (Gemini 2.0 Flash)
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-2.0-flash", 
+    // 2. Initialize Model (Gemini Flash Latest)
+    const model = genAI.getGenerativeModel({
+      model: "gemini-flash-latest",
       systemInstruction: systemPrompt,
     });
 
-    // 3. Construct History
+    // 3. Construct History (Sliding Window optimization)
     const lastMessage = messages[messages.length - 1];
-    const historyMessages = messages.slice(0, -1);
+    const historyMessages = messages.slice(0, -1).slice(-10);
 
     const history = historyMessages.map((msg: any) => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }],
     }));
 
-    console.log("🤖 Orb (Gemini 2.0) architecting response...");
+    console.log("🤖 Orb (Gemini Flash) architecting response...");
 
     // 4. Start Chat Session
     const chat = model.startChat({
@@ -81,10 +88,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ response: text });
 
   } catch (error: any) {
-    console.error("💥 Chat Error:", error.message);
-    
+    console.error("💥 Chat Error Detail:", {
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause,
+      name: error.name
+    });
+
     return NextResponse.json(
-      { error: "Orb is having trouble connecting. Please try again." },
+      {
+        error: "Orb is having trouble connecting.",
+        details: error.message,
+        debug_key_status: isKeySet ? "Key configured" : "Key missing"
+      },
       { status: 500 }
     );
   }

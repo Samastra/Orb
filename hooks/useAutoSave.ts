@@ -14,20 +14,20 @@ const areEqual = (obj1: unknown, obj2: unknown): boolean => {
   if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 == null || obj2 == null) {
     return obj1 === obj2;
   }
-  
+
   const obj1Record = obj1 as Record<string, unknown>;
   const obj2Record = obj2 as Record<string, unknown>;
-  
+
   const keys1 = Object.keys(obj1Record);
   const keys2 = Object.keys(obj2Record);
   if (keys1.length !== keys2.length) return false;
-  
+
   for (const key of keys1) {
     if (!keys2.includes(key)) return false;
-    
+
     const val1 = obj1Record[key];
     const val2 = obj2Record[key];
-    
+
     if (Array.isArray(val1) && Array.isArray(val2)) {
       if (val1.length !== val2.length) return false;
       for (let i = 0; i < val1.length; i++) {
@@ -121,5 +121,26 @@ export const useAutoSave = (boardId: string, isTemporary: boolean, userId?: stri
     [boardId, isTemporary, userId]
   );
 
-  return { triggerSave };
+  // Ref for loop protection
+  const lastImmediateSaveTimeRef = useRef<number>(0);
+
+  // Wrap the original triggerSave to add protection
+  const safeTriggerSave = useCallback(async (data: any, immediate: boolean = false) => {
+    const now = Date.now();
+    if (immediate && (now - lastImmediateSaveTimeRef.current < 2000)) {
+      console.groupCollapsed("🚫 Auto-save loop detected! Blocking immediate save.");
+      console.warn(`Save blocked. Time since last immediate save: ${now - lastImmediateSaveTimeRef.current}ms`);
+      console.trace("Caller stack trace:");
+      console.groupEnd();
+      return;
+    }
+
+    if (immediate) {
+      lastImmediateSaveTimeRef.current = now;
+    }
+
+    return triggerSave(data, immediate);
+  }, [triggerSave]);
+
+  return { triggerSave: safeTriggerSave };
 };
